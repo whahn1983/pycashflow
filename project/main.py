@@ -92,4 +92,13 @@ def create():
 
     return render_template('create.html')
 
-
+@main.route('/delete')
+@login_required
+def schedule_delete(mid):
+    schedule = Schedule.query.filter_by(id=mid).first()
+    if schedule:
+        msg_text = 'Schedule %s successfully removed' % str(schedule)
+        db.session.delete(schedule)
+        db.session.commit()
+        flash(msg_text)
+    return redirect(url_for('mail.schedule'))
