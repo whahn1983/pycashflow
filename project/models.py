@@ -14,3 +14,11 @@ class Schedule(db.Model):
     amount = db.Column(db.Numeric(10, 2))
     frequency = db.Column(db.String(100))
     startdate = db.Column(db.Date)
+
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'amount': self.amount,
+            'frequency': self.frequency,
+            'startdate': self.startdate,
+        }

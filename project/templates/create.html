@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1 style="width: 100%">{% block title %} Add a New Schedule {% endblock %}</h1>
+    <form method="post">
+        <p>
+            <label for="name">Name</label>
+            <input type="text" name="name"
+                   placeholder="Name">
+            </input>
+        </p>
+
+        <p>
+            <label for="amount">Amount</label>
+            <input type="number" min="0.01" step="0.01" name="amount"
+                   placeholder="Amount">
+            </input>
+        </p>
+
+        <p>
+            <label for="frequency">Frequency</label>
+            <input type="text" name="frequency"
+                   placeholder="Frequency">
+            </input>
+        </p>
+
+        <p>
+            <label for="startdate">Start Date</label>
+            <input type="date" name="startdate"
+                   placeholder="Start Date">
+            </input>
+        </p>
+        <p>
+            <button type="submit">Submit</button>
+        </p>
+    </form>
+{% endblock %}
