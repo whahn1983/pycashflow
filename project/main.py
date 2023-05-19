@@ -1,9 +1,14 @@
-from flask import Flask, render_template, request, abort, redirect, url_for
+from flask import Flask, render_template, request, abort, redirect, url_for, config
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import Schedule
 from . import db
 from datetime import datetime
+import pandas as pd
+import json
+import plotly
+import plotly.express as px
+from sqlalchemy import URL
 
 main = Blueprint('main', __name__)
 
@@ -102,3 +107,19 @@ def schedule_delete(mid):
         db.session.commit()
         flash(msg_text)
     return redirect(url_for('mail.schedule'))
+
+@main.route('/report')
+@login_required
+def report():
+    return render_template('report.html', graphJSON=report_gen())
+
+def report_gen():
+    engine = db.create_engine('sqlite:///instance/db.sqlite').connect()
+
+    df = pd.read_sql('SELECT * FROM schedule;', engine)
+
+    fig = px.line(df, x="startdate", y="amount")
+
+    graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+    return graphJSON
