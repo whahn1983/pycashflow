@@ -2,7 +2,7 @@
 
 {% block content %}
     <h1 style="width: 100%">{% block title %} Add a New Schedule {% endblock %}</h1>
-    <form method="post">
+    <form method="post" style="text-align:center">
         <p>
             <label for="name">Name</label>
             <input type="text" name="name"
@@ -18,10 +18,14 @@
         </p>
 
         <p>
+            <div class="d-flex align-items-center justify-content-center">
             <label for="frequency">Frequency</label>
-            <input type="text" name="frequency"
-                   placeholder="Frequency">
-            </input>
+            <select name="frequency" class="selectpicker form-control" style="width: 150px;">
+                        <option value="Weekly">Weekly</option>
+                        <option value="Monthly">Monthly</option>
+                        <option value="Yearly">Yearly</option>
+            </select>
+            </div>
         </p>
 
         <p>
