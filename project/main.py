@@ -8,7 +8,7 @@ import pandas as pd
 import json
 import plotly
 import plotly.express as px
-from sqlalchemy import URL
+from sqlalchemy import and_, select
 
 main = Blueprint('main', __name__)
 
@@ -68,7 +68,8 @@ def data():
 @main.route('/profile')
 @login_required
 def profile():
-    return render_template('profile.html')
+
+    return render_template('profile.html', name="William Hahn")
 
 @main.route('/schedule')
 @login_required
@@ -102,11 +103,9 @@ def create():
 def schedule_delete(mid):
     schedule = Schedule.query.filter_by(id=mid).first()
     if schedule:
-        msg_text = 'Schedule %s successfully removed' % str(schedule)
         db.session.delete(schedule)
         db.session.commit()
-        flash(msg_text)
-    return redirect(url_for('mail.schedule'))
+    return redirect(url_for('main.schedule'))
 
 @main.route('/report')
 @login_required
