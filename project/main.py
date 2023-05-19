@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, abort, redirect, url_for, config
+from flask import Flask, render_template, request, abort, redirect, url_for, config, send_from_directory
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import Schedule
@@ -8,6 +8,7 @@ import pandas as pd
 import json
 import plotly
 import plotly.express as px
+import os
 from sqlalchemy import and_, select
 
 main = Blueprint('main', __name__)
@@ -122,3 +123,8 @@ def report_gen():
     graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
     return graphJSON
+
+@main.route('/favicon')
+def favicon():
+    return send_from_directory(os.path.join(main.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
