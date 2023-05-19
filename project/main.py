@@ -1,15 +1,19 @@
 from flask import Flask, render_template, request, abort, redirect, url_for, config, send_from_directory
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Balance, Total
+from .models import Schedule, Balance, Total, Running
 from . import db
-from datetime import datetime
+from datetime import datetime, date
 import pandas as pd
 import json
 import plotly
 import plotly.express as px
 import os
 from sqlalchemy import desc, and_, select
+from dateutil.relativedelta import relativedelta
+from natsort import index_natsorted
+import numpy as np
+
 
 main = Blueprint('main', __name__)
 
@@ -18,6 +22,50 @@ main = Blueprint('main', __name__)
 @login_required
 def index():
     balance = Balance.query.order_by(desc(Balance.date)).first()
+
+    db.session.query(Total).delete()
+    db.session.query(Running).delete()
+    db.session.commit()
+    engine = db.create_engine('sqlite:///instance/db.sqlite').connect()
+
+    df = pd.read_sql('SELECT * FROM schedule;', engine)
+
+    for i in range(len(df.index)):
+        format = '%Y-%m-%d'
+        startdate = df['startdate'][i]
+        frequency = df['frequency'][i]
+        amount = df['amount'][i]
+        if frequency == 'Monthly':
+            for k in range(12):
+                futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
+                total = Total(amount=amount, date=futuredate)
+                db.session.add(total)
+        elif frequency == 'Weekly':
+            for k in range(52):
+                futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
+                total = Total(amount=amount, date=futuredate)
+                db.session.add(total)
+        elif frequency == 'Yearly':
+            for k in range(2):
+                futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
+                total = Total(amount=amount, date=futuredate)
+                db.session.add(total)
+    db.session.commit()
+
+    df = pd.read_sql('SELECT * FROM total;', engine)
+    df = df.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(df["date"])))
+
+    runbalance = float(balance.amount)
+    for i in df.iterrows():
+        print(i[1].date)
+        format = '%Y-%m-%d'
+        rundate = i[1].date
+        amount = i[1].amount
+        runbalance += amount
+        running = Running(amount=runbalance, date=datetime.strptime(rundate, format).date())
+        db.session.add(running)
+    db.session.commit()
+
     return render_template('index.html', title='Index', balance=balance.amount)
 
 
@@ -81,6 +129,7 @@ def profile():
 @login_required
 def schedule():
     schedule = Schedule.query
+    print(schedule)
     return render_template('schedule_table.html', title='Schedule Table',
                            schedule=schedule)
 
@@ -106,10 +155,12 @@ def create():
     return render_template('create.html')
 
 
-@main.route('/delete')
+@main.route('/delete/<mid>')
 @login_required
 def schedule_delete(mid):
-    schedule = Schedule.query.filter_by(id=mid).first()
+    print(mid)
+    schedule = Schedule.query.filter_by(name=mid).first()
+
     if schedule:
         db.session.delete(schedule)
         db.session.commit()
@@ -124,9 +175,9 @@ def report():
 def report_gen():
     engine = db.create_engine('sqlite:///instance/db.sqlite').connect()
 
-    df = pd.read_sql('SELECT * FROM schedule;', engine)
-
-    fig = px.line(df, x="startdate", y="amount")
+    df = pd.read_sql('SELECT * FROM running;', engine)
+    df = df.sort_values(by='date', ascending=True)
+    fig = px.line(df, x="date", y="amount")
 
     graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
@@ -145,9 +196,12 @@ def balance():
     format = '%Y-%m-%d'
     if request.method == 'POST':
         amount = request.form['amount']
-        date = request.form['date']
+        dateentry = request.form['date']
+        datetest = datetime.strptime(dateentry, format).date()
+        if datetest > date.today():
+            return redirect(url_for('main.balance'))
         balance = Balance(amount=amount,
-                          date=datetime.strptime(date, format).date())
+                          date=datetime.strptime(dateentry, format).date())
         db.session.add(balance)
         db.session.commit()
 

@@ -12,42 +12,9 @@
     <title>Schedule Table</title>
   </head>
   <body>
-    <div class="hero-head">
-            <nav class="navbar">
-                <div class="container">
-                    <div id="navbarMenuHeroA" class="navbar-menu">
-                        <div class="navbar-end">
-                            <a href="{{ url_for('main.index') }}" class="navbar-item">
-                                Home
-                            </a>
-                            {% if current_user.is_authenticated %}
-                            <a href="{{ url_for('main.profile') }}" class="navbar-item">
-                                Profile
-                            </a>
-                            {% endif %}
-                            {% if not current_user.is_authenticated %}
-                            <a href="{{ url_for('auth.login') }}" class="navbar-item">
-                                Login
-                            </a>
-                            <a href="{{ url_for('auth.signup') }}" class="navbar-item">
-                                Sign Up
-                            </a>
-                            {% endif %}
-                            {% if current_user.is_authenticated %}
-                            <a href="{{ url_for('auth.logout') }}" class="navbar-item">
-                                Logout
-                            </a>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </nav>
-        </div>
-    <div>
       <h1>Schedule Table</h1>
       <hr>
       <div id="table"></div>
-    </div>
     <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
     <script>
       const tableDiv = document.getElementById('table');
@@ -67,11 +34,16 @@
 
       new gridjs.Grid({
         columns: [
-          { id: 'id', 'hidden': true },
+          { id: 'id', hidden : true},
           { id: 'name', name: 'Name' },
           { id: 'amount', name: 'Amount' },
           { id: 'frequency', name: 'Frequency' },
           { id: 'startdate', name: 'Start Date' },
+          {
+            name: 'Buttons',
+            formatter: (_, row) =>
+                    gridjs.html(`<a href="/delete/${row.cells[1].data} ">Delete</a>`)
+          }
         ],
         server: {
           url: '/api/data',
