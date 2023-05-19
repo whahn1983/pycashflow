@@ -8,6 +8,7 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(100))
     name = db.Column(db.String(1000))
 
+
 class Schedule(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100))
@@ -22,3 +23,15 @@ class Schedule(db.Model):
             'frequency': self.frequency,
             'startdate': self.startdate,
         }
+
+
+class Balance(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    amount = db.Column(db.Numeric(10, 2))
+    date = db.Column(db.Date)
+
+
+class Total(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    amount = db.Column(db.Numeric(10, 2))
+    date = db.Column(db.Date)

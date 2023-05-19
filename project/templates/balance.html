@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1 style="width: 100%">{% block title %} Add a New Balance {% endblock %}</h1>
+    <form method="post">
+        <p>
+            <label for="amount">Amount</label>
+            <input type="number" min="0.01" step="0.01" name="amount"
+                   placeholder="Amount">
+            </input>
+        </p>
+
+        <p>
+            <label for="date">Date</label>
+            <input type="date" name="date"
+                   placeholder="Date">
+            </input>
+        </p>
+        <p>
+            <button type="submit">Submit</button>
+        </p>
+    </form>
+{% endblock %}

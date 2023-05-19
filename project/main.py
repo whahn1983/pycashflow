@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, abort, redirect, url_for, config, send_from_directory
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule
+from .models import Schedule, Balance, Total
 from . import db
 from datetime import datetime
 import pandas as pd
@@ -9,14 +9,17 @@ import json
 import plotly
 import plotly.express as px
 import os
-from sqlalchemy import and_, select
+from sqlalchemy import desc, and_, select
 
 main = Blueprint('main', __name__)
+
 
 @main.route('/')
 @login_required
 def index():
-    return render_template('index.html', title='Index')
+    balance = Balance.query.order_by(desc(Balance.date)).first()
+    return render_template('index.html', title='Index', balance=balance.amount)
+
 
 @main.route('/api/data')
 @login_required
@@ -66,11 +69,13 @@ def data():
         'draw': request.args.get('draw', type=int),
     }
 
+
 @main.route('/profile')
 @login_required
 def profile():
 
     return render_template('profile.html', name="William Hahn")
+
 
 @main.route('/schedule')
 @login_required
@@ -78,6 +83,7 @@ def schedule():
     schedule = Schedule.query
     return render_template('schedule_table.html', title='Schedule Table',
                            schedule=schedule)
+
 
 @main.route('/create', methods=('GET', 'POST'))
 @login_required
@@ -99,6 +105,7 @@ def create():
 
     return render_template('create.html')
 
+
 @main.route('/delete')
 @login_required
 def schedule_delete(mid):
@@ -107,6 +114,7 @@ def schedule_delete(mid):
         db.session.delete(schedule)
         db.session.commit()
     return redirect(url_for('main.schedule'))
+
 
 @main.route('/report')
 @login_required
@@ -124,7 +132,25 @@ def report_gen():
 
     return graphJSON
 
+
 @main.route('/favicon')
 def favicon():
     return send_from_directory(os.path.join(main.root_path, 'static'),
                                'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
+
+@main.route('/balance', methods=('GET', 'POST'))
+@login_required
+def balance():
+    format = '%Y-%m-%d'
+    if request.method == 'POST':
+        amount = request.form['amount']
+        date = request.form['date']
+        balance = Balance(amount=amount,
+                          date=datetime.strptime(date, format).date())
+        db.session.add(balance)
+        db.session.commit()
+
+        return redirect(url_for('main.index'))
+
+    return render_template('balance.html')
