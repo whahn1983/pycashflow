@@ -23,49 +23,6 @@ main = Blueprint('main', __name__)
 def index():
     balance = Balance.query.order_by(desc(Balance.date)).first()
 
-    db.session.query(Total).delete()
-    db.session.query(Running).delete()
-    db.session.commit()
-    engine = db.create_engine('sqlite:///instance/db.sqlite').connect()
-
-    df = pd.read_sql('SELECT * FROM schedule;', engine)
-
-    for i in range(len(df.index)):
-        format = '%Y-%m-%d'
-        startdate = df['startdate'][i]
-        frequency = df['frequency'][i]
-        amount = df['amount'][i]
-        if frequency == 'Monthly':
-            for k in range(12):
-                futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
-                total = Total(amount=amount, date=futuredate)
-                db.session.add(total)
-        elif frequency == 'Weekly':
-            for k in range(52):
-                futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
-                total = Total(amount=amount, date=futuredate)
-                db.session.add(total)
-        elif frequency == 'Yearly':
-            for k in range(2):
-                futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
-                total = Total(amount=amount, date=futuredate)
-                db.session.add(total)
-    db.session.commit()
-
-    df = pd.read_sql('SELECT * FROM total;', engine)
-    df = df.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(df["date"])))
-
-    runbalance = float(balance.amount)
-    for i in df.iterrows():
-        print(i[1].date)
-        format = '%Y-%m-%d'
-        rundate = i[1].date
-        amount = i[1].amount
-        runbalance += amount
-        running = Running(amount=runbalance, date=datetime.strptime(rundate, format).date())
-        db.session.add(running)
-    db.session.commit()
-
     return render_template('index.html', title='Index', balance=balance.amount)
 
 
@@ -167,9 +124,74 @@ def schedule_delete(mid):
     return redirect(url_for('main.schedule'))
 
 
-@main.route('/report')
+@main.route('/report', methods=('GET', 'POST'))
 @login_required
 def report():
+    months = 12
+    weeks = 52
+    years = 1
+    yearamount = request.form.get('yearamount')
+    if yearamount == "1":
+        months = 12
+        weeks = 52
+        years = 1
+    if yearamount == "2":
+        months = 24
+        weeks = 104
+        years = 2
+    if yearamount == "3":
+        months = 36
+        weeks = 156
+        years = 3
+    if yearamount == "4":
+        months = 48
+        weeks = 208
+        years = 4
+    balance = Balance.query.order_by(desc(Balance.date)).first()
+
+    db.session.query(Total).delete()
+    db.session.query(Running).delete()
+    db.session.commit()
+    engine = db.create_engine('sqlite:///instance/db.sqlite').connect()
+
+    df = pd.read_sql('SELECT * FROM schedule;', engine)
+
+    for i in range(len(df.index)):
+        format = '%Y-%m-%d'
+        startdate = df['startdate'][i]
+        frequency = df['frequency'][i]
+        amount = df['amount'][i]
+        if frequency == 'Monthly':
+            for k in range(months):
+                futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
+                total = Total(amount=amount, date=futuredate)
+                db.session.add(total)
+        elif frequency == 'Weekly':
+            for k in range(weeks):
+                futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
+                total = Total(amount=amount, date=futuredate)
+                db.session.add(total)
+        elif frequency == 'Yearly':
+            for k in range(years):
+                futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
+                total = Total(amount=amount, date=futuredate)
+                db.session.add(total)
+    db.session.commit()
+
+    df = pd.read_sql('SELECT * FROM total;', engine)
+    df = df.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(df["date"])))
+
+    runbalance = float(balance.amount)
+    for i in df.iterrows():
+        print(i[1].date)
+        format = '%Y-%m-%d'
+        rundate = i[1].date
+        amount = i[1].amount
+        runbalance += amount
+        running = Running(amount=runbalance, date=datetime.strptime(rundate, format).date())
+        db.session.add(running)
+    db.session.commit()
+
     return render_template('report.html', graphJSON=report_gen())
 
 def report_gen():

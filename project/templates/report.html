@@ -2,6 +2,22 @@
 
 {% block content %}
 <head>
+    <form class="form-inline" method="POST" action="{{ url_for('main.report') }}">
+        <div class="form-group">
+            <div class="input-group">
+                <span class="input-group-addon">Select Years</span>
+                    <select name="yearamount" class="selectpicker form-control">
+                        <option value="1">1 Year</option>
+                        <option value="2">2 Years</option>
+                        <option value="3">3 Years</option>
+                        <option value="4">4 Years</option>
+                    </select>
+            </div>
+            <button type="submit" class="btn btn-default">Go</button>
+        </div>
+    </form>
+
+    </select>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script>
