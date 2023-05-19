@@ -1,2 +1,4 @@
 Flask>=2.2.2
 flask-sqlalchemy>=3.0.2
+plotly>=5.14.1
+pandas>=2.0.1
