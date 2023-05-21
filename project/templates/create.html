@@ -1,24 +1,26 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h1 style="width: 100%">{% block title %} Add a New Schedule {% endblock %}</h1>
+    <p align="left">
+    <h1 style="width: 100%". align="left">{% block title %} Add a New Schedule {% endblock %}</h1>
+    </p>
     <form method="post" style="text-align:center">
-        <p>
+        <p align="left">
             <label for="name">Name</label>
             <input type="text" name="name"
                    placeholder="Name">
             </input>
         </p>
 
-        <p>
+        <p align="left">
             <label for="amount">Amount</label>
             <input type="number" step="0.01" name="amount"
                    placeholder="Amount">
             </input>
         </p>
 
-        <p>
-            <div class="d-flex align-items-center justify-content-center">
+        <p align="left">
+            <div class="d-flex align-items-left justify-content-left">
             <label for="frequency">Frequency</label>
             <select name="frequency" class="selectpicker form-control" style="width: 150px;">
                         <option value="Weekly">Weekly</option>
@@ -28,13 +30,13 @@
             </div>
         </p>
 
-        <p>
+        <p align="left">
             <label for="startdate">Start Date</label>
             <input type="date" name="startdate"
                    placeholder="Start Date">
             </input>
         </p>
-        <p>
+        <p align="left">
             <button type="submit">Submit</button>
         </p>
     </form>

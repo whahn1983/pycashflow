@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, abort, redirect, url_for, config, send_from_directory
+from flask import Flask, render_template, request, abort, redirect, url_for, config, send_from_directory, session
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import Schedule, Balance, Total, Running
@@ -79,7 +79,7 @@ def data():
 @login_required
 def profile():
 
-    return render_template('profile.html', name="William Hahn")
+    return render_template('profile.html')
 
 
 @main.route('/schedule')
