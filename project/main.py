@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, abort, redirect, url_for, config, send_from_directory, session
+from flask import Flask, render_template, request, abort, redirect, url_for, config, send_from_directory, flash
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import Schedule, Balance, Total, Running
@@ -21,58 +21,9 @@ main = Blueprint('main', __name__)
 @main.route('/')
 @login_required
 def index():
-    balance = Balance.query.order_by(desc(Balance.date)).first()
+    balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
 
     return render_template('index.html', title='Index', balance=balance.amount)
-
-
-@main.route('/api/data')
-@login_required
-def data():
-    query = Schedule.query
-
-    # search filter
-    search = request.args.get('search[value]')
-    if search:
-        query = query.filter(db.or_(
-            Schedule.name.like(f'%{search}%'),
-            Schedule.amount.like(f'%{search}%'),
-            Schedule.frequency.like(f'%{search}%'),
-            Schedule.startdate.like(f'%{search}%'),
-        ))
-    total_filtered = query.count()
-
-    # sorting
-    order = []
-    i = 0
-    while True:
-        col_index = request.args.get(f'order[{i}][column]')
-        if col_index is None:
-            break
-        col_name = request.args.get(f'columns[{col_index}][data]')
-        if col_name not in ['name', 'amount', 'frequency', 'startdate']:
-            col_name = 'name'
-        descending = request.args.get(f'order[{i}][dir]') == 'desc'
-        col = getattr(Schedule, col_name)
-        if descending:
-            col = col.desc()
-        order.append(col)
-        i += 1
-    if order:
-        query = query.order_by(*order)
-
-    # pagination
-    start = request.args.get('start', type=int)
-    length = request.args.get('length', type=int)
-    query = query.offset(start).limit(length)
-
-    # response
-    return {
-        'data': [schedule.to_dict() for schedule in query],
-        'recordsFiltered': total_filtered,
-        'recordsTotal': Schedule.query.count(),
-        'draw': request.args.get('draw', type=int),
-    }
 
 
 @main.route('/profile')
@@ -86,9 +37,8 @@ def profile():
 @login_required
 def schedule():
     schedule = Schedule.query
-    print(schedule)
-    return render_template('schedule_table.html', title='Schedule Table',
-                           schedule=schedule)
+
+    return render_template('schedule_table.html', title='Schedule Table', schedule=schedule)
 
 
 @main.route('/create', methods=('GET', 'POST'))
@@ -106,21 +56,44 @@ def create():
                           startdate=datetime.strptime(startdate, format).date())
         db.session.add(schedule)
         db.session.commit()
+        flash("Added Successfully")
 
-        return redirect(url_for('main.index'))
+        return redirect(url_for('main.schedule'))
 
     return render_template('create.html')
 
 
-@main.route('/delete/<mid>')
+@main.route('/update', methods=['GET', 'POST'])
 @login_required
-def schedule_delete(mid):
-    print(mid)
-    schedule = Schedule.query.filter_by(name=mid).first()
+def update():
+    format = '%Y-%m-%d'
+
+    if request.method == 'POST':
+        my_data = Schedule.query.get(request.form.get('id'))
+        my_data.name = request.form['name']
+        my_data.amount = request.form['amount']
+        my_data.frequency = request.form['frequency']
+        my_data.startdate = request.form['startdate']
+        startdate = request.form['startdate']
+        my_data.startdate = datetime.strptime(startdate, format).date()
+        db.session.commit()
+        flash("Updated Successfully")
+
+        return redirect(url_for('main.schedule'))
+
+    return redirect(url_for('main.schedule'))
+
+
+@main.route('/delete/<id>')
+@login_required
+def schedule_delete(id):
+    schedule = Schedule.query.filter_by(id=id).first()
 
     if schedule:
         db.session.delete(schedule)
         db.session.commit()
+        flash("Deleted Successfully")
+
     return redirect(url_for('main.schedule'))
 
 
@@ -148,11 +121,13 @@ def report():
         weeks = 208
         years = 4
     balance = Balance.query.order_by(desc(Balance.date)).first()
-
     db.session.query(Total).delete()
     db.session.query(Running).delete()
     db.session.commit()
-    engine = db.create_engine('sqlite:///instance/db.sqlite').connect()
+    try:
+        engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
+    except:
+        engine = db.create_engine('sqlite:///db.sqlite').connect()
 
     df = pd.read_sql('SELECT * FROM schedule;', engine)
 
@@ -183,7 +158,6 @@ def report():
 
     runbalance = float(balance.amount)
     for i in df.iterrows():
-        print(i[1].date)
         format = '%Y-%m-%d'
         rundate = i[1].date
         amount = i[1].amount
@@ -194,12 +168,18 @@ def report():
 
     return render_template('report.html', graphJSON=report_gen())
 
+
 def report_gen():
-    engine = db.create_engine('sqlite:///instance/db.sqlite').connect()
+    try:
+        engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
+    except:
+        engine = db.create_engine('sqlite:///db.sqlite').connect()
 
     df = pd.read_sql('SELECT * FROM running;', engine)
     df = df.sort_values(by='date', ascending=True)
     fig = px.line(df, x="date", y="amount")
+    fig.update_xaxes(title_text='Date')
+    fig.update_yaxes(title_text='Amount')
 
     graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
@@ -219,14 +199,9 @@ def balance():
     if request.method == 'POST':
         amount = request.form['amount']
         dateentry = request.form['date']
-        datetest = datetime.strptime(dateentry, format).date()
-        if datetest > date.today():
-            return redirect(url_for('main.balance'))
         balance = Balance(amount=amount,
                           date=datetime.strptime(dateentry, format).date())
         db.session.add(balance)
         db.session.commit()
 
         return redirect(url_for('main.index'))
-
-    return render_template('balance.html')
