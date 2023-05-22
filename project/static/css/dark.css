@@ -9,7 +9,7 @@ body {
 	font-family: 'Open Sans', sans-serif;
 	line-height: 1.75em;
 	font-size: 16px;
-	background-color: #222;
+	background-color: DimGray;
 	color: #aaa;
 }
 
@@ -69,7 +69,7 @@ hr {
 }
 
 a[href] {
-	color: #1e8ad6;
+	color: white;
 }
 
 a[href]:hover {
@@ -98,3 +98,5 @@ aside,
 		font-size: 18px;
 	}
 }
+
+html {background-color: DimGray}

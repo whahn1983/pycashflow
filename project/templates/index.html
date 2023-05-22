@@ -1,18 +1,53 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1 class="title">
-  PyCashFlow
+<h1 class="title" style="color:white">
   <br/>
   <br/>
-  <p><b>Balance: <button type="button" class="btn btn-success float-center"
+  <p><b style="color:white">Balance: <button type="button" style="font-size : 20px" class="btn btn-success float-center"
                 data-toggle="modal" data-target="#balancemodal">{{ balance }}</button></b></p>
 </h1>
-<h2 class="subtitle">
-<br/>
-</h2>
-<p align="center"><a href=report ><button class='btn btn-primary' style="height:75px;width:150px">Report</button></a></p>
-<p align="center"><a href=schedule ><button class='btn btn-primary' style="height:75px;width:150px">Schedules</button></a></p>
+<head>
+    <form class="form-inline" method="POST" action="{{ url_for('main.index') }}">
+        <div class="form-group">
+            <div class="input-group">
+                <span class="input-group-addon"></span>
+                    <select name="yearamount" class="selectpicker form-control">
+                        <option value="1">1 Year</option>
+                        <option value="2">2 Years</option>
+                        <option value="3">3 Years</option>
+                        <option value="4">4 Years</option>
+                    </select>
+            </div>
+            <button type="submit" class="btn btn-success float-center">Go</button>
+        </div>
+    </form>
+
+    </select>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+        function cb(selection) {
+            $.getJSON({
+                url: "/callback", data: { 'data': selection }, success: function (result) {
+                    Plotly.newPlot('chart', result, {staticPlot: true});;
+                }
+            });
+        }
+    </script>
+</head>
+
+<body style="font-family:arial, sans-serif">
+
+    <div id="chart" class="chart"></div>
+</body>
+
+<script>
+    d = {{ graphJSON | safe }};
+    d.config={responsive: true};
+    Plotly.newPlot('chart', d, {});
+
+</script>
  <div id = "balancemodal" class = "modal fade" role="dialog">
                     <div class = "modal-dialog">
                         <div class="modal-content">
@@ -44,5 +79,4 @@
                         </div>
                     </div>
                 </div>
-
 {% endblock %}

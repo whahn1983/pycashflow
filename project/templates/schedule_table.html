@@ -4,8 +4,8 @@
   <div class = "container">
     <div class = "row">
         <div class="col md-12">
-            <div class = "jumbotron p-3">
-               <h2  style="color:black"><b>Schedule</b>  <button type="button"  class="btn btn-success float-right"
+            <div class = "jumbotron p-3 p-md-5 text-white rounded bg-dark">
+               <h2  style="color:white"><b>Schedule</b>  <button type="button"  class="btn btn-success float-right"
                 data-toggle="modal" data-target="#mymodal">Add New Schedule</button> </h2>
 
                 {% with messages  = get_flashed_messages() %}
@@ -25,13 +25,13 @@
 
                 {% endwith %}
 
-                <table class="table table-hover table-light">
+                <table class="table table-hover table-dark">
                     <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Amount</th>
-                        <th>Frequency</th>
-                        <th>Start Date</th>
+                        <th style="color:white">ID</th>
+                        <th style="color:white">Name</th>
+                        <th style="color:white">Amount</th>
+                        <th style="color:white">Frequency</th>
+                        <th style="color:white">Start Date</th>
                     </tr>
 
                     {% for row in schedule %}

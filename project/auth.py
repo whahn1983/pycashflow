@@ -18,7 +18,7 @@ def login_post():
     remember = True if request.form.get('remember') else False
 
     user = User.query.filter_by(email=email).first()
-    print(user)
+
     # check if the user actually exists
     # take the user-supplied password, hash it, and compare it to the hashed password in the database
     if not user or not check_password_hash(user.password, password):
@@ -29,7 +29,7 @@ def login_post():
     login_user(user, remember=remember)
     session['name'] = user.name
 
-    return redirect(url_for('main.profile'))
+    return redirect(url_for('main.index'))
 
 @auth.route('/signup')
 def signup():
@@ -48,7 +48,7 @@ def signup_post():
         return redirect(url_for('auth.signup'))
 
     # create a new user with the form data. Hash the password so the plaintext version isn't saved.
-    new_user = User(email=email, name=name, password=generate_password_hash(password, method='sha256'))
+    new_user = User(email=email, name=name, password=generate_password_hash(password, method='scrypt'))
 
     # add the new user to the database
     db.session.add(new_user)
