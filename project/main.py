@@ -95,6 +95,10 @@ def index():
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
                 total = Total(amount=amount, date=futuredate)
                 db.session.add(total)
+        elif frequency == 'Onetime':
+            futuredate = datetime.strptime(startdate, format).date()
+            total = Total(amount=amount, date=futuredate)
+            db.session.add(total)
     db.session.commit()
 
     df = pd.read_sql('SELECT * FROM total;', engine)
