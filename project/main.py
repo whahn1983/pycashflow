@@ -1,15 +1,15 @@
-from flask import Flask, render_template, request, abort, redirect, url_for, config, send_from_directory, flash
+from flask import request, redirect, url_for, send_from_directory, flash
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import Schedule, Balance, Total, Running, User, Settings
 from . import db
-from datetime import datetime, date
+from datetime import datetime
 import pandas as pd
 import json
 import plotly
 import plotly.express as px
 import os
-from sqlalchemy import desc, and_, select
+from sqlalchemy import desc
 from dateutil.relativedelta import relativedelta
 from natsort import index_natsorted
 import numpy as np
@@ -27,23 +27,33 @@ def index():
     months = 12
     weeks = 52
     years = 1
+    quarters = 4
+    biweeks = 26
     yearamount = request.form.get('yearamount')
     if yearamount == "1":
         months = 12
         weeks = 52
         years = 1
+        quarters = 4
+        biweeks = 26
     if yearamount == "2":
         months = 24
         weeks = 104
         years = 2
+        quarters = 8
+        biweeks = 52
     if yearamount == "3":
         months = 36
         weeks = 156
         years = 3
+        quarters = 12
+        biweeks = 78
     if yearamount == "4":
         months = 48
         weeks = 208
         years = 4
+        quarters = 16
+        biweeks = 104
     balance = Balance.query.order_by(desc(Balance.date)).first()
     db.session.query(Total).delete()
     db.session.query(Running).delete()
@@ -73,6 +83,16 @@ def index():
         elif frequency == 'Yearly':
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
+                total = Total(amount=amount, date=futuredate)
+                db.session.add(total)
+        elif frequency == 'Quarterly':
+            for k in range(quarters):
+                futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=3 * k)
+                total = Total(amount=amount, date=futuredate)
+                db.session.add(total)
+        elif frequency == 'BiWeekly':
+            for k in range(biweeks):
+                futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
                 total = Total(amount=amount, date=futuredate)
                 db.session.add(total)
     db.session.commit()
