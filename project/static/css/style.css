@@ -30,7 +30,7 @@
 
 /* Add a black background color to the top navigation */
 .topnav1 {
-  background-color: Black;
+  background-color: DarkSlateGrey;
   overflow: hidden;
 }
 
@@ -47,7 +47,7 @@
 
 /* Add an active class to highlight the current page */
 .active {
-  background-color: grey;
+  background-color: DarkCyan;
   color: white;
 }
 

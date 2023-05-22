@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, abort, redirect, url_for, config, send_from_directory, flash
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Balance, Total, Running, User
+from .models import Schedule, Balance, Total, Running, User, Settings
 from . import db
 from datetime import datetime, date
 import pandas as pd
@@ -92,9 +92,10 @@ def index():
 
     df = pd.read_sql('SELECT * FROM running;', engine)
     df = df.sort_values(by='date', ascending=True)
-    fig = px.line(df, x="date", y="amount", template="plotly_dark", title="Cash Flow")
+    fig = px.line(df, x="date", y="amount", template="plotly", title="Cash Flow")
     fig.update_xaxes(title_text='Date')
     fig.update_yaxes(title_text='Amount')
+    fig.update_layout(paper_bgcolor="PaleTurquoise")
 
     graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
@@ -201,6 +202,33 @@ def changepw():
         my_user = User.query.filter_by(id=curr_user).first()
         password = request.form['password']
         my_user.password = generate_password_hash(password, method='scrypt')
+        db.session.commit()
+
+        return redirect(url_for('main.profile'))
+
+    return redirect(url_for('main.profile'))
+
+
+@main.route('/settings', methods=('GET', 'POST'))
+@login_required
+def settings():
+    if request.method == 'POST':
+        signupsettingname = Settings.query.filter_by(name='signup').first()
+
+        if signupsettingname:
+            signupvalue = request.form['signupvalue']
+            print(signupvalue)
+            print(eval(signupvalue))
+            signupsettingname.value = eval(signupvalue)
+            db.session.commit()
+
+            return redirect(url_for('main.profile'))
+
+        signupvalue = request.form['signupvalue']
+        signupvalue = eval(signupvalue)
+        settings = Settings(name="signup",
+                          value=signupvalue)
+        db.session.add(settings)
         db.session.commit()
 
         return redirect(url_for('main.profile'))

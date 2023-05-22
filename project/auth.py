@@ -3,6 +3,8 @@ from flask_login import login_user, login_required, logout_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from .models import User
 from . import db
+import pandas as pd
+import os
 
 auth = Blueprint('auth', __name__)
 
@@ -33,6 +35,19 @@ def login_post():
 
 @auth.route('/signup')
 def signup():
+    try:
+        engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
+    except:
+        engine = db.create_engine('sqlite:///db.sqlite').connect()
+
+    try:
+        df = pd.read_sql('SELECT * FROM settings;', engine)
+
+        if df['value'][0] == 1:
+            return render_template('login.html')
+    except:
+        pass
+
     return render_template('signup.html')
 
 @auth.route('/signup', methods=['POST'])
