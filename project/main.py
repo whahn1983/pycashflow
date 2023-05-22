@@ -2,7 +2,7 @@ from flask import request, redirect, url_for, send_from_directory, flash
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import Schedule, Balance, Total, Running, User, Settings
-from . import db
+from project import db
 from datetime import datetime
 import pandas as pd
 import json

@@ -5,9 +5,11 @@ import secrets
 import os
 from flask_migrate import Migrate
 
+
 # init SQLAlchemy so we can use it later in our models
 db = SQLAlchemy()
 migrate = Migrate()
+
 
 def create_app():
     app = Flask(__name__, static_url_path='/static')
@@ -21,7 +23,6 @@ def create_app():
     'sqlite:///' + os.path.join(basedir, 'db.sqlite')
 
     db.init_app(app)
-
     migrate.init_app(app, db)
 
     login_manager = LoginManager()

@@ -1,5 +1,5 @@
 from flask_login import UserMixin
-from . import db
+from project import db
 
 
 class User(UserMixin, db.Model):
@@ -41,6 +41,7 @@ class Running(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     amount = db.Column(db.Numeric(10, 2))
     date = db.Column(db.Date)
+
 
 class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
