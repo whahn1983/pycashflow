@@ -111,6 +111,7 @@ def index():
 
     df = pd.read_sql('SELECT * FROM total;', engine)
     df = df.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(df["date"])))
+    df = df.groupby("date")['amount'].sum().reset_index()
 
     runbalance = float(balance.amount)
     running = Running(amount=runbalance, date=datetime.today().date())
@@ -126,8 +127,7 @@ def index():
     db.session.commit()
 
     df = pd.read_sql('SELECT * FROM running;', engine)
-    df = df.groupby("date")['amount'].sum().reset_index()
-    df = df.sort_values(by='date', ascending=True)
+    df = df.sort_values(by='date', ascending=False)
     fig = px.line(df, x="date", y="amount", template="plotly", title="Cash Flow")
     fig.update_xaxes(title_text='Date')
     fig.update_yaxes(title_text='Amount')
