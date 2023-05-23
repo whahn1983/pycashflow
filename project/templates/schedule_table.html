@@ -69,8 +69,7 @@
                </div>
                <div class="form-group">
                   <label style="color:black">Frequency:</label>
-                  <select name="frequency" class="selectpicker form-control" style="width: 150px;" required = "True">
-                              <option disabled selected value> -- select an option -- </option>
+                  <select name="frequency" class="selectpicker form-control" style="width: 150px;" data-selected="{{row.frequency}}" required = "True">
                               <option value="Weekly">Weekly</option>
                               <option value="BiWeekly">BiWeekly</option>
                               <option value="Monthly">Monthly</option>
@@ -155,4 +154,8 @@
         </div>
     </div>
 </div>
+<script> document.querySelectorAll('[data-selected]').forEach(e => {
+   e.value = e.dataset.selected
+    });
+</script>
 {% endblock content %}
