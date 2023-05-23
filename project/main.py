@@ -15,6 +15,7 @@ from natsort import index_natsorted
 import numpy as np
 from werkzeug.security import generate_password_hash
 import decimal
+import plotly.graph_objs as go
 
 
 main = Blueprint('main', __name__)
@@ -131,7 +132,11 @@ def index():
     df = df.sort_values(by='date', ascending=False)
     minbalance = df['amount'].min()
     minbalance = decimal.Decimal(str(minbalance)).quantize(decimal.Decimal('.01'))
+    start_date = str(datetime.today().date())
+    end_date = str(datetime.today().date() + relativedelta(months=2))
+    layout = go.Layout(xaxis=dict(range=[start_date, end_date]))
     fig = px.line(df, x="date", y="amount", template="plotly", title="Cash Flow", line_shape="spline")
+    fig.update_layout(layout)
     fig.update_xaxes(title_text='Date')
     fig.update_yaxes(title_text='Amount')
     fig.update_layout(paper_bgcolor="PaleTurquoise")
