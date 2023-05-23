@@ -23,6 +23,13 @@ main = Blueprint('main', __name__)
 @login_required
 def index():
     balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
+    try:
+        balance.amount
+    except:
+        balance = Balance(amount=0,
+                          date=datetime.today())
+        db.session.add(balance)
+        db.session.commit()
 
     months = 12
     weeks = 52
