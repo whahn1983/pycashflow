@@ -61,15 +61,16 @@
                <div class="form-group">
                   <label style="color:black">Name:</label>
                    <input type="hidden"  name="id" value="{{row.id}}">
-                  <input type="text" class="form-control" name="name" value="{{row.name}}">
+                  <input type="text" class="form-control" name="name" value="{{row.name}}" required = "True">
                </div>
                <div class="form-group">
                   <label style="color:black">Amount:</label>
-                  <input type="number" step="0.01" class="form-control" name="amount" value="{{row.amount}}">
+                  <input type="number" step="0.01" class="form-control" name="amount" value="{{row.amount}}" required = "True">
                </div>
                <div class="form-group">
                   <label style="color:black">Frequency:</label>
-                  <select name="frequency" class="selectpicker form-control" style="width: 150px;">
+                  <select name="frequency" class="selectpicker form-control" style="width: 150px;" required = "True">
+                              <option disabled selected value> -- select an option -- </option>
                               <option value="Weekly">Weekly</option>
                               <option value="BiWeekly">BiWeekly</option>
                               <option value="Monthly">Monthly</option>
@@ -80,7 +81,7 @@
                </div>
                <div class="form-group">
                   <label style="color:black">Start Date:</label>
-                  <input type="date" class="form-control" name="startdate" value="{{row.startdate}}">
+                  <input type="date" class="form-control" name="startdate" value="{{row.startdate}}" required = "True">
                </div>
                <div class="form-group">
                   <button class="btn btn-primary" type="submit">Update</button>
@@ -121,7 +122,8 @@
                                     </div>
                                     <div class = "form-group">
                                         <label style="color:black"> Frequency:</label>
-                                        <select name="frequency" class="selectpicker form-control" style="width: 150px;">
+                                        <select name="frequency" class="selectpicker form-control" style="width: 150px;" required = "True">
+                                                    <option disabled selected value> -- select an option -- </option>
                                                     <option value="Weekly">Weekly</option>
                                                     <option value="BiWeekly">BiWeekly</option>
                                                     <option value="Monthly">Monthly</option>
@@ -153,5 +155,4 @@
         </div>
     </div>
 </div>
-
 {% endblock content %}

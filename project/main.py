@@ -83,27 +83,31 @@ def index():
         if frequency == 'Monthly':
             for k in range(months):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
-                total = Total(amount=amount, date=futuredate)
+                if amount > 0:
+                    rollbackdate = datetime.combine(futuredate, datetime.min.time())
+                    total = Total(amount=amount, date=pd.tseries.offsets.BDay(1).rollback(rollbackdate).date())
+                else:
+                    total = Total(amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Weekly':
             for k in range(weeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
-                total = Total(amount=amount, date=futuredate)
+                total = Total(amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Yearly':
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
-                total = Total(amount=amount, date=futuredate)
+                total = Total(amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Quarterly':
             for k in range(quarters):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=3 * k)
-                total = Total(amount=amount, date=futuredate)
+                total = Total(amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'BiWeekly':
             for k in range(biweeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
-                total = Total(amount=amount, date=futuredate)
+                total = Total(amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Onetime':
             futuredate = datetime.strptime(startdate, format).date()
