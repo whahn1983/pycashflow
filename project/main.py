@@ -113,17 +113,21 @@ def index():
     df = df.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(df["date"])))
 
     runbalance = float(balance.amount)
+    running = Running(amount=runbalance, date=datetime.today().date())
+    db.session.add(running)
     for i in df.iterrows():
         format = '%Y-%m-%d'
         rundate = i[1].date
         amount = i[1].amount
-        runbalance += amount
-        running = Running(amount=runbalance, date=datetime.strptime(rundate, format).date())
-        db.session.add(running)
+        if datetime.strptime(rundate, format).date() > datetime.today().date():
+            runbalance += amount
+            running = Running(amount=runbalance, date=datetime.strptime(rundate, format).date())
+            db.session.add(running)
     db.session.commit()
 
     df = pd.read_sql('SELECT * FROM running;', engine)
     df = df.sort_values(by='date', ascending=True)
+    df = df.groupby("date")['amount'].sum().reset_index()
     fig = px.line(df, x="date", y="amount", template="plotly", title="Cash Flow")
     fig.update_xaxes(title_text='Date')
     fig.update_yaxes(title_text='Amount')
