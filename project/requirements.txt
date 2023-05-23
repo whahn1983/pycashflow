@@ -1,5 +1,6 @@
 Flask>=2.2.2
 flask-sqlalchemy>=3.0.2
+Flask-Login>=0.6.2
 plotly>=5.14.1
 pandas>=2.0.1
 numpy>=1.24.3
