@@ -4,8 +4,9 @@
 <h1 class="title" style="color:white">
   <br/>
   <br/>
-  <p><b style="color:white">Balance: <button type="button" style="font-size : 20px" class="btn btn-success float-center"
+  <p style="font-size:20px"><b style="color:white">Balance: <button type="button" style="font-size : 20px" class="btn btn-success float-center"
                 data-toggle="modal" data-target="#balancemodal">{{ balance }}</button></b></p>
+  <p style="font-size:20px">Lowest Balance: <span style="color:white; font-weight:bold">${{ minbalance }}</span></p>
 </h1>
 <head>
     <form class="form-inline" method="POST" action="{{ url_for('main.index') }}">

@@ -14,6 +14,7 @@ from dateutil.relativedelta import relativedelta
 from natsort import index_natsorted
 import numpy as np
 from werkzeug.security import generate_password_hash
+import decimal
 
 
 main = Blueprint('main', __name__)
@@ -128,14 +129,17 @@ def index():
 
     df = pd.read_sql('SELECT * FROM running;', engine)
     df = df.sort_values(by='date', ascending=False)
-    fig = px.line(df, x="date", y="amount", template="plotly", title="Cash Flow")
+    minbalance = df['amount'].min()
+    minbalance = decimal.Decimal(str(minbalance)).quantize(decimal.Decimal('.01'))
+    fig = px.line(df, x="date", y="amount", template="plotly", title="Cash Flow", line_shape="spline")
     fig.update_xaxes(title_text='Date')
     fig.update_yaxes(title_text='Amount')
     fig.update_layout(paper_bgcolor="PaleTurquoise")
 
     graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
-    return render_template('index.html', title='Index', balance=balance.amount, graphJSON=graphJSON)
+    return render_template('index.html', title='Index', balance=balance.amount, minbalance=minbalance,
+                           graphJSON=graphJSON)
 
 
 @main.route('/profile')
