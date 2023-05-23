@@ -23,6 +23,7 @@ main = Blueprint('main', __name__)
 @login_required
 def index():
     balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
+
     try:
         balance.amount
     except:
@@ -61,7 +62,7 @@ def index():
         years = 4
         quarters = 16
         biweeks = 104
-    balance = Balance.query.order_by(desc(Balance.date)).first()
+
     db.session.query(Total).delete()
     db.session.query(Running).delete()
     db.session.commit()
