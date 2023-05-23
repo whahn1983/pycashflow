@@ -77,6 +77,7 @@ def index():
 
     for i in range(len(df.index)):
         format = '%Y-%m-%d'
+        name = df['name'][i]
         startdate = df['startdate'][i]
         frequency = df['frequency'][i]
         amount = df['amount'][i]
@@ -111,8 +112,12 @@ def index():
                 db.session.add(total)
         elif frequency == 'Onetime':
             futuredate = datetime.strptime(startdate, format).date()
-            total = Total(amount=amount, date=futuredate)
-            db.session.add(total)
+            if futuredate < datetime.today().date():
+                onetimeschedule = Schedule.query.filter_by(name=name).first()
+                db.session.delete(onetimeschedule)
+            else:
+                total = Total(amount=amount, date=futuredate)
+                db.session.add(total)
     db.session.commit()
 
     df = pd.read_sql('SELECT * FROM total;', engine)
