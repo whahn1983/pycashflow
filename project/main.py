@@ -1,7 +1,7 @@
 from flask import request, redirect, url_for, send_from_directory, flash
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Balance, Total, Running, User, Settings
+from .models import Schedule, Balance, Total, Running, User, Settings, Transactions
 from project import db
 from datetime import datetime
 import pandas as pd
@@ -67,6 +67,7 @@ def index():
 
     db.session.query(Total).delete()
     db.session.query(Running).delete()
+    db.session.query(Transactions).delete()
     db.session.commit()
     try:
         engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
@@ -86,29 +87,29 @@ def index():
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
                 if amount > 0:
                     rollbackdate = datetime.combine(futuredate, datetime.min.time())
-                    total = Total(amount=amount, date=pd.tseries.offsets.BDay(1).rollback(rollbackdate).date())
+                    total = Total(name=name, amount=amount, date=pd.tseries.offsets.BDay(1).rollback(rollbackdate).date())
                 else:
-                    total = Total(amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
+                    total = Total(name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Weekly':
             for k in range(weeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
-                total = Total(amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
+                total = Total(name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Yearly':
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
-                total = Total(amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
+                total = Total(name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Quarterly':
             for k in range(quarters):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=3 * k)
-                total = Total(amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
+                total = Total(name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'BiWeekly':
             for k in range(biweeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
-                total = Total(amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
+                total = Total(name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Onetime':
             futuredate = datetime.strptime(startdate, format).date()
@@ -116,12 +117,21 @@ def index():
                 onetimeschedule = Schedule.query.filter_by(name=name).first()
                 db.session.delete(onetimeschedule)
             else:
-                total = Total(amount=amount, date=futuredate)
+                total = Total(name=name, amount=amount, date=futuredate)
                 db.session.add(total)
     db.session.commit()
 
     df = pd.read_sql('SELECT * FROM total;', engine)
     df = df.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(df["date"])))
+
+    format = '%Y-%m-%d'
+    for i in df.iterrows():
+        if datetime.today().date() + relativedelta(months=1) > \
+                datetime.strptime(i[1].date, format).date() > datetime.today().date():
+            transactions = Transactions(name=i[1].iloc[3], amount=i[1].amount, date=datetime.strptime(i[1].date, format).date())
+            db.session.add(transactions)
+    db.session.commit()
+
     df = df.groupby("date")['amount'].sum().reset_index()
 
     runbalance = float(balance.amount)
@@ -288,3 +298,11 @@ def settings():
         return redirect(url_for('main.profile'))
 
     return redirect(url_for('main.profile'))
+
+
+@main.route('/transactions')
+@login_required
+def transactions():
+    total = Transactions.query
+
+    return render_template('transactions_table.html', total=total)
