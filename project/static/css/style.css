@@ -82,6 +82,7 @@
   min-width: 160px;
   box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
   z-index: 1;
+  top: 7%;
 }
 
 /* Style the links inside the dropdown */
@@ -111,6 +112,10 @@
   display: block;
 }
 
+.topnav1 a.icon {
+float: right;
+display: none;
+
 /* When the screen is less than 600 pixels wide, hide all links, except for the first one ("Home"). Show the link that contains should open and close the topnav (.icon) */
 @media screen and (max-width: 600px) {
   .topnav1 a:not(:first-child), .dropdown1 .dropbtn {
@@ -131,7 +136,7 @@
   }
   .topnav1.responsive a {
     float: none;
-    display: block;
+    display: inline-block;
     text-align: left;
   }
   .topnav1.responsive .dropdown1 {float: none;}
