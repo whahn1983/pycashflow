@@ -151,9 +151,21 @@ def index():
     df = df.sort_values(by='date', ascending=False)
     minbalance = df['amount'].min()
     minbalance = decimal.Decimal(str(minbalance)).quantize(decimal.Decimal('.01'))
+    if minbalance >= 0:
+        minrange = 0
+    else:
+        minrange = minbalance * 1.1
+    maxbalance = 0
+    for i in df.iterrows():
+        if datetime.today().date() + relativedelta(months=2) > \
+                datetime.strptime(i[1].date, format).date() > datetime.today().date():
+            if i[1].amount > maxbalance:
+                maxbalance = i[1].amount
+    maxrange = maxbalance * 1.1
     start_date = str(datetime.today().date())
     end_date = str(datetime.today().date() + relativedelta(months=2))
-    layout = go.Layout(xaxis=dict(range=[start_date, end_date]), margin=dict(l=5, r=20, t=35, b=5))
+    layout = go.Layout(yaxis=dict(range=[minrange, maxrange]), xaxis=dict(range=[start_date, end_date]),
+                       margin=dict(l=5, r=20, t=35, b=5))
     fig = px.line(df, x="date", y="amount", template="plotly", title="Cash Flow", line_shape="spline")
     fig.update_layout(layout)
     fig.update_xaxes(title_text='Date')
