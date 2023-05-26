@@ -255,6 +255,12 @@ def favicon():
                                'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 
+@main.route('/appleicon')
+def appleicon():
+    return send_from_directory(os.path.join(main.root_path, 'static'),
+                               'apple-touch-icon.png', mimetype='image/png')
+
+
 @main.route('/balance', methods=('GET', 'POST'))
 @login_required
 def balance():
