@@ -15,6 +15,7 @@ class Schedule(db.Model):
     amount = db.Column(db.Numeric(10, 2))
     frequency = db.Column(db.String(100))
     startdate = db.Column(db.Date)
+    type = db.Column(db.String(100))
 
     def to_dict(self):
         return {
@@ -36,6 +37,7 @@ class Total(db.Model):
     amount = db.Column(db.Numeric(10, 2))
     date = db.Column(db.Date)
     name = db.Column(db.String(100))
+    type = db.Column(db.String(100))
 
 
 class Running(db.Model):
@@ -55,3 +57,4 @@ class Transactions(db.Model):
     name = db.Column(db.String(100))
     date = db.Column(db.Date)
     amount = db.Column(db.Numeric(10, 2))
+    type = db.Column(db.String(100))

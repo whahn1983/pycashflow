@@ -9,7 +9,7 @@ import json
 import plotly
 import plotly.express as px
 import os
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from dateutil.relativedelta import relativedelta
 from natsort import index_natsorted
 import numpy as np
@@ -76,48 +76,64 @@ def index():
 
     df = pd.read_sql('SELECT * FROM schedule;', engine)
 
+    #temporary
+    schedulelist = db.session.query(func.max(Schedule.id)).scalar() + 1
+    for i in range(1, schedulelist):
+        schedule = Schedule.query.get(i)
+        try:
+            if schedule.amount < 0:
+                schedule.amount = schedule.amount * -1
+                schedule.type = 'Expense'
+                db.session.commit()
+            elif schedule.amount > 0:
+                schedule.type = 'Income'
+                db.session.commit()
+        except:
+            pass
+
     for i in range(len(df.index)):
         format = '%Y-%m-%d'
         name = df['name'][i]
         startdate = df['startdate'][i]
         frequency = df['frequency'][i]
         amount = df['amount'][i]
+        type = df['type'][i]
         if frequency == 'Monthly':
             for k in range(months):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
                 if amount > 0:
                     rollbackdate = datetime.combine(futuredate, datetime.min.time())
-                    total = Total(name=name, amount=amount, date=pd.tseries.offsets.BDay(1).rollback(rollbackdate).date())
+                    total = Total(type=type, name=name, amount=amount, date=pd.tseries.offsets.BDay(1).rollback(rollbackdate).date())
                 else:
-                    total = Total(name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
+                    total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Weekly':
             for k in range(weeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
-                total = Total(name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
+                total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Yearly':
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
-                total = Total(name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
+                total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Quarterly':
             for k in range(quarters):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=3 * k)
-                total = Total(name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
+                total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'BiWeekly':
             for k in range(biweeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
-                total = Total(name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
+                total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Onetime':
             futuredate = datetime.strptime(startdate, format).date()
             if futuredate < datetime.today().date():
-                onetimeschedule = Schedule.query.filter_by(name=name).first()
+                onetimeschedule = Schedule.query.filter_by(type=type, name=name).first()
                 db.session.delete(onetimeschedule)
             else:
-                total = Total(name=name, amount=amount, date=futuredate)
+                total = Total(type=type, name=name, amount=amount, date=futuredate)
                 db.session.add(total)
     db.session.commit()
 
@@ -128,9 +144,20 @@ def index():
     for i in df.iterrows():
         if datetime.today().date() + relativedelta(months=1) > \
                 datetime.strptime(i[1].date, format).date() > datetime.today().date():
-            transactions = Transactions(name=i[1].iloc[3], amount=i[1].amount, date=datetime.strptime(i[1].date, format).date())
+            transactions = Transactions(name=i[1].iloc[3], type=i[1].type, amount=i[1].amount, date=datetime.strptime(i[1].date, format).date())
             db.session.add(transactions)
     db.session.commit()
+
+    for i in df.iterrows():
+        id = i[1].id
+        amount = i[1].amount
+        type = i[1].type
+        if type == 'Expense':
+            amount = float(amount) * -1
+            df.at[id - 1, 'amount'] = amount
+            print(i[1].amount, i[1].type)
+        elif type == 'Income':
+            pass
 
     df = df.groupby("date")['amount'].sum().reset_index()
 
@@ -202,7 +229,9 @@ def create():
         amount = request.form['amount']
         frequency = request.form['frequency']
         startdate = request.form['startdate']
+        type = request.form['type']
         schedule = Schedule(name=name,
+                          type=type,
                           amount=amount,
                           frequency=frequency,
                           startdate=datetime.strptime(startdate, format).date())
@@ -224,6 +253,7 @@ def update():
         my_data = Schedule.query.get(request.form.get('id'))
         my_data.name = request.form['name']
         my_data.amount = request.form['amount']
+        my_data.type = request.form['type']
         my_data.frequency = request.form['frequency']
         my_data.startdate = request.form['startdate']
         startdate = request.form['startdate']
