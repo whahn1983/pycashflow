@@ -76,21 +76,6 @@ def index():
 
     df = pd.read_sql('SELECT * FROM schedule;', engine)
 
-    #temporary
-    schedulelist = db.session.query(func.max(Schedule.id)).scalar() + 1
-    for i in range(1, schedulelist):
-        schedule = Schedule.query.get(i)
-        try:
-            if schedule.amount < 0:
-                schedule.amount = schedule.amount * -1
-                schedule.type = 'Expense'
-                db.session.commit()
-            elif schedule.amount > 0:
-                schedule.type = 'Income'
-                db.session.commit()
-        except:
-            pass
-
     for i in range(len(df.index)):
         format = '%Y-%m-%d'
         name = df['name'][i]
