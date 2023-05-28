@@ -86,7 +86,7 @@ def index():
         if frequency == 'Monthly':
             for k in range(months):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
-                if amount > 0:
+                if type == 'Income':
                     rollbackdate = datetime.combine(futuredate, datetime.min.time())
                     total = Total(type=type, name=name, amount=amount, date=pd.tseries.offsets.BDay(1).rollback(rollbackdate).date())
                 else:
@@ -115,7 +115,7 @@ def index():
         elif frequency == 'Onetime':
             futuredate = datetime.strptime(startdate, format).date()
             if futuredate < datetime.today().date():
-                onetimeschedule = Schedule.query.filter_by(type=type, name=name).first()
+                onetimeschedule = Schedule.query.filter_by(name=name).first()
                 db.session.delete(onetimeschedule)
             else:
                 total = Total(type=type, name=name, amount=amount, date=futuredate)
