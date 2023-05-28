@@ -71,12 +71,15 @@ for i in range(1, messages + 1):
                     email_content[subject] = body
 
 # formatted for Bank of America email alerts.  Re-format for your bank.
-start_index = email_content['Your Available Balance'].find('Balance: ') + 10
-end_index = email_content['Your Available Balance'].find(' \r\nAccount: ')
-new_balance = float(email_content['Your Available Balance'][start_index:end_index].replace(',', ''))
+try:
+    start_index = email_content['Your Available Balance'].find('Balance: ') + 10
+    end_index = email_content['Your Available Balance'].find(' \r\nAccount: ')
+    new_balance = float(email_content['Your Available Balance'][start_index:end_index].replace(',', ''))
 
-conn.execute("INSERT INTO BALANCE (AMOUNT, DATE) VALUES (?,?)", (str(new_balance), datetime.today().date()))
-conn.commit()
+    conn.execute("INSERT INTO BALANCE (AMOUNT, DATE) VALUES (?,?)", (str(new_balance), datetime.today().date()))
+    conn.commit()
+except:
+    pass
 
 # close the connection and logout
 imap.close()
