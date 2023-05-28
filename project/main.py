@@ -1,7 +1,7 @@
 from flask import request, redirect, url_for, send_from_directory, flash
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Balance, Total, Running, User, Settings, Transactions
+from .models import Schedule, Balance, Total, Running, User, Settings, Transactions, Email
 from project import db
 from datetime import datetime
 import pandas as pd
@@ -339,3 +339,32 @@ def transactions():
     total = Transactions.query
 
     return render_template('transactions_table.html', total=total)
+
+
+@main.route('/email', methods=('GET', 'POST'))
+@login_required
+def email():
+    if request.method == 'POST':
+        emailsettings = Email.query.filter_by(id=1).first()
+
+        if emailsettings:
+            email = request.form['email']
+            password = request.form['password']
+            server = request.form['server']
+            emailsettings.email = email
+            emailsettings.password = password
+            emailsettings.server = server
+            db.session.commit()
+
+            return redirect(url_for('main.profile'))
+
+        email = request.form['email']
+        password = request.form['password']
+        server = request.form['server']
+        emailentry = Email(email=email, password=password, server=server)
+        db.session.add(emailentry)
+        db.session.commit()
+
+        return redirect(url_for('main.profile'))
+
+    return redirect(url_for('main.profile'))

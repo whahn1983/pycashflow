@@ -58,3 +58,10 @@ class Transactions(db.Model):
     date = db.Column(db.Date)
     amount = db.Column(db.Numeric(10, 2))
     type = db.Column(db.String(100))
+
+
+class Email(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), unique=True)
+    password = db.Column(db.String(100))
+    server = db.Column(db.String(100))
