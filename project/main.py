@@ -28,8 +28,13 @@ def index():
 
     try:
         balance.amount
+        if balance.amount:
+            db.session.query(Balance).delete()
+            balance = Balance(amount=balance.amount, date=datetime.today())
+            db.session.add(balance)
+            db.session.commit()
     except:
-        balance = Balance(amount=0,
+        balance = Balance(amount='0',
                           date=datetime.today())
         db.session.add(balance)
         db.session.commit()
@@ -166,7 +171,7 @@ def index():
     if minbalance >= 0:
         minrange = 0
     else:
-        minrange = minbalance * 1.1
+        minrange = float(minbalance) * 1.1
     maxbalance = 0
     for i in df.iterrows():
         if datetime.today().date() + relativedelta(months=2) > \

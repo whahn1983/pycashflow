@@ -41,7 +41,10 @@ for i in range(1, messages + 1):
             subject, encoding = decode_header(msg["Subject"])[0]
             if isinstance(subject, bytes):
                 # if it's a bytes, decode to str
-                subject = subject.decode(encoding)
+                try:
+                    subject = subject.decode(encoding)
+                except:
+                    subject = "subject"
             # decode email sender
             From, encoding = decode_header(msg.get("From"))[0]
             if isinstance(From, bytes):
