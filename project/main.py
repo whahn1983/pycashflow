@@ -145,7 +145,6 @@ def index():
         if type == 'Expense':
             amount = float(amount) * -1
             df.at[id - 1, 'amount'] = amount
-            print(i[1].amount, i[1].type)
         elif type == 'Income':
             pass
 
@@ -319,8 +318,6 @@ def settings():
 
         if signupsettingname:
             signupvalue = request.form['signupvalue']
-            print(signupvalue)
-            print(eval(signupvalue))
             signupsettingname.value = eval(signupvalue)
             db.session.commit()
 
