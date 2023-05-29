@@ -25,7 +25,7 @@ imap = imaplib.IMAP4_SSL(imap_server)
 # authenticate
 imap.login(username, password)
 
-status, messages = imap.select("INBOX")
+status, messages = imap.select("INBOX", readonly=True)
 messages = int(messages[0])
 
 email_content = {}
