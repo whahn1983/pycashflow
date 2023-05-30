@@ -48,7 +48,10 @@ for i in range(1, messages + 1):
             # decode email sender
             From, encoding = decode_header(msg.get("From"))[0]
             if isinstance(From, bytes):
-                From = From.decode(encoding)
+                try:
+                    From = From.decode(encoding)
+                except:
+                    pass
             # if the email message is multipart
             if msg.is_multipart():
                 # iterate over email parts
@@ -63,7 +66,10 @@ for i in range(1, messages + 1):
                         pass
                     if content_type == "text/plain" and "attachment" not in content_disposition:
                         # print text/plain emails and skip attachments
-                        email_content[subject] = body
+                        try:
+                            email_content[subject] = body
+                        except:
+                            pass
             else:
                 # extract content type of email
                 content_type = msg.get_content_type()
@@ -71,7 +77,10 @@ for i in range(1, messages + 1):
                 body = msg.get_payload(decode=True).decode()
                 if content_type == "text/plain":
                     # print only text email parts
-                    email_content[subject] = body
+                    try:
+                        email_content[subject] = body
+                    except:
+                        pass
 
 # formatted for Bank of America email alerts.  Re-format for your bank.
 try:
