@@ -6,6 +6,7 @@ from email.header import decode_header
 from datetime import datetime
 
 
+# connect to the database for email information
 basedir = os.path.abspath(os.path.dirname(__file__))
 sql_database = os.environ.get('DATABASE_URL') or \
     'sqlite:///' + os.path.join(basedir, 'db.sqlite')

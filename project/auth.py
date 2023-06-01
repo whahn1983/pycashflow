@@ -6,11 +6,14 @@ from project import db
 import pandas as pd
 import os
 
+
 auth = Blueprint('auth', __name__)
+
 
 @auth.route('/login')
 def login():
     return render_template('login.html')
+
 
 @auth.route('/login', methods=['POST'])
 def login_post():
@@ -33,6 +36,7 @@ def login_post():
 
     return redirect(url_for('main.index'))
 
+
 @auth.route('/signup')
 def signup():
     try:
@@ -49,6 +53,7 @@ def signup():
         pass
 
     return render_template('signup.html')
+
 
 @auth.route('/signup', methods=['POST'])
 def signup_post():
@@ -71,6 +76,7 @@ def signup_post():
     if user:  # if a user is found, we want to redirect back to signup page so user can try again
         flash('Email address already exists')
     return redirect(url_for('auth.login'))
+
 
 @auth.route('/logout')
 @login_required

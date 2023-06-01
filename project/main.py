@@ -24,6 +24,7 @@ main = Blueprint('main', __name__)
 @main.route('/', methods=('GET', 'POST'))
 @login_required
 def index():
+    # query the latest balance information
     balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
 
     try:
@@ -39,6 +40,7 @@ def index():
         db.session.add(balance)
         db.session.commit()
 
+    # retrieve the number of years for the cash flow plot
     months = 12
     weeks = 52
     years = 1
@@ -70,6 +72,7 @@ def index():
         quarters = 16
         biweeks = 104
 
+    # empty the tables to create fresh data from the schedule
     db.session.query(Total).delete()
     db.session.query(Running).delete()
     db.session.query(Transactions).delete()
@@ -79,8 +82,10 @@ def index():
     except:
         engine = db.create_engine('sqlite:///db.sqlite').connect()
 
+    # pull the schedule information
     df = pd.read_sql('SELECT * FROM schedule;', engine)
 
+    # loop through the schedule and create transactions in a table out to the future number of years
     for i in range(len(df.index)):
         format = '%Y-%m-%d'
         name = df['name'][i]
@@ -127,9 +132,11 @@ def index():
                 db.session.add(total)
     db.session.commit()
 
+    # retrieve the total future transactions
     df = pd.read_sql('SELECT * FROM total;', engine)
     df = df.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(df["date"])))
 
+    # collect the next 60 days of transactions for the transactions table
     format = '%Y-%m-%d'
     for i in df.iterrows():
         if datetime.today().date() + relativedelta(months=1) > \
@@ -138,6 +145,7 @@ def index():
             db.session.add(transactions)
     db.session.commit()
 
+    # for schedules marked as expenses, make the value negative for the sum
     for i in df.iterrows():
         id = i[1].id
         amount = i[1].amount
@@ -148,8 +156,10 @@ def index():
         elif type == 'Income':
             pass
 
+    # group total transactions by date and sum the amounts for each date
     df = df.groupby("date")['amount'].sum().reset_index()
 
+    # loop through the total transactions by date and add the sums to the total balance amount
     runbalance = float(balance.amount)
     running = Running(amount=runbalance, date=datetime.today().date())
     db.session.add(running)
@@ -163,6 +173,7 @@ def index():
             db.session.add(running)
     db.session.commit()
 
+    # plot the running balances by date on a line plot
     df = pd.read_sql('SELECT * FROM running;', engine)
     df = df.sort_values(by='date', ascending=False)
     minbalance = df['amount'].min()
@@ -212,6 +223,7 @@ def schedule():
 @main.route('/create', methods=('GET', 'POST'))
 @login_required
 def create():
+    # create a new schedule item
     format = '%Y-%m-%d'
     if request.method == 'POST':
         name = request.form['name']
@@ -236,6 +248,7 @@ def create():
 @main.route('/update', methods=['GET', 'POST'])
 @login_required
 def update():
+    # update an existing schedule item
     format = '%Y-%m-%d'
 
     if request.method == 'POST':
@@ -258,6 +271,7 @@ def update():
 @main.route('/delete/<id>')
 @login_required
 def schedule_delete(id):
+    # delete a schedule item
     schedule = Schedule.query.filter_by(id=id).first()
 
     if schedule:
@@ -283,6 +297,7 @@ def appleicon():
 @main.route('/balance', methods=('GET', 'POST'))
 @login_required
 def balance():
+    # manually update the balance from the balance button
     format = '%Y-%m-%d'
     if request.method == 'POST':
         amount = request.form['amount']
@@ -298,6 +313,7 @@ def balance():
 @main.route('/changepw', methods=('GET', 'POST'))
 @login_required
 def changepw():
+    # change the users password from the profile page
     if request.method == 'POST':
         curr_user = current_user.id
         my_user = User.query.filter_by(id=curr_user).first()
@@ -313,6 +329,7 @@ def changepw():
 @main.route('/settings', methods=('GET', 'POST'))
 @login_required
 def settings():
+    # set the settings options, in this case disable signups, from the profile page
     if request.method == 'POST':
         signupsettingname = Settings.query.filter_by(name='signup').first()
 
@@ -323,6 +340,7 @@ def settings():
 
             return redirect(url_for('main.profile'))
 
+        # store the signup option value in the database to check when the user clicks signup
         signupvalue = request.form['signupvalue']
         signupvalue = eval(signupvalue)
         settings = Settings(name="signup",
@@ -346,6 +364,7 @@ def transactions():
 @main.route('/email', methods=('GET', 'POST'))
 @login_required
 def email():
+    # set the users email address, password, and server for the auto email balance update
     if request.method == 'POST':
         emailsettings = Email.query.filter_by(id=1).first()
 
