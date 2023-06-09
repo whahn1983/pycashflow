@@ -7,7 +7,7 @@ User=www-data
 WorkingDirectory=[PYCASHFLOW PROGRAM DIRECTORY]
 Environment=FLASK_CONFIG=production
 Environment=DATABASE_URL=sqlite:///[DATABASE FOLDER LOCATION]
-ExecStart=/usr/local/bin/waitress-serve --url-prefix=/project --listen=127.0.0.1:5000 --call project:create_app
+ExecStart=/usr/local/bin/waitress-serve --listen=127.0.0.1:5000 --call app:create_app
 Restart=always
 
 [Install]

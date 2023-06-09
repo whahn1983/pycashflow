@@ -2,14 +2,14 @@ from flask import request, redirect, url_for, send_from_directory, flash
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import Schedule, Balance, Total, Running, User, Settings, Transactions, Email
-from project import db
+from app import db
 from datetime import datetime
 import pandas as pd
 import json
 import plotly
 import plotly.express as px
 import os
-from sqlalchemy import desc, func
+from sqlalchemy import desc
 from dateutil.relativedelta import relativedelta
 from natsort import index_natsorted
 import numpy as np
