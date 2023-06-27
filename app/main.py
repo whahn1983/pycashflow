@@ -9,7 +9,7 @@ import json
 import plotly
 import plotly.express as px
 import os
-from sqlalchemy import desc
+from sqlalchemy import desc, extract, asc
 from dateutil.relativedelta import relativedelta
 from natsort import index_natsorted
 import numpy as np
@@ -215,7 +215,7 @@ def profile():
 @main.route('/schedule')
 @login_required
 def schedule():
-    schedule = Schedule.query
+    schedule = Schedule.query.order_by(asc(extract('day', Schedule.startdate)))
 
     return render_template('schedule_table.html', title='Schedule Table', schedule=schedule)
 
