@@ -142,7 +142,7 @@ def holds_delete(id):
     # delete a hold item
     hold = Hold.query.filter_by(id=id).first()
 
-    if schedule:
+    if hold:
         db.session.delete(hold)
         db.session.commit()
         flash("Deleted Successfully")
