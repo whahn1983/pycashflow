@@ -62,6 +62,13 @@ def upgrade():
     sa.Column('type', sa.String(length=100), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('hold',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('amount', sa.Numeric(precision=10, scale=2), nullable=True),
+    sa.Column('name', sa.String(length=100), nullable=True),
+    sa.Column('type', sa.String(length=100), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('transactions',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=True),
@@ -86,6 +93,7 @@ def downgrade():
     op.drop_table('user')
     op.drop_table('transactions')
     op.drop_table('total')
+    op.drop_table('hold')
     op.drop_table('settings')
     op.drop_table('schedule')
     op.drop_table('running')

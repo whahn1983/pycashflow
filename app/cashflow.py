@@ -101,6 +101,17 @@ def calc_schedule(yearamount):
                 db.session.add(total)
     db.session.commit()
 
+    # add the hold items
+    df = pd.read_sql('SELECT * FROM hold;', engine)
+    for i in range(len(df.index)):
+        format = '%Y-%m-%d'
+        name = df['name'][i]
+        amount = df['amount'][i]
+        type = df['type'][i]
+        total = Total(type=type, name=name, amount=amount, date=datetime.today().date() + relativedelta(days=1))
+        db.session.add(total)
+    db.session.commit()
+
 
 def calc_transactions(balance):
     try:

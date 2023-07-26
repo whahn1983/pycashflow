@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class = "container">
+    <div class = "row">
+        <div class="col md-12">
+            <div style="background:transparent !important" class = "jumbotron p-3 p-md-5 text-white rounded">
+               <h2  style="color:white"><b>Holds</b>
+               <a href = "/clearholds" class="btn btn-danger float-right" style="font-size : 15px"
+                  onclick="return confirm ('Are you sure you want to Delete ?')">Clear Holds</a>
+               </h2>
+
+                {% with messages  = get_flashed_messages() %}
+
+                   {% if messages %}
+                       {% for message in messages %}
+                            <div class="alert alert-success alert-dismissable" role="alert">
+                                <button type="button" class="close" data-dismiss="alert" aria-label="close">
+
+                                    <span aria-hidden="true">x</span>
+                                </button>
+                                {{message }}
+
+                            </div>
+                       {% endfor %}
+                    {% endif %}
+
+                {% endwith %}
+
+                <table style="background-color:DarkSlateGrey" class="table">
+                    <tr>
+                        <th style="display:none;">ID</th>
+                        <th style="color:white">Name</th>
+                        <th style="color:white">Amount</th>
+                        <th style="color:white">Type</th>
+                    </tr>
+
+                    {% for row in hold %}
+                    <tr>
+                        <td style="display:none;">{{row.id}}</td>
+                        <td style="color:white">{{row.name}}</td>
+                        <td style="color:white">{{row.amount}}</td>
+                        <td style="color:white">{{row.type}}</td>
+
+                        <td>
+                             <a href = "/deletehold/{{row.id}}" class="btn btn-danger btn-xs" onclick="return confirm ('Are you sure you want to Delete ?')">Delete</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+
+
+            </div>
+        </div>
+    </div>
+  </div>
+
+{% endblock content %}

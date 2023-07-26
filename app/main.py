@@ -1,7 +1,7 @@
 from flask import request, redirect, url_for, send_from_directory, flash
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Balance, Total, Running, User, Settings, Transactions, Email
+from .models import Schedule, Balance, Total, Running, User, Settings, Transactions, Email, Hold
 from app import db
 from datetime import datetime
 import os
@@ -68,6 +68,14 @@ def schedule():
     return render_template('schedule_table.html', title='Schedule Table', schedule=schedule)
 
 
+@main.route('/holds')
+@login_required
+def holds():
+    hold = Hold.query
+
+    return render_template('holds_table.html', title='Holds Table', hold=hold)
+
+
 @main.route('/create', methods=('GET', 'POST'))
 @login_required
 def create():
@@ -114,6 +122,43 @@ def update():
         return redirect(url_for('main.schedule'))
 
     return redirect(url_for('main.schedule'))
+
+
+@main.route('/addhold/<id>')
+@login_required
+def addhold(id):
+    # add a hold item from the schedule
+    schedule = Schedule.query.filter_by(id=id).first()
+    hold = Hold(name=schedule.name, type=schedule.type, amount=schedule.amount)
+    db.session.add(hold)
+    db.session.commit()
+
+    return redirect(url_for('main.schedule'))
+
+
+@main.route('/deletehold/<id>')
+@login_required
+def holds_delete(id):
+    # delete a hold item
+    hold = Hold.query.filter_by(id=id).first()
+
+    if schedule:
+        db.session.delete(hold)
+        db.session.commit()
+        flash("Deleted Successfully")
+
+    return redirect(url_for('main.holds'))
+
+
+@main.route('/clearholds')
+@login_required
+def clear_holds():
+    # clear holds
+
+    db.session.query(Hold).delete()
+    db.session.commit()
+
+    return redirect(url_for('main.index'))
 
 
 @main.route('/delete/<id>')
