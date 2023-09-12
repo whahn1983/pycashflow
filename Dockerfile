@@ -19,6 +19,6 @@ COPY entry.sh /entry.sh
 RUN chmod +x /getemail.sh /entry.sh
 RUN /usr/bin/crontab /crontab.txt
 
-CMD CMD echo /usr/sbin/crond -f -l 8;echo flask --app app db migrate;echo waitress --listen=127.0.0.1:5000 --call app:create_app
+CMD ["waitress", "--listen=127.0.0.1:5000", "--call", "app:create_app"]
 
 EXPOSE 5000
