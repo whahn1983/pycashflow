@@ -1,1 +1,1 @@
-*/1 * * * * getemail.sh >> /var/log/getemail.log
+*/1 * * * * sh getemail.sh >> /var/log/getemail.log
