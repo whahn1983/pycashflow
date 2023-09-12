@@ -7,4 +7,4 @@
 flask --app app db migrate
 
 #run waitress
-waitress --listen=127.0.0.1:5000 --call app:create_app
+waitress-serve --listen=127.0.0.1:5000 --call app:create_app
