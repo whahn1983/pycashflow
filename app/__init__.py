@@ -20,7 +20,7 @@ def create_app():
     app.config['SECRET_KEY'] = secret
     # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or \
-    'sqlite:///' + os.path.join(basedir, 'db.sqlite')
+    'sqlite:///' + os.path.join(basedir, 'data/db.sqlite')
 
     db.init_app(app)
     migrate.init_app(app, db)
