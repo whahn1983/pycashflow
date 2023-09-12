@@ -21,3 +21,4 @@ RUN /usr/bin/crontab /crontab.txt
 
 CMD ["/entry.sh"]
 
+EXPOSE 5000
