@@ -9,14 +9,10 @@ RUN pip3 install -r requirements.txt
 
 COPY . .
 
-# Give execution rights on the cron script
-RUN chmod 0644 getemail.sh
-
 #Run Cron
 ADD crontab.txt /crontab.txt
-ADD getemail.sh /getemail.sh
 COPY entry.sh /entry.sh
-RUN chmod +x /getemail.sh /entry.sh
+RUN chmod +x /entry.sh
 RUN /usr/bin/crontab /crontab.txt
 
 ENV PYTHONPATH=/app
