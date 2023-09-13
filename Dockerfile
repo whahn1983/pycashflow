@@ -19,6 +19,6 @@ COPY entry.sh /entry.sh
 RUN chmod +x /getemail.sh /entry.sh
 RUN /usr/bin/crontab /crontab.txt
 
-CMD ["/usr/sbin/crond" ; "-f" ; "-l" ; "8" ;  "&&" ; "flask" ; "--app" ; "app" ; "db" ; "migrate" ; "&&" ; "waitress-serve" ; "--listen=127.0.0.1:5000" ; "--call" ; "app:create_app" ; "&"]
+CMD ["/entry.sh"]
 
 EXPOSE 5000
