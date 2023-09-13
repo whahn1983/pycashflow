@@ -19,6 +19,6 @@ COPY entry.sh /entry.sh
 RUN chmod +x /getemail.sh /entry.sh
 RUN /usr/bin/crontab /crontab.txt
 
-CMD ["/entry.sh"]
-
 EXPOSE 5000
+
+CMD ["/entry.sh"]
