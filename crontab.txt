@@ -1,1 +1,1 @@
-*/1 * * * * python3 app/app/getemail.py >> /var/log/getemail.log
+*/1 * * * * python3 /app/app/getemail.py >> /var/log/getemail.log
