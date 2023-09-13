@@ -17,7 +17,9 @@ Python Flask application for future cash flow calculation and management.
 For Docker Support:
 
 docker pull whahn1983/pycashflow:latest
+
 docker run -dp 127.0.0.1:5000:5000 -v /mnt/data:/app/app/data --name pycashflow whahn1983/pycashflow:latest
+
 
 For Local Installation:
 
