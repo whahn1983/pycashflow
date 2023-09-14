@@ -14,12 +14,19 @@ Python Flask application for future cash flow calculation and management.
 ![Screenshot4](https://github.com/whahn1983/pycashflow/assets/7118098/e8dd8ac1-3d9d-46cd-ab8b-f365cb8a1f64)
 ![Screenshot2](https://github.com/whahn1983/pycashflow/assets/7118098/a71b13fb-ec00-4ac1-b3ce-d70ffb6d6cfc)
 
+<br />
+
 For Docker Support:
 
+https://hub.docker.com/r/whahn1983/pycashflow
+```
 docker pull whahn1983/pycashflow:latest
+```
+```
+docker run -d -p 127.0.0.1:5000:5000 -v /mnt/data:/app/app/data --restart always --pull always --name pycashflow whahn1983/pycashflow:latest
+```
 
-docker run -dp 127.0.0.1:5000:5000 -v /mnt/data:/app/app/data --name pycashflow whahn1983/pycashflow:latest
-
+<br />
 
 For Local Installation:
 
