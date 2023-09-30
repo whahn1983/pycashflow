@@ -16,6 +16,9 @@ main = Blueprint('main', __name__)
 @main.route('/', methods=('GET', 'POST'))
 @login_required
 def index():
+    # get today's date
+    todaydate = datetime.today().strftime('%A, %B %d, %Y')
+
     # query the latest balance information
     balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
 
@@ -49,8 +52,8 @@ def index():
     # plot cash flow results
     minbalance, graphJSON = plot_cash()
 
-    return render_template('index.html', title='Index', balance=balance.amount, minbalance=minbalance,
-                           graphJSON=graphJSON)
+    return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
+                           minbalance=minbalance, graphJSON=graphJSON)
 
 
 @main.route('/profile')

@@ -2,8 +2,7 @@
 
 {% block content %}
 <h1 class="title" style="color:white">
-  <br/>
-  <br/>
+  <p style="font-size:20px; float: center; text-align: center"><span style="color:white; font-weight:bold">{{ todaydate }}</span></p>
   <p style="font-size:20px"><b style="color:white">Balance: <button type="button" style="font-size : 20px" class="btn btn-success float-center"
                 data-toggle="modal" data-target="#balancemodal">{{ balance }}</button></b></p>
   <p style="font-size:20px">Lowest Balance: <span style="color:white; font-weight:bold">${{ minbalance }}</span></p>
@@ -41,7 +40,6 @@
 </head>
 
 <body style="font-family:arial, sans-serif">
-
     <div id="chart" class="chart"></div>
 </body>
 
