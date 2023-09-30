@@ -28,6 +28,22 @@ docker run -d -p 127.0.0.1:5000:5000 -v /mnt/data:/app/app/data --restart always
 
 <br />
 
+For proper date management for the calculations, consider mounting the correct local time with 
+```
+-v /etc/localtime:/etc/localtime:ro
+```
+<br />
+
+Also consider mounting the Flask Migrate folder to save your database migration files with 
+
+```
+-v /mnt/migrations:/app/migrations
+```
+
+<br />
+
+<br />
+
 For Local Installation:
 
 To install, clone the git repo onto your server and modify and deploy the .service file for Systemd.  Leverage a WSGI server, like waitress or gunicorn, to run the flask application.  Optionally leverage a reverse proxy with Apache or Nginx to the WSGI server.  To support automatic database migrations, run flask-migrate to generate an initial version configuration.  For the automatic balance updates with email, edit the included bash script for your configuration and set up cron to execute the .py on a regular schedule.  Ensure your email account is properly configured under Profile in the flask application.
