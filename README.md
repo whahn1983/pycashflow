@@ -28,9 +28,17 @@ docker run -d -p 127.0.0.1:5000:5000 -v /mnt/data:/app/app/data --restart always
 
 <br />
 
-For proper date management for the calculations, consider mounting the correct local time with ```-v /etc/localtime:/etc/localtime:ro```
+For proper date management for the calculations, consider mounting the correct local time with 
+```
+-v /etc/localtime:/etc/localtime:ro
+```
 <br />
-Also consider mounting the Flask Migrate folder to save your database migration files with ```-v /mnt/migrations:/app/migrations```
+
+Also consider mounting the Flask Migrate folder to save your database migration files with 
+
+```
+-v /mnt/migrations:/app/migrations
+```
 
 <br />
 
