@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # start cron
-/usr/sbin/crond -f -l 8 > /dev/null 2>&1 & disown
+/usr/sbin/crond -f -l 8 > /dev/null 2>&1 &
 
 #flask migrate
 /usr/local/bin/flask --app app db migrate > /dev/null 2>&1
