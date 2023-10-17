@@ -72,3 +72,6 @@ class Email(db.Model):
     email = db.Column(db.String(100), unique=True)
     password = db.Column(db.String(100))
     server = db.Column(db.String(100))
+    subjectstr = db.Column(db.String(100))
+    startstr = db.Column(db.String(100))
+    endstr = db.Column(db.String(100))

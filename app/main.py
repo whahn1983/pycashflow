@@ -268,9 +268,15 @@ def email():
             email = request.form['email']
             password = request.form['password']
             server = request.form['server']
+            subjectstr = request.form['subject_str']
+            startstr = request.form['start_str']
+            endstr = request.form['end_str']
             emailsettings.email = email
             emailsettings.password = password
             emailsettings.server = server
+            emailsettings.subjectstr = subjectstr
+            emailsettings.startstr = startstr
+            emailsettings.endstr = endstr
             db.session.commit()
 
             return redirect(url_for('main.profile'))
@@ -278,7 +284,11 @@ def email():
         email = request.form['email']
         password = request.form['password']
         server = request.form['server']
-        emailentry = Email(email=email, password=password, server=server)
+        subjectstr = request.form['subject_str']
+        startstr = request.form['start_str']
+        endstr = request.form['end_str']
+        emailentry = Email(email=email, password=password, server=server, subjectstr=subjectstr, startstr=startstr,
+                           endstr=endstr)
         db.session.add(emailentry)
         db.session.commit()
 

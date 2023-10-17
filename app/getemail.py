@@ -14,12 +14,15 @@ sql_database = sql_database[10:]
 
 conn = sqlite3.connect(sql_database)
 
-cursor = conn.execute("SELECT email, password, server from email")
+cursor = conn.execute("SELECT email, password, server, subjectstr, startstr, endstr from email")
 
 for row in cursor:
     username = row[0]
     password = row[1]
     imap_server = row[2]
+    subjectstr = row[3]
+    startstr = row[4]
+    endstr = row[5]
 
 # create an IMAP4 class with SSL
 imap = imaplib.IMAP4_SSL(imap_server)
@@ -86,13 +89,16 @@ for i in range(1, messages + 1):
     except:
         pass
 
-# formatted for Bank of America email alerts.  Re-format for your bank.
+# Find the email by subject and the balance between the start and end strings and write to database
 try:
-    start_index = email_content['Your Available Balance'].find('Balance: ') + 10
-    end_index = email_content['Your Available Balance'].find(' \r\nAccount: ')
-    new_balance = float(email_content['Your Available Balance'][start_index:end_index].replace(',', ''))
+    start_index = email_content[subjectstr].find(startstr) + len(startstr)
+    end_index = email_content[subjectstr].find(endstr)
+    new_balance = email_content[subjectstr][start_index:end_index].replace(',', '')
+    new_balance = new_balance.replace('$', '')
+    new_balance = float(new_balance)
 
-    conn.execute("INSERT INTO BALANCE (AMOUNT, DATE) VALUES (?,?)", (str(new_balance), datetime.today().date()))
+    conn.execute("INSERT INTO BALANCE (AMOUNT, DATE) VALUES (?,?)", (str(new_balance),
+                                                                     datetime.today().date()))
     conn.commit()
 except:
     pass

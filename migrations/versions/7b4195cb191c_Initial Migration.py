@@ -29,6 +29,9 @@ def upgrade():
     sa.Column('email', sa.String(length=100), nullable=True),
     sa.Column('password', sa.String(length=100), nullable=True),
     sa.Column('server', sa.String(length=100), nullable=True),
+    sa.Column('subjectstr', sa.String(length=100), nullable=True),
+    sa.Column('startstr', sa.String(length=100), nullable=True),
+    sa.Column('endstr', sa.String(length=100), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('running',
