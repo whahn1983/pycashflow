@@ -95,6 +95,10 @@ def create():
                           amount=amount,
                           frequency=frequency,
                           startdate=datetime.strptime(startdate, format).date())
+        existing = Schedule.query.filter_by(name=name).first()
+        if existing:
+            flash("Schedule already exists")
+            return redirect(url_for('main.schedule'))
         db.session.add(schedule)
         db.session.commit()
         flash("Added Successfully")
