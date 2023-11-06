@@ -15,6 +15,8 @@ COPY entry.sh /entry.sh
 RUN chmod +x /entry.sh
 RUN /usr/bin/crontab /crontab.txt
 
+RUN apk --no-cache add curl
+
 ENV PYTHONPATH=/app
 ENV DATABASE_URL=sqlite:////app/app/data/db.sqlite
 
