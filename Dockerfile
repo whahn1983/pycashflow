@@ -18,6 +18,8 @@ RUN /usr/bin/crontab /crontab.txt
 ENV PYTHONPATH=/app
 ENV DATABASE_URL=sqlite:////app/app/data/db.sqlite
 
+HEALTHCHECK CMD curl --fail http://localhost:5000
+
 EXPOSE 5000
 
 CMD ["/entry.sh"]
