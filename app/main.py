@@ -1,4 +1,4 @@
-from flask import request, redirect, url_for, send_from_directory, flash
+from flask import request, redirect, url_for, send_from_directory, flash, send_file
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import Schedule, Balance, Total, Running, User, Settings, Transactions, Email, Hold
@@ -299,3 +299,13 @@ def email():
         return redirect(url_for('main.profile'))
 
     return redirect(url_for('main.profile'))
+
+
+@main.route('/manifest.json')
+def serve_manifest():
+    return send_file('manifest.json', mimetype='application/manifest+json')
+
+
+@main.route('/sw.js')
+def serve_sw():
+    return send_file('sw.js', mimetype='application/javascript')

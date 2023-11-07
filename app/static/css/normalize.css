@@ -418,10 +418,11 @@ optgroup {
 
 table {
   border-collapse: collapse;
-  border-spacing: 0;
+  border-spacing: 15px;
 }
 
 td,
 th {
-  padding: 0;
+  padding: 15px;
+  padding-left: 15px;
 }

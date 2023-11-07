@@ -6,8 +6,9 @@
         <div class="col md-12">
             <div style="background:transparent !important" class = "jumbotron p-3 p-md-5 text-white rounded">
                 <h2  style="color:white"><b>Transactions</b></h2>
-                <table style="background-color:DarkSlateGrey" class="table table-hover">
+                <table style="background-color:DarkSlateGrey" class="table table-hover" border="2">
                     <tr>
+                        <th style="display:none;">ID</th>
                         <th style="color:white">Name</th>
                         <th style="color:white">Date</th>
                         <th style="color:white">Type</th>
@@ -16,6 +17,7 @@
 
                     {% for row in total %}
                     <tr>
+                        <td style="display:none;">{{row.id}}</td>
                         <td style="color:white">{{row.name}}</td>
                         <td style="color:white">{{row.date}}</td>
                         <td style="color:white">{{row.type}}</td>

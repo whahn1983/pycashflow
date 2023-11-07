@@ -14,16 +14,19 @@ body {
 }
 
 table {
-    background-color:DarkSlateGrey
+    background-color:DarkSlateGrey;
     padding: 15px;
+	left: 15px;
+	box-shadow: inset 5px -10px 25px, 5px 5px 5px;
+	margin: 20px 30px;
 }
 th{
-     background-color:white
     padding: 15px;
+	padding-left: 15px;
 }
 tr{
-     background-color:white
     padding: 15px;
+	padding-left: 15px;
 }
 
 .modal-content {
