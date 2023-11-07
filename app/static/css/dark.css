@@ -19,6 +19,9 @@ table {
 	left: 15px;
 	box-shadow: inset 5px -10px 25px, 5px 5px 5px;
 	margin: 20px 30px;
+	margin-left: auto;
+  	margin-right: auto;
+	overflow: scroll;
 }
 th{
     padding: 15px;

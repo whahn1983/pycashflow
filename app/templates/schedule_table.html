@@ -5,8 +5,7 @@
     <div class = "row">
         <div class="col md-12">
             <div style="background:transparent !important" class = "jumbotron p-3 p-md-5 text-white rounded">
-               <h2  style="color:white"><b>Schedules</b>  <button type="button"  class="btn btn-success float-right"
-                data-toggle="modal" data-target="#mymodal">Add New Schedule</button> </h2>
+               <h2  style="color:white"><b>Schedules</b>  </h2>
 
                 {% with messages  = get_flashed_messages() %}
 
@@ -33,6 +32,10 @@
                         <th style="color:white">Type</th>
                         <th style="color:white">Frequency</th>
                         <th style="color:white">Start Date</th>
+                        <th>
+                             <button type="button"  class="btn btn-success float-center"
+                                    data-toggle="modal" data-target="#mymodal">Add New</button>
+                        </th>
                     </tr>
 
                     {% for row in schedule %}
