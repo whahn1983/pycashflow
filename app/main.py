@@ -115,6 +115,10 @@ def update():
     format = '%Y-%m-%d'
 
     if request.method == 'POST':
+        existing = Schedule.query.filter_by(name=request.form['name']).first()
+        if existing:
+            flash("Schedule already exists")
+            return redirect(url_for('main.schedule'))
         my_data = Schedule.query.get(request.form.get('id'))
         my_data.name = request.form['name']
         my_data.amount = request.form['amount']
