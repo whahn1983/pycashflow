@@ -22,6 +22,9 @@
                         <td style="color:white">{{row.date}}</td>
                         <td style="color:white">{{row.type}}</td>
                         <td style="color:white">{{row.amount}}</td>
+                        <td>
+                            <a href = "/addskip/{{row.id}}" class="btn btn-success btn-xs">Skip</a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </table>

@@ -1,7 +1,7 @@
 from flask import request, redirect, url_for, send_from_directory, flash, send_file
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Balance, Total, Running, User, Settings, Transactions, Email, Hold
+from .models import Schedule, Balance, Total, Running, User, Settings, Transactions, Email, Hold, Skip
 from app import db
 from datetime import datetime
 import os
@@ -75,8 +75,9 @@ def schedule():
 @login_required
 def holds():
     hold = Hold.query
+    skip = Skip.query
 
-    return render_template('holds_table.html', title='Holds Table', hold=hold)
+    return render_template('holds_table.html', title='Holds Table', hold=hold, skip=skip)
 
 
 @main.route('/create', methods=('GET', 'POST'))
@@ -147,6 +148,23 @@ def addhold(id):
     return redirect(url_for('main.schedule'))
 
 
+@main.route('/addskip/<id>')
+@login_required
+def addskip(id):
+    # add a skip item from the schedule
+    transaction = Transactions.query.filter_by(id=id).first()
+    trans_type = ""
+    if transaction.type == "Expense":
+        trans_type = "Income"
+    elif transaction.type == "Income":
+        trans_type = "Expense"
+    skip = Skip(name=transaction.name + " (SKIP)", type=trans_type, amount=transaction.amount, date=transaction.date)
+    db.session.add(skip)
+    db.session.commit()
+
+    return redirect(url_for('main.transactions'))
+
+
 @main.route('/deletehold/<id>')
 @login_required
 def holds_delete(id):
@@ -161,12 +179,37 @@ def holds_delete(id):
     return redirect(url_for('main.holds'))
 
 
+@main.route('/deleteskip/<id>')
+@login_required
+def skips_delete(id):
+    # delete a skip item
+    skip = Skip.query.filter_by(id=id).first()
+
+    if skip:
+        db.session.delete(skip)
+        db.session.commit()
+        flash("Deleted Successfully")
+
+    return redirect(url_for('main.holds'))
+
+
 @main.route('/clearholds')
 @login_required
 def clear_holds():
     # clear holds
 
     db.session.query(Hold).delete()
+    db.session.commit()
+
+    return redirect(url_for('main.index'))
+
+
+@main.route('/clearskips')
+@login_required
+def clear_skips():
+    # clear skips
+
+    db.session.query(Skip).delete()
     db.session.commit()
 
     return redirect(url_for('main.index'))

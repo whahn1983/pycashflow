@@ -47,6 +47,14 @@ class Hold(db.Model):
     type = db.Column(db.String(100))
 
 
+class Skip(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100))
+    date = db.Column(db.Date)
+    amount = db.Column(db.Numeric(10, 2))
+    type = db.Column(db.String(100))
+
+
 class Running(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     amount = db.Column(db.Numeric(10, 2))

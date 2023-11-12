@@ -48,7 +48,32 @@
                     </tr>
                     {% endfor %}
                 </table>
+                <br>
+                <h2  style="color:white"><b>Skips</b> </h2>
+                <table style="background-color:DarkSlateGrey" class="table  table-hover" border="2">
+                    <tr>
+                        <th style="display:none;">ID</th>
+                        <th style="color:white">Name</th>
+                        <th style="color:white">Amount</th>
+                        <th style="color:white">Date</th>
+                        <th> <a href = "/clearskips" class="btn btn-danger float-center" style="font-size : 10px"
+                                onclick="return confirm ('Are you sure you want to Delete ?')">Clear Skips</a>
+                        </th>
+                    </tr>
 
+                    {% for row in skip %}
+                    <tr>
+                        <td style="display:none;">{{row.id}}</td>
+                        <td style="color:white">{{row.name}}</td>
+                        <td style="color:white">{{row.amount}}</td>
+                        <td style="color:white">{{row.date}}</td>
+
+                        <td>
+                             <a href = "/deleteskip/{{row.id}}" class="btn btn-danger btn-xs" onclick="return confirm ('Are you sure you want to Delete ?')">Delete</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
 
             </div>
         </div>

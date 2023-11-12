@@ -112,6 +112,18 @@ def calc_schedule(yearamount):
         db.session.add(total)
     db.session.commit()
 
+    # add the skip items
+    df = pd.read_sql('SELECT * FROM skip;', engine)
+    for i in range(len(df.index)):
+        format = '%Y-%m-%d'
+        name = df['name'][i]
+        amount = df['amount'][i]
+        type = df['type'][i]
+        date = df['date'][i]
+        total = Total(type=type, name=name, amount=amount, date=datetime.strptime(date, format).date())
+        db.session.add(total)
+    db.session.commit()
+
 
 def calc_transactions(balance):
     try:
@@ -126,8 +138,8 @@ def calc_transactions(balance):
     # collect the next 60 days of transactions for the transactions table
     format = '%Y-%m-%d'
     for i in df.iterrows():
-        if datetime.today().date() + relativedelta(months=1) > \
-                datetime.strptime(i[1].date, format).date() > datetime.today().date():
+        if datetime.today().date() + relativedelta(months=2) > \
+                datetime.strptime(i[1].date, format).date() > datetime.today().date() and "(SKIP)" not in i[1].iloc[3]:
             transactions = Transactions(name=i[1].iloc[3], type=i[1].type, amount=i[1].amount,
                                         date=datetime.strptime(i[1].date, format).date())
             db.session.add(transactions)

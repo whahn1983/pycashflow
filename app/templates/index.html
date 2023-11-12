@@ -8,6 +8,8 @@
   <p style="font-size:20px">Lowest Balance: <span style="color:white; font-weight:bold">${{ minbalance }}</span></p>
     <a href = "/clearholds" class="btn btn-danger float-right" style="font-size : 15px; float : right"
           onclick="return confirm ('Are you sure you want to Delete ?')">Clear Holds</a>
+    <a href = "/clearskips" class="btn btn-danger float-right" style="font-size : 15px; float : right"
+          onclick="return confirm ('Are you sure you want to Delete ?')">Clear Skips</a>
 </h1>
 <head>
     <form class="form-inline" method="POST" action="{{ url_for('main.index') }}">
