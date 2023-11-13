@@ -12,7 +12,8 @@ Python Flask application for future cash flow calculation and management.
 * Plot future cash flow out to up to 4 years
 * Enable reading emails via IMAP to search for balance alerts from bank to automatically update balance
 
-![screenshot](https://github.com/whahn1983/pycashflow/assets/7118098/a404660e-e89a-41bf-9494-28387f89774b)
+
+![screenshot](https://github.com/whahn1983/pycashflow/assets/7118098/d1ac3862-1ed0-4ebd-886e-a2cdb5f42eb5)
 
 
 <br />
