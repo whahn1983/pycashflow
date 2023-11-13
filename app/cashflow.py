@@ -1,5 +1,5 @@
 from app import db
-from .models import Schedule, Total, Running, Transactions
+from .models import Schedule, Total, Running, Transactions, Skip
 from datetime import datetime
 import pandas as pd
 import json
@@ -13,37 +13,12 @@ import decimal
 import plotly.graph_objs as go
 
 
-def calc_schedule(yearamount):
-    months = 12
-    weeks = 52
-    years = 1
-    quarters = 4
-    biweeks = 26
-
-    if yearamount == "1":
-        months = 12
-        weeks = 52
-        years = 1
-        quarters = 4
-        biweeks = 26
-    if yearamount == "2":
-        months = 24
-        weeks = 104
-        years = 2
-        quarters = 8
-        biweeks = 52
-    if yearamount == "3":
-        months = 36
-        weeks = 156
-        years = 3
-        quarters = 12
-        biweeks = 78
-    if yearamount == "4":
-        months = 48
-        weeks = 208
-        years = 4
-        quarters = 16
-        biweeks = 104
+def calc_schedule():
+    months = 49
+    weeks = 209
+    years = 5
+    quarters = 17
+    biweeks = 105
 
     try:
         engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
@@ -64,6 +39,9 @@ def calc_schedule(yearamount):
         if frequency == 'Monthly':
             for k in range(months):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
+                if futuredate <= datetime.today().date():
+                    existing = Schedule.query.filter_by(name=name).first()
+                    existing.startdate = futuredate
                 if type == 'Income':
                     rollbackdate = datetime.combine(futuredate, datetime.min.time())
                     total = Total(type=type, name=name, amount=amount,
@@ -74,21 +52,33 @@ def calc_schedule(yearamount):
         elif frequency == 'Weekly':
             for k in range(weeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
+                if futuredate <= datetime.today().date():
+                    existing = Schedule.query.filter_by(name=name).first()
+                    existing.startdate = futuredate
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Yearly':
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
+                if futuredate <= datetime.today().date():
+                    existing = Schedule.query.filter_by(name=name).first()
+                    existing.startdate = futuredate
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Quarterly':
             for k in range(quarters):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=3 * k)
+                if futuredate <= datetime.today().date():
+                    existing = Schedule.query.filter_by(name=name).first()
+                    existing.startdate = futuredate
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'BiWeekly':
             for k in range(biweeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
+                if futuredate <= datetime.today().date():
+                    existing = Schedule.query.filter_by(name=name).first()
+                    existing.startdate = futuredate
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Onetime':
@@ -120,8 +110,12 @@ def calc_schedule(yearamount):
         amount = df['amount'][i]
         type = df['type'][i]
         date = df['date'][i]
-        total = Total(type=type, name=name, amount=amount, date=datetime.strptime(date, format).date())
-        db.session.add(total)
+        if datetime.strptime(date, format).date() < datetime.today().date():
+            skip = Skip.query.filter_by(name=name).first()
+            db.session.delete(skip)
+        else:
+            total = Total(type=type, name=name, amount=amount, date=datetime.strptime(date, format).date())
+            db.session.add(total)
     db.session.commit()
 
 

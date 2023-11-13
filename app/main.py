@@ -40,11 +40,8 @@ def index():
     db.session.query(Transactions).delete()
     db.session.commit()
 
-    # retrieve the number of years for the cash flow plot
-    yearamount = request.form.get('yearamount')
-
     # calculate total events for the year amount
-    calc_schedule(yearamount)
+    calc_schedule()
 
     # calculate sum of running transactions
     calc_transactions(balance)
