@@ -14,11 +14,11 @@ import plotly.graph_objs as go
 
 
 def calc_schedule():
-    months = 49
-    weeks = 209
-    years = 5
-    quarters = 17
-    biweeks = 105
+    months = 13
+    weeks = 53
+    years = 2
+    quarters = 5
+    biweeks = 27
 
     try:
         engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
