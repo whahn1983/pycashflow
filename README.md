@@ -8,10 +8,12 @@ Python Flask application for future cash flow calculation and management.
 * Ability to manually set updated balance for the day
 * List upcoming transactions (expenses/incomes) for next 60 days
 * Hold transactions that have not yet posted on schedule
+* Skip a future transaction from the transactions table
 * Plot future cash flow out to up to 4 years
 * Enable reading emails via IMAP to search for balance alerts from bank to automatically update balance
 
-![screenshot](https://github.com/whahn1983/pycashflow/assets/7118098/a404660e-e89a-41bf-9494-28387f89774b)
+
+![screenshot](https://github.com/whahn1983/pycashflow/assets/7118098/d1ac3862-1ed0-4ebd-886e-a2cdb5f42eb5)
 
 
 <br />
