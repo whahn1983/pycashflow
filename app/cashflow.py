@@ -16,8 +16,8 @@ import plotly.graph_objs as go
 def calc_schedule():
     months = 13
     weeks = 53
-    years = 2
-    quarters = 5
+    years = 1
+    quarters = 4
     biweeks = 27
 
     try:
@@ -41,7 +41,7 @@ def calc_schedule():
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
                 if futuredate <= datetime.today().date():
                     existing = Schedule.query.filter_by(name=name).first()
-                    existing.startdate = futuredate
+                    existing.startdate = futuredate + relativedelta(months=1)
                 if type == 'Income':
                     rollbackdate = datetime.combine(futuredate, datetime.min.time())
                     total = Total(type=type, name=name, amount=amount,
@@ -54,7 +54,7 @@ def calc_schedule():
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
                 if futuredate <= datetime.today().date():
                     existing = Schedule.query.filter_by(name=name).first()
-                    existing.startdate = futuredate
+                    existing.startdate = futuredate + relativedelta(weeks=1)
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Yearly':
@@ -62,7 +62,7 @@ def calc_schedule():
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
                 if futuredate <= datetime.today().date():
                     existing = Schedule.query.filter_by(name=name).first()
-                    existing.startdate = futuredate
+                    existing.startdate = futuredate + relativedelta(years=1)
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Quarterly':
@@ -70,7 +70,7 @@ def calc_schedule():
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=3 * k)
                 if futuredate <= datetime.today().date():
                     existing = Schedule.query.filter_by(name=name).first()
-                    existing.startdate = futuredate
+                    existing.startdate = futuredate + relativedelta(months=3)
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'BiWeekly':
@@ -78,7 +78,7 @@ def calc_schedule():
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
                 if futuredate <= datetime.today().date():
                     existing = Schedule.query.filter_by(name=name).first()
-                    existing.startdate = futuredate
+                    existing.startdate = futuredate + relativedelta(weeks=2)
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Onetime':
