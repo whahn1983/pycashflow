@@ -113,10 +113,12 @@ def update():
     format = '%Y-%m-%d'
 
     if request.method == 'POST':
+        current = Schedule.query.filter_by(id=request.form['id']).first()
         existing = Schedule.query.filter_by(name=request.form['name']).first()
         if existing:
-            flash("Schedule already exists")
-            return redirect(url_for('main.schedule'))
+            if current.name != request.form['name']:
+                flash("Schedule name already exists")
+                return redirect(url_for('main.schedule'))
         my_data = Schedule.query.get(request.form.get('id'))
         my_data.name = request.form['name']
         my_data.amount = request.form['amount']
