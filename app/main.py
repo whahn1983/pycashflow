@@ -200,7 +200,7 @@ def clear_holds():
     db.session.query(Hold).delete()
     db.session.commit()
 
-    return redirect(url_for('main.index'))
+    return redirect(url_for('main.holds'))
 
 
 @main.route('/clearskips')
