@@ -30,6 +30,12 @@ def login_post():
         flash('Please check your login details and try again.')
         return redirect(url_for('auth.login')) # if the user doesn't exist or password is wrong, reload the page
 
+    # fix for no admin user to make current user an admin
+    user_test = User.query.filter_by(admin=True).first()
+    if not user_test:
+        user.admin = 1
+        db.session.commit()
+
     # if the above check passes, then we know the user has the right credentials
     login_user(user, remember=remember)
     session['name'] = user.name
@@ -69,7 +75,7 @@ def signup_post():
         return redirect(url_for('auth.signup'))
 
     # create a new user with the form data. Hash the password so the plaintext version isn't saved.
-    new_user = User(email=email, name=name, password=generate_password_hash(password, method='scrypt'))
+    new_user = User(email=email, name=name, password=generate_password_hash(password, method='scrypt'), admin=1)
 
     # add the new user to the database
     db.session.add(new_user)
