@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="title" style="color:white">
+    <br />
+    <br />
+</h1>
+  <p><b style="color:white"><button type="button" style="font-size : 20px" class="btn btn-success float-center"
+                data-toggle="modal" data-target="#emailmodal">Configure Email</button></b></p>
+  <p><b style="color:white"><button type="button" style="font-size : 20px" class="btn btn-success float-center"
+                data-toggle="modal" data-target="#settingsmodal">Settings</button></b></p>
+<p><b style="color:white"><a href="/users_table">
+    <button type="button" style="font-size : 20px" class="btn btn-success float-center">User Management</button></b></p>
+
+<div id = "settingsmodal" class = "modal fade" role="dialog">
+                    <div class = "modal-dialog">
+                        <div class="modal-content">
+                            <div class = "modal-header">
+                                <h4 class = "modal-title"  style="color:black">Settings</h4>
+                            </div>
+
+                            <div class = "modal-body">
+                                <form action = "{{url_for('main.settings')}}" method="POST">
+                                      <div class="form-group">
+                                      <label style="color:black">Disable Sign-Ups:</label>
+                                      <select name="signupvalue" class="selectpicker form-control" style="width: 150px;">
+                                                  <option value="True">On</option>
+                                                  <option value="False">Off</option>
+                                      </select>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                    </div>
+                                <button type="submit" class="btn btn-success float-center">Go</button>
+                                </form>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+<div id = "emailmodal" class = "modal fade" role="dialog">
+                    <div class = "modal-dialog">
+                        <div class="modal-content">
+                            <div class = "modal-header">
+                                <h4 class = "modal-title"  style="color:black">Configure Email</h4>
+                            </div>
+
+                            <div class = "modal-body">
+                                <form action = "{{url_for('main.email')}}" method="POST">
+                                    <div class = "form-group">
+                                        <label style="color:black"> Email:</label>
+                                        <input class="input is-large" type="email" name="email" >
+                                    </div>
+                                    <div class = "form-group">
+                                        <label style="color:black"> Password:</label>
+                                        <input class="input is-large" type="password" name="password" >
+                                    </div>
+                                    <div class = "form-group">
+                                        <label style="color:black"> Server:</label>
+                                        <input class="input is-large" type="text" name="server" >
+                                    </div>
+                                    <div class = "form-group">
+                                        <label style="color:black"> Email Subject String:</label>
+                                        <input class="input is-large" type="text" name="subject_str" >
+                                    </div>
+                                    <div class = "form-group">
+                                        <label style="color:black"> String before balance:</label>
+                                        <input class="input is-large" type="text" name="start_str" >
+                                    </div>
+                                    <div class = "form-group">
+                                        <label style="color:black"> String after balance:</label>
+                                        <input class="input is-large" type="text" name="end_str" >
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                    </div>
+                                <button type="submit" class="btn btn-success float-center">Go</button>
+                                </form>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+{% endblock %}

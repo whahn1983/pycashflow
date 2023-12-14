@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class = "container">
+    <div class = "row">
+        <div class="col md-12">
+            <div style="background:transparent !important" class = "jumbotron p-3 p-md-5 text-white rounded">
+               <h2  style="color:white"><b>Users</b>  </h2>
+
+                {% with messages  = get_flashed_messages() %}
+
+                   {% if messages %}
+                       {% for message in messages %}
+                            <div class="alert alert-success alert-dismissable" role="alert">
+                                <button type="button" class="close" data-dismiss="alert" aria-label="close">
+
+                                    <span aria-hidden="true">x</span>
+                                </button>
+                                {{message }}
+
+                            </div>
+                       {% endfor %}
+                    {% endif %}
+
+                {% endwith %}
+
+                <table style="background-color:DarkSlateGrey" class="table table-hover sortable" border="2">
+                    <tr>
+                        <th style="display:none;">ID</th>
+                        <th style="color:white">Name</th>
+                        <th style="color:white">Email</th>
+                        <th style="color:white">Admin</th>
+                        <th>
+                             <button type="button"  class="btn btn-success float-center"
+                                    data-toggle="modal" data-target="#mymodal">Add New</button>
+                        </th>
+                    </tr>
+
+                    {% for row in users %}
+                    <tr>
+                        <td style="display:none;">{{row.id}}</td>
+                        <td style="color:white">{{row.name}}</td>
+                        <td style="color:white">{{row.email}}</td>
+                        <td style="color:white">{{row.admin}}</td>
+                        <td>
+                            <a href = "/update_user/{{row.id}}" class="btn btn-warning btn-xs" data-toggle="modal" data-target="#modaledit{{row.id}}">Edit</a>
+                             <a href = "/delete_user/{{row.id}}" class="btn btn-danger btn-xs" onclick="return confirm ('Are you sure you want to Delete ?')">Delete</a>
+                        </td>
+                    </tr>
+
+                <!-- Edit Modal -->
+
+                    <div id="modaledit{{row.id}}" class="modal fade" role="dialog">
+   <div class="modal-dialog">
+      <div class="modal-content">
+         <div class="modal-header">
+            <h4 class="modal-title"  style="color:black">Update User</h4>
+         </div>
+         <div class="modal-body">
+            <form action="{{url_for('main.update_user')}}" method="POST">
+               <div class="form-group">
+                  <label style="color:black">Name:</label>
+                   <input type="hidden"  name="id" value="{{row.id}}">
+                  <input type="text" class="form-control" name="name" value="{{row.name}}" required = "True">
+               </div>
+               <div class="form-group">
+                  <label style="color:black">Email:</label>
+                  <input type="text" class="form-control" name="email" value="{{row.email}}" required = "True">
+               </div>
+                <div class = "form-group">
+                    <label style="color:black"> Admin:</label>
+                    <select id="admin" name="admin" class="selectpicker form-control" style="width: 150px;">
+                                                  <option value="True">True</option>
+                                                  <option value="False">False</option>
+                    </select>
+                </div>
+               <div class="form-group">
+                  <button class="btn btn-primary" type="submit">Update</button>
+               </div>
+            </form>
+         </div>
+         <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+         </div>
+      </div>
+   </div>
+</div>
+
+                    {% endfor %}
+                </table>
+            </div>
+
+                <!-- Open Modal Box (Add User)-->
+
+                <div id = "mymodal" class = "modal fade" role="dialog">
+                    <div class = "modal-dialog">
+                        <div class="modal-content">
+                            <div class = "modal-header">
+                                <h4 class = "modal-title"  style="color:black">Add User</h4>
+                            </div>
+
+                            <div class = "modal-body">
+                                <form action = "{{url_for('main.create_user')}}" method="POST">
+
+                                    <div class = "form-group">
+                                        <label style="color:black"> Name:</label>
+                                        <input type="text" class="form-control" name="name" required = "True">
+                                    </div>
+
+                                    <div class = "form-group">
+                                        <label style="color:black"> Email:</label>
+                                        <input type="text" class="form-control" name="email" required = "True">
+                                    </div>
+                                    <div class = "form-group">
+                                        <label style="color:black"> Admin:</label>
+                                        <select name="admin" class="selectpicker form-control" style="width: 150px;">
+                                                  <option value="True">True</option>
+                                                  <option value="False">False</option>
+                                         </select>
+                                    </div>
+                                    <div class = "form-group">
+                                        <label style="color:black"> Password:</label>
+                                        <input class="input is-large" type="password" name="password" placeholder="Password">
+                                    </div>
+                                    <div class = "form-group">
+                                        <button class="btn btn-primary" type = "submit" name="user">Add New User</button>
+                                    </div>
+
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                    </div>
+                                </form>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+<script> document.querySelectorAll('[data-selected]').forEach(e => {
+   e.value = e.dataset.selected
+    });
+</script>
+<script src="https://www.kryogenix.org/code/browser/sorttable/sorttable.js"></script>
+{% endblock content %}

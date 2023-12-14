@@ -49,15 +49,32 @@ def index():
     # plot cash flow results
     minbalance, graphJSON = plot_cash()
 
-    return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
+    user = User.query.filter_by(id=current_user.get_id()).first()
+
+    if user.admin:
+        return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
+                           minbalance=minbalance, graphJSON=graphJSON)
+    else:
+        return render_template('index_guest.html', title='Index', todaydate=todaydate, balance=balance.amount,
                            minbalance=minbalance, graphJSON=graphJSON)
 
 
 @main.route('/profile')
 @login_required
 def profile():
+    user = User.query.filter_by(id=current_user.get_id()).first()
 
-    return render_template('profile.html')
+    if user.admin:
+        return render_template('profile.html')
+    else:
+        return render_template('profile_guest.html')
+
+
+@main.route('/settings')
+@login_required
+def settings_page():
+
+    return render_template('settings.html')
 
 
 @main.route('/schedule')
@@ -345,6 +362,76 @@ def email():
         return redirect(url_for('main.profile'))
 
     return redirect(url_for('main.profile'))
+
+
+@main.route('/users_table')
+@login_required
+def users():
+    users = User.query
+
+    return render_template('users_table.html', title='Users Table', users=users)
+
+
+@main.route('/update_user', methods=['GET', 'POST'])
+@login_required
+def update_user():
+    # update an existing user
+
+    if request.method == 'POST':
+        current = User.query.filter_by(id=request.form['id']).first()
+        existing = User.query.filter_by(email=request.form['email']).first()
+        if existing:
+            if current.email != request.form['email']:
+                flash("Email already exists")
+                return redirect(url_for('main.users'))
+        my_data = User.query.get(request.form.get('id'))
+        my_data.name = request.form['name']
+        my_data.email = request.form['email']
+        my_data.admin = eval(request.form['admin'])
+        db.session.commit()
+        flash("Updated Successfully")
+
+        return redirect(url_for('main.users'))
+
+    return redirect(url_for('main.users'))
+
+
+@main.route('/delete_user/<id>')
+@login_required
+def delete_user(id):
+    # delete a schedule item
+    user = User.query.filter_by(id=id).first()
+
+    if user:
+        db.session.delete(user)
+        db.session.commit()
+        flash("Deleted Successfully")
+
+    return redirect(url_for('main.users'))
+
+
+@main.route('/create_user', methods=('GET', 'POST'))
+@login_required
+def create_user():
+    # create a new user
+
+    if request.method == 'POST':
+        name = request.form['name']
+        email = request.form['email']
+        admin = eval(request.form['admin'])
+        password = generate_password_hash(request.form['password'], method='scrypt')
+        user = User(name=name, email=email, admin=admin, password=password)
+        existing = User.query.filter_by(email=email).first()
+        if existing:
+            flash("User already exists")
+            return redirect(url_for('main.users'))
+        db.session.add(user)
+        db.session.commit()
+        flash("Added Successfully")
+
+        return redirect(url_for('main.users'))
+
+    return redirect(url_for('main.users'))
 
 
 @main.route('/manifest.json')
