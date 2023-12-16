@@ -88,7 +88,6 @@ def schedule():
         return redirect(url_for('main.index'))
 
 
-
 @main.route('/holds')
 @login_required
 def holds():
@@ -131,6 +130,7 @@ def create():
         return redirect(url_for('main.schedule'))
     else:
         return redirect(url_for('main.index'))
+
 
 @main.route('/update', methods=['GET', 'POST'])
 @login_required
@@ -447,7 +447,7 @@ def update_user():
 @main.route('/delete_user/<id>')
 @login_required
 def delete_user(id):
-    # delete a schedule item
+    # delete a user
     if current_user.admin:
         user = User.query.filter_by(id=id).first()
 
