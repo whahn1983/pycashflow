@@ -29,6 +29,7 @@ def calc_schedule():
     df = pd.read_sql('SELECT * FROM schedule;', engine)
 
     # loop through the schedule and create transactions in a table out to the future number of years
+    todaydate = datetime.today().date()
     for i in range(len(df.index)):
         format = '%Y-%m-%d'
         name = df['name'][i]
@@ -36,11 +37,11 @@ def calc_schedule():
         frequency = df['frequency'][i]
         amount = df['amount'][i]
         type = df['type'][i]
+        existing = Schedule.query.filter_by(name=name).first()
         if frequency == 'Monthly':
             for k in range(months):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
-                if futuredate <= datetime.today().date():
-                    existing = Schedule.query.filter_by(name=name).first()
+                if futuredate <= todaydate:
                     existing.startdate = futuredate + relativedelta(months=1)
                 if type == 'Income':
                     rollbackdate = datetime.combine(futuredate, datetime.min.time())
@@ -52,40 +53,35 @@ def calc_schedule():
         elif frequency == 'Weekly':
             for k in range(weeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
-                if futuredate <= datetime.today().date():
-                    existing = Schedule.query.filter_by(name=name).first()
+                if futuredate <= todaydate:
                     existing.startdate = futuredate + relativedelta(weeks=1)
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Yearly':
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
-                if futuredate <= datetime.today().date():
-                    existing = Schedule.query.filter_by(name=name).first()
+                if futuredate <= todaydate:
                     existing.startdate = futuredate + relativedelta(years=1)
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Quarterly':
             for k in range(quarters):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=3 * k)
-                if futuredate <= datetime.today().date():
-                    existing = Schedule.query.filter_by(name=name).first()
+                if futuredate <= todaydate:
                     existing.startdate = futuredate + relativedelta(months=3)
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'BiWeekly':
             for k in range(biweeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
-                if futuredate <= datetime.today().date():
-                    existing = Schedule.query.filter_by(name=name).first()
+                if futuredate <= todaydate:
                     existing.startdate = futuredate + relativedelta(weeks=2)
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Onetime':
             futuredate = datetime.strptime(startdate, format).date()
-            if futuredate < datetime.today().date():
-                onetimeschedule = Schedule.query.filter_by(name=name).first()
-                db.session.delete(onetimeschedule)
+            if futuredate < todaydate:
+                db.session.delete(existing)
             else:
                 total = Total(type=type, name=name, amount=amount, date=futuredate)
                 db.session.add(total)
@@ -94,11 +90,10 @@ def calc_schedule():
     # add the hold items
     df = pd.read_sql('SELECT * FROM hold;', engine)
     for i in range(len(df.index)):
-        format = '%Y-%m-%d'
         name = df['name'][i]
         amount = df['amount'][i]
         type = df['type'][i]
-        total = Total(type=type, name=name, amount=amount, date=datetime.today().date() + relativedelta(days=1))
+        total = Total(type=type, name=name, amount=amount, date=todaydate + relativedelta(days=1))
         db.session.add(total)
     db.session.commit()
 
@@ -110,7 +105,7 @@ def calc_schedule():
         amount = df['amount'][i]
         type = df['type'][i]
         date = df['date'][i]
-        if datetime.strptime(date, format).date() < datetime.today().date():
+        if datetime.strptime(date, format).date() < todaydate:
             skip = Skip.query.filter_by(name=name).first()
             db.session.delete(skip)
         else:
@@ -131,9 +126,11 @@ def calc_transactions(balance):
 
     # collect the next 60 days of transactions for the transactions table
     format = '%Y-%m-%d'
+    todaydate = datetime.today().date()
+    todaydateplus = todaydate + relativedelta(months=2)
     for i in df.iterrows():
-        if datetime.today().date() + relativedelta(months=2) > \
-                datetime.strptime(i[1].date, format).date() > datetime.today().date() and "(SKIP)" not in i[1].iloc[3]:
+        if todaydateplus > \
+                datetime.strptime(i[1].date, format).date() > todaydate and "(SKIP)" not in i[1].iloc[3]:
             transactions = Transactions(name=i[1].iloc[3], type=i[1].type, amount=i[1].amount,
                                         date=datetime.strptime(i[1].date, format).date())
             db.session.add(transactions)
@@ -161,7 +158,7 @@ def calc_transactions(balance):
         format = '%Y-%m-%d'
         rundate = i[1].date
         amount = i[1].amount
-        if datetime.strptime(rundate, format).date() > datetime.today().date():
+        if datetime.strptime(rundate, format).date() > todaydate:
             runbalance += amount
             running = Running(amount=runbalance, date=datetime.strptime(rundate, format).date())
             db.session.add(running)
@@ -185,9 +182,10 @@ def plot_cash():
     else:
         minrange = float(minbalance) * 1.1
     maxbalance = 0
+    todaydate = datetime.today().date()
+    todaydateplus = todaydate + relativedelta(months=2)
     for i in df.iterrows():
-        if datetime.today().date() + relativedelta(months=2) > \
-                datetime.strptime(i[1].date, format).date() > datetime.today().date():
+        if todaydateplus > datetime.strptime(i[1].date, format).date() > todaydate:
             if i[1].amount > maxbalance:
                 maxbalance = i[1].amount
     maxrange = maxbalance * 1.1
