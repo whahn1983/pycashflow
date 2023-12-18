@@ -34,6 +34,8 @@ def index():
         db.session.add(balance)
         db.session.commit()
 
+    main_page(todaydate, balance)
+
     # empty the tables to create fresh data from the schedule
     db.session.query(Total).delete()
     db.session.query(Running).delete()
@@ -55,6 +57,18 @@ def index():
     else:
         return render_template('index_guest.html', title='Index', todaydate=todaydate, balance=balance.amount,
                            minbalance=minbalance, graphJSON=graphJSON)
+
+
+def main_page(todaydate, balance):
+    # plot cash flow results
+    minbalance, graphJSON = plot_cash()
+
+    if current_user.admin:
+        return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
+                               minbalance=minbalance, graphJSON=graphJSON)
+    else:
+        return render_template('index_guest.html', title='Index', todaydate=todaydate, balance=balance.amount,
+                               minbalance=minbalance, graphJSON=graphJSON)
 
 
 @main.route('/profile')
