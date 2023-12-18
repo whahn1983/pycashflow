@@ -84,3 +84,4 @@ class Email(db.Model):
     subjectstr = db.Column(db.String(100))
     startstr = db.Column(db.String(100))
     endstr = db.Column(db.String(100))
+

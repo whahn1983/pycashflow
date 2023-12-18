@@ -8,6 +8,7 @@ import os
 from sqlalchemy import desc, extract, asc
 from werkzeug.security import generate_password_hash
 from .cashflow import calc_schedule, calc_transactions, plot_cash
+from pathlib import Path
 
 
 main = Blueprint('main', __name__)
@@ -23,30 +24,49 @@ def index():
     balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
 
     try:
-        if balance.amount:
-            db.session.query(Balance).delete()
-            balance = Balance(amount=balance.amount, date=datetime.today())
+        modifiedtime = os.path.getmtime(os.environ.get('DATABASE_URL').replace('sqlite:///', ''))
+        modifiedtime = datetime.fromtimestamp(modifiedtime)
+        modpath = os.environ.get('DATABASE_URL').replace('sqlite:///', '')
+        modpath = modpath.replace('db.sqlite', 'modified')
+        os.close(os.open(modpath, os.O_CREAT))
+        dbmodified = os.path.getmtime(modpath)
+        dbmodified = datetime.fromtimestamp(dbmodified)
+    except:
+        basedir = os.path.abspath(os.path.dirname(__file__))
+        datafile = os.path.join(basedir, "data/db.sqlite")
+        modifiedtime = os.path.getmtime(datafile)
+        modifiedtime = datetime.fromtimestamp(modifiedtime)
+        modpath = os.path.join(basedir, "data/modified")
+        os.close(os.open(modpath, os.O_CREAT))
+        dbmodified = os.path.getmtime(modpath)
+        dbmodified = datetime.fromtimestamp(dbmodified)
+
+    if modifiedtime > dbmodified:
+        try:
+            if balance.amount:
+                db.session.query(Balance).delete()
+                balance = Balance(amount=balance.amount, date=datetime.today())
+                db.session.add(balance)
+                db.session.commit()
+        except:
+            balance = Balance(amount='0',
+                              date=datetime.today())
             db.session.add(balance)
             db.session.commit()
-    except:
-        balance = Balance(amount='0',
-                          date=datetime.today())
-        db.session.add(balance)
+
+        # empty the tables to create fresh data from the schedule
+        db.session.query(Total).delete()
+        db.session.query(Running).delete()
+        db.session.query(Transactions).delete()
         db.session.commit()
 
-    main_page(todaydate, balance)
+        # calculate total events for the year amount
+        calc_schedule()
 
-    # empty the tables to create fresh data from the schedule
-    db.session.query(Total).delete()
-    db.session.query(Running).delete()
-    db.session.query(Transactions).delete()
-    db.session.commit()
+        # calculate sum of running transactions
+        calc_transactions(balance)
 
-    # calculate total events for the year amount
-    calc_schedule()
-
-    # calculate sum of running transactions
-    calc_transactions(balance)
+        Path(modpath).touch()
 
     # plot cash flow results
     minbalance, graphJSON = plot_cash()
@@ -57,18 +77,6 @@ def index():
     else:
         return render_template('index_guest.html', title='Index', todaydate=todaydate, balance=balance.amount,
                            minbalance=minbalance, graphJSON=graphJSON)
-
-
-def main_page(todaydate, balance):
-    # plot cash flow results
-    minbalance, graphJSON = plot_cash()
-
-    if current_user.admin:
-        return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
-                               minbalance=minbalance, graphJSON=graphJSON)
-    else:
-        return render_template('index_guest.html', title='Index', todaydate=todaydate, balance=balance.amount,
-                               minbalance=minbalance, graphJSON=graphJSON)
 
 
 @main.route('/profile')
