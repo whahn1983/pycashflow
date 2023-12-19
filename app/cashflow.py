@@ -1,5 +1,5 @@
 from app import db
-from .models import Schedule, Total, Running, Transactions, Skip
+from .models import Schedule, Total, Running, Transactions, Skip, Balance
 from datetime import datetime
 import pandas as pd
 import json
@@ -11,6 +11,55 @@ from natsort import index_natsorted
 import numpy as np
 import decimal
 import plotly.graph_objs as go
+from pathlib import Path
+
+
+def update_cash(balance):
+    # if the database has been modified, update the calculations
+    try:
+        modifiedtime = os.path.getmtime(os.environ.get('DATABASE_URL').replace('sqlite:///', ''))
+        modifiedtime = datetime.fromtimestamp(modifiedtime)
+        modpath = os.environ.get('DATABASE_URL').replace('sqlite:///', '')
+        modpath = modpath.replace('db.sqlite', 'modified')
+        os.close(os.open(modpath, os.O_CREAT))
+        dbmodified = os.path.getmtime(modpath)
+        dbmodified = datetime.fromtimestamp(dbmodified)
+    except:
+        basedir = os.path.abspath(os.path.dirname(__file__))
+        datafile = os.path.join(basedir, "data/db.sqlite")
+        modifiedtime = os.path.getmtime(datafile)
+        modifiedtime = datetime.fromtimestamp(modifiedtime)
+        modpath = os.path.join(basedir, "data/modified")
+        os.close(os.open(modpath, os.O_CREAT))
+        dbmodified = os.path.getmtime(modpath)
+        dbmodified = datetime.fromtimestamp(dbmodified)
+
+    if modifiedtime > dbmodified:
+        try:
+            if balance.amount:
+                db.session.query(Balance).delete()
+                balance = Balance(amount=balance.amount, date=datetime.today())
+                db.session.add(balance)
+                db.session.commit()
+        except:
+            balance = Balance(amount='0',
+                              date=datetime.today())
+            db.session.add(balance)
+            db.session.commit()
+
+        # empty the tables to create fresh data from the schedule
+        db.session.query(Total).delete()
+        db.session.query(Running).delete()
+        db.session.query(Transactions).delete()
+        db.session.commit()
+
+        # calculate total events for the year amount
+        calc_schedule()
+
+        # calculate sum of running transactions
+        calc_transactions(balance)
+
+        Path(modpath).touch()
 
 
 def calc_schedule():

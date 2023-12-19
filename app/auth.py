@@ -1,10 +1,11 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, session
-from flask_login import login_user, login_required, logout_user
+from flask_login import login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from .models import User
 from app import db
 import pandas as pd
 import os
+from functools import wraps
 
 
 auth = Blueprint('auth', __name__)
@@ -97,3 +98,13 @@ def signup_post():
 def logout():
     logout_user()
     return redirect(url_for('main.index'))
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if current_user.admin:
+            return f(*args, **kwargs)
+        else:
+            return redirect(url_for('main.index'))
+    return decorated_function
