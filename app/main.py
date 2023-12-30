@@ -49,7 +49,7 @@ def profile():
 @main.route('/settings')
 @login_required
 @admin_required
-def settings_page():
+def settings():
 
     return render_template('settings.html')
 
@@ -276,10 +276,10 @@ def changepw():
     return redirect(url_for('main.profile'))
 
 
-@main.route('/settings', methods=('GET', 'POST'))
+@main.route('/signups', methods=('GET', 'POST'))
 @login_required
 @admin_required
-def settings():
+def signups():
     # set the settings options, in this case disable signups, from the profile page
     if request.method == 'POST':
         signupsettingname = Settings.query.filter_by(name='signup').first()
@@ -289,7 +289,7 @@ def settings():
             signupsettingname.value = eval(signupvalue)
             db.session.commit()
 
-            return redirect(url_for('main.profile'))
+            return redirect(url_for('main.settings'))
 
         # store the signup option value in the database to check when the user clicks signup
         signupvalue = request.form['signupvalue']
@@ -299,9 +299,9 @@ def settings():
         db.session.add(settings)
         db.session.commit()
 
-        return redirect(url_for('main.profile'))
+        return redirect(url_for('main.settings'))
 
-    return redirect(url_for('main.profile'))
+    return redirect(url_for('main.settings'))
 
 
 @main.route('/transactions')
@@ -336,7 +336,7 @@ def email():
             emailsettings.endstr = endstr
             db.session.commit()
 
-            return redirect(url_for('main.profile'))
+            return redirect(url_for('main.settings'))
 
         email = request.form['email']
         password = request.form['password']
@@ -349,9 +349,9 @@ def email():
         db.session.add(emailentry)
         db.session.commit()
 
-        return redirect(url_for('main.profile'))
+        return redirect(url_for('main.settings'))
 
-    return redirect(url_for('main.profile'))
+    return redirect(url_for('main.settings'))
 
 
 @main.route('/users_table')
