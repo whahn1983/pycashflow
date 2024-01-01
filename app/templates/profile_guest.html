@@ -53,8 +53,7 @@
                 </div>
             </div>
         </div>
-
-            <div style="clear: both">
+        <div style="clear: both">
 
 <h1 class="title" style="color:white">
     <br />
@@ -65,31 +64,29 @@
 </h1>
   <p><b style="color:white"><button type="button" style="font-size : 20px" class="btn btn-success float-center"
                 data-toggle="modal" data-target="#pwmodal">Change Password</button></b></p>
+        <div id = "pwmodal" class = "modal fade" role="dialog">
+            <div class = "modal-dialog">
+                <div class="modal-content">
+                    <div class = "modal-header">
+                        <h4 class = "modal-title"  style="color:black">Change Password</h4>
+                    </div>
 
-<div id = "pwmodal" class = "modal fade" role="dialog">
-                    <div class = "modal-dialog">
-                        <div class="modal-content">
-                            <div class = "modal-header">
-                                <h4 class = "modal-title"  style="color:black">Change Password</h4>
+                    <div class = "modal-body">
+                        <form action = "{{url_for('main.changepw')}}" method="POST">
+                            <div class = "form-group">
+                                <label style="color:black"> New Password:</label>
+                                <input class="input is-large" type="password" name="password" placeholder="Password">
                             </div>
-
-                            <div class = "modal-body">
-                                <form action = "{{url_for('main.changepw')}}" method="POST">
-                                    <div class = "form-group">
-                                        <label style="color:black"> New Password:</label>
-                                        <input class="input is-large" type="password" name="password" placeholder="Password">
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                                    </div>
-                                <button type="submit" class="btn btn-success float-center">Go</button>
-                                </form>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                             </div>
-
-                        </div>
+                        <button type="submit" class="btn btn-success float-center">Go</button>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
-    </body>
+    </div>
+</div>
+</body>
 </html>

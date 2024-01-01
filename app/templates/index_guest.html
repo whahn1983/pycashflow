@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -26,19 +25,18 @@
     <link rel="apple-touch-icon" href="{{url_for('static', filename='icons/icon_512x512.png')}}" type="image/png">
     <link rel="manifest" href="/manifest.json">
       <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register("/sw.js").then(function(registration) {
-          console.log('ServiceWorker registration successful with scope: ', registration.scope);
-        }, function(err) {
-          console.log('ServiceWorker registration failed: ', err);
-        });
-      });
-    }
-  </script>
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function() {
+            navigator.serviceWorker.register("/sw.js").then(function(registration) {
+              console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            }, function(err) {
+              console.log('ServiceWorker registration failed: ', err);
+            });
+          });
+        }
+      </script>
     <meta name="viewport" content="width=device-width, initial-scale=0.65">
 </head>
-
 <body>
     <div class="container">
         <div class="topnav1" id="myTopnav">
@@ -53,10 +51,7 @@
                 </div>
             </div>
         </div>
-
-            <div style="clear: both">
-                &nbsp;
-
+        <div style="clear: both">
 <h1 class="title" style="color:white">
   <p style="font-size:20px; float: center; text-align: center"><span style="color:white; font-weight:bold">{{ todaydate }}</span></p>
   <p style="font-size:20px"><span style="color:white">Balance: {{ balance }}</span></p>
@@ -84,15 +79,13 @@
     d = {{ graphJSON | safe }};
     d.config={responsive: true};
     Plotly.newPlot('chart', d, {});
-
 </script>
- <div id = "balancemodal" class = "modal fade" role="dialog">
+                <div id = "balancemodal" class = "modal fade" role="dialog">
                     <div class = "modal-dialog">
                         <div class="modal-content">
                             <div class = "modal-header">
                                 <h4 class = "modal-title"  style="color:black">Update Balance</h4>
                             </div>
-
                             <div class = "modal-body">
                                 <form action = "{{url_for('main.balance')}}" method="POST">
                                     <div class = "form-group">
@@ -110,14 +103,11 @@
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                     </div>
-
                                 </form>
                             </div>
-
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     </body>
