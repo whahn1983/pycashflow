@@ -1,6 +1,6 @@
 from app import db
 from .models import Schedule, Total, Running, Transactions, Skip, Balance
-from datetime import datetime
+from datetime import datetime, date
 import pandas as pd
 import json
 import plotly
@@ -14,7 +14,7 @@ import plotly.graph_objs as go
 from pathlib import Path
 
 
-def update_cash(balance):
+def update_cash(balance, refresh):
     # if the database has been modified, update the calculations
     try:
         modifiedtime = os.path.getmtime(os.environ.get('DATABASE_URL').replace('sqlite:///', ''))
@@ -34,7 +34,10 @@ def update_cash(balance):
         dbmodified = os.path.getmtime(modpath)
         dbmodified = datetime.fromtimestamp(dbmodified)
 
-    if modifiedtime > dbmodified:
+    dt = date.today()
+    today = datetime.combine(dt, datetime.min.time())
+
+    if modifiedtime > dbmodified or dbmodified < today or refresh == 1:
         try:
             if balance.amount:
                 db.session.query(Balance).delete()

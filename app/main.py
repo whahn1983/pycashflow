@@ -23,7 +23,9 @@ def index():
     # query the latest balance information
     balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
 
-    update_cash(balance)
+    refresh=0
+
+    update_cash(balance, refresh)
 
     # plot cash flow results
     minbalance, graphJSON = plot_cash()
@@ -34,6 +36,17 @@ def index():
     else:
         return render_template('index_guest.html', title='Index', todaydate=todaydate, balance=balance.amount,
                            minbalance=minbalance, graphJSON=graphJSON)
+
+
+@main.route('/refresh')
+@login_required
+def refresh():
+    balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
+    refresh=1
+
+    update_cash(balance, refresh)
+
+    return redirect(url_for('main.index'))
 
 
 @main.route('/profile')

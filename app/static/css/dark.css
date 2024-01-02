@@ -123,3 +123,64 @@ aside,
 }
 
 html {background-color: DarkCyan}
+
+.refresh-start {
+	animation-name: rotate;
+	animation-duration: 1s;
+	animation-iteration-count: infinite;
+	animation-timing-function: linear;
+	animation-play-state: inherit;
+	border: none;
+	color: white;
+	padding: 0px 0px;
+	text-align: center;
+	text-decoration: none;
+	display: table-cell;
+	font-size: 0px;
+}
+
+.refresh-end {
+	animation-play-state: paused !important;
+	border: none;
+	color: white;
+	padding: 0px 0px;
+	text-align: right;
+	text-decoration: none;
+	display: table-cell;
+	font-size: 0px;
+}
+
+#refresh-button {
+	animation-play-state: running;
+	border: none;
+	color: white;
+	padding: 0px 0px;
+	text-align: center;
+	text-decoration: none;
+	display: table-cell;
+	font-size: 0px;
+}
+
+@keyframes rotate {
+	from {
+		transform: rotate(0deg)
+	}
+
+	to {
+		transform: rotate(359deg)
+	}
+}
+
+.d-table {
+    display:table;
+	border: none;
+}
+
+.d-table-cell {
+    display:table-cell;
+	border: none;
+}
+
+.w-100 {
+  width: 100%;
+}
