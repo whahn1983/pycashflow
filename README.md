@@ -5,7 +5,6 @@
 ![Docker Pulls](https://img.shields.io/docker/pulls/whahn1983/pycashflow)
 ![GitHub License](https://img.shields.io/github/license/whahn1983/pycashflow)
 
-
 Python Flask application for future cash flow calculation and management.
 
 * Ability to set schedule of recurring expenses and income
@@ -56,3 +55,11 @@ For manual Installation:
 To install, clone the git repo onto your server.  Leverage a WSGI server, like waitress or gunicorn, to run the flask application.  Optionally leverage a reverse proxy with Apache or Nginx to the WSGI server.  To support automatic database migrations, run flask-migrate commands to generate an initial version configuration.  For the automatic balance updates with email, set up cron to execute getemail.py on a regular schedule.  Ensure your email account is properly configured under Profile in the flask application.
 
 To update, pull the latest version from git.  If database changes were necessary, leverage flask-migrate commands to migrate and update your database.  Restart the service.
+
+<br />
+
+<br />
+
+Built with:
+
+[<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/PyCharm.png" alt="PyCharm logo." width="300" media="(prefers-color-scheme: light)">](https://jb.gg/OpenSourceSupport)
