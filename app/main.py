@@ -1,7 +1,7 @@
 from flask import request, redirect, url_for, send_from_directory, flash, send_file
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Balance, Total, Running, User, Settings, Transactions, Email, Hold, Skip
+from .models import Schedule, Balance, User, Settings, Transactions, Email, Hold, Skip
 from app import db
 from datetime import datetime
 import os
@@ -155,6 +155,7 @@ def addhold(id):
     hold = Hold(name=schedule.name, type=schedule.type, amount=schedule.amount)
     db.session.add(hold)
     db.session.commit()
+    flash("Added Hold")
 
     return redirect(url_for('main.schedule'))
 
@@ -173,6 +174,7 @@ def addskip(id):
     skip = Skip(name=transaction.name + " (SKIP)", type=trans_type, amount=transaction.amount, date=transaction.date)
     db.session.add(skip)
     db.session.commit()
+    flash("Added Skip")
 
     return redirect(url_for('main.transactions'))
 
@@ -226,7 +228,7 @@ def clear_skips():
     db.session.query(Skip).delete()
     db.session.commit()
 
-    return redirect(url_for('main.index'))
+    return redirect(url_for('main.holds'))
 
 
 @main.route('/delete/<id>')

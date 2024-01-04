@@ -55,7 +55,19 @@
 <h1 class="title" style="color:white">
   <p style="font-size:20px; float: center; text-align: center"><span style="color:white; font-weight:bold">{{ todaydate }}</span></p>
   <p style="font-size:20px"><span style="color:white">Balance: {{ balance }}</span></p>
-  <p style="font-size:20px">Lowest Balance: <span style="color:white; font-weight:bold">${{ minbalance }}</span></p>
+  <div class="d-table w-100">
+      <p class="d-table-cell" style="font-size:20px">Lowest Balance: <span style="color:white; font-weight:bold">${{ minbalance }}</span></p>
+      <div style = "display: flex; justify-content:flex-end; padding:0;">
+          <button id="refresh-button" class="refresh-end" onclick="refreshContent();location.href='/refresh';"
+            >refresh <img id="refresh-icon"
+                          class="refresh-start"
+                          src="../static/icons/refresh-icon.png"
+                          width="20"
+                          loading="lazy"
+                    />
+          </button>
+      </div>
+  </div>
 </h1>
 <head>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
@@ -109,6 +121,14 @@
                     </div>
                 </div>
             </div>
+            <script>
+                function refreshContent() {
+                    let refreshIcon = document.getElementById("refresh-icon")
+                    let refreshButton = document.getElementById("refresh-button")
+                    refreshButton.removeAttribute("class")
+                    refreshButton.disabled = true
+                }
+            </script>
         </div>
     </body>
 </html>
