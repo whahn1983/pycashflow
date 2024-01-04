@@ -244,7 +244,7 @@ def plot_cash():
     start_date = str(datetime.today().date())
     end_date = str(datetime.today().date() + relativedelta(months=2))
     layout = go.Layout(yaxis=dict(range=[minrange, maxrange]), xaxis=dict(range=[start_date, end_date]),
-                       margin=dict(l=5, r=20, t=35, b=5))
+                       margin=dict(l=5, r=20, t=35, b=5), dragmode='pan')
     fig = px.line(df, x="date", y="amount", template="plotly", title="Cash Flow", line_shape="spline")
     fig.update_layout(layout)
     fig.update_xaxes(title_text='Date')
