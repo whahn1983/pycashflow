@@ -184,3 +184,11 @@ html {background-color: DarkCyan}
 .w-100 {
   width: 100%;
 }
+
+.btn3 {
+  border: none;
+  color: white;
+  display: table-cell;
+  font-size: 30px;
+  padding: 0px 5px;
+}

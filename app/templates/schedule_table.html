@@ -33,8 +33,11 @@
                         <th style="color:white">Frequency</th>
                         <th style="color:white">Next Date</th>
                         <th>
-                             <button type="button"  class="btn btn-success float-center"
-                                    data-toggle="modal" data-target="#mymodal">Add New</button>
+                             <button type="button"  class="btn3" data-toggle="modal" data-target="#mymodal">
+                                 <i class="fa fa-calendar-plus-o" ></i></button>
+                             <a href="/export" ><button class="btn3" ><i class="fa fa-download" ></i></a></button>
+                             <button type="button"  class="btn3" data-toggle="modal" data-target="#uploadmodal">
+                                 <i class="fa fa-upload" ></i></button>
                         </th>
                     </tr>
 
@@ -158,6 +161,26 @@
                                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                     </div>
                                 </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                                <!-- Open Modal Box (Upload File)-->
+                <div id = "uploadmodal" class = "modal fade" role="dialog">
+                    <div class = "modal-dialog">
+                        <div class="modal-content">
+                            <div class = "modal-header">
+                                <h4 class = "modal-title"  style="color:white">Upload File</h4>
+                            </div>
+                            <div class = "modal-body">
+                                Format must match export template
+                                <body>
+                                    <form method="post" action = "{{url_for('main.import_csv')}}" enctype="multipart/form-data">
+                                        <input type="file" name="file" accept=".csv">
+                                        <button class="btn btn-primary" type="submit" value="Submit">Submit</button>
+                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                    </form>
+                                </body>
                             </div>
                         </div>
                     </div>

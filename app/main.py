@@ -1,14 +1,15 @@
-from flask import request, redirect, url_for, send_from_directory, flash, send_file
+from flask import request, redirect, url_for, send_from_directory, flash, send_file, Response
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import Schedule, Balance, User, Settings, Transactions, Email, Hold, Skip
 from app import db
 from datetime import datetime
 import os
-from sqlalchemy import desc, extract, asc
+from sqlalchemy import desc, extract, asc, select
 from werkzeug.security import generate_password_hash
 from .cashflow import update_cash, plot_cash
 from .auth import admin_required
+from .files import export, upload
 
 
 main = Blueprint('main', __name__)
@@ -439,6 +440,34 @@ def create_user():
         return redirect(url_for('main.users'))
 
     return redirect(url_for('main.users'))
+
+
+@main.route('/export', methods=('GET', 'POST'))
+@login_required
+@admin_required
+def export_csv():
+
+    csv_data = export()
+
+    # Create a direct download response with the CSV data and appropriate headers
+    response = Response(csv_data, content_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=schedule_export.csv"
+
+    return response
+
+
+@main.route('/import', methods=('GET', 'POST'))
+@login_required
+@admin_required
+def import_csv():
+    if request.method == 'POST':
+        csv_file = request.files.get('file')
+
+        upload(csv_file)
+
+        flash("Import Successful")
+
+    return redirect(url_for('main.schedule'))
 
 
 @main.route('/manifest.json')
