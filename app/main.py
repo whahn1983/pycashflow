@@ -9,7 +9,7 @@ from sqlalchemy import desc, extract, asc, select
 from werkzeug.security import generate_password_hash
 from .cashflow import update_cash, plot_cash
 from .auth import admin_required
-from .files import export, upload
+from .files import export, upload, version
 
 
 main = Blueprint('main', __name__)
@@ -64,8 +64,10 @@ def profile():
 @login_required
 @admin_required
 def settings():
+    # get about info
+    about = version()
 
-    return render_template('settings.html')
+    return render_template('settings.html', about=about)
 
 
 @main.route('/schedule')

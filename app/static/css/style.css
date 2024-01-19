@@ -102,8 +102,9 @@
 }
 
 .topnav1 a.icon {
-float: right;
-display: none;
+  float: right;
+  display: none;
+}
 
 /* When the screen is less than 600 pixels wide, hide all links, except for the first one ("Home"). Show the link that contains should open and close the topnav (.icon) */
 @media screen and (max-width: 600px) {
@@ -117,24 +118,33 @@ display: none;
 }
 
 @media screen and (max-width: 600px) {
-  .topnav1.responsive {position: relative;}
+  .topnav1.responsive {
+    position: relative;
+  }
+
   .topnav1.responsive a.icon {
     position: absolute;
     right: 0;
     top: 0;
   }
+
   .topnav1.responsive a {
     float: none;
     display: inline-block;
     text-align: left;
   }
-  .topnav1.responsive .dropdown1 {float: none;}
-  .topnav1.responsive .dropdown-content1 {position: relative;}
+
+  .topnav1.responsive .dropdown1 {
+    float: none;
+  }
+
+  .topnav1.responsive .dropdown-content1 {
+    position: relative;
+  }
+
   .topnav1.responsive .dropdown1 .dropbtn {
     display: block;
     width: 100%;
     text-align: left;
   }
 }
-
-</style>

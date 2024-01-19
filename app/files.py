@@ -63,3 +63,11 @@ def upload(csv_file):
             pass
 
     return 0
+
+
+def version():
+    # read VERSION file and store string
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    version = open(os.path.join(basedir, 'VERSION'), 'r').read()
+
+    return version
