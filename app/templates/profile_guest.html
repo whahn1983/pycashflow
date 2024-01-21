@@ -61,6 +61,22 @@
     <br />
     <br />
     <br />
+    {% with messages  = get_flashed_messages() %}
+
+       {% if messages %}
+           {% for message in messages %}
+                <div class="alert alert-success alert-dismissable" role="alert">
+                    <button type="button" class="close" data-dismiss="alert" aria-label="close">
+
+                        <span aria-hidden="true">x</span>
+                    </button>
+                    {{message }}
+
+                </div>
+           {% endfor %}
+        {% endif %}
+
+        {% endwith %}
 </h1>
   <p><b style="color:white"><button type="button" style="font-size : 20px; margin-left:5%" class="btn btn-success float-center"
                 data-toggle="modal" data-target="#pwmodal">Change Password</button></b></p>
@@ -70,12 +86,19 @@
                     <div class = "modal-header">
                         <h4 class = "modal-title"  style="color:black">Change Password</h4>
                     </div>
-
                     <div class = "modal-body">
                         <form action = "{{url_for('main.changepw')}}" method="POST">
                             <div class = "form-group">
+                                <label style="color:black"> Current Password:</label>
+                                <input class="input is-large" type="password" name="current" placeholder="Password">
+                            </div>
+                            <div class = "form-group">
                                 <label style="color:black"> New Password:</label>
                                 <input class="input is-large" type="password" name="password" placeholder="Password">
+                            </div>
+                            <div class = "form-group">
+                                <label style="color:black"> Reenter Password:</label>
+                                <input class="input is-large" type="password" name="password2" placeholder="Password">
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>

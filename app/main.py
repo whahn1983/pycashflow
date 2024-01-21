@@ -6,7 +6,7 @@ from app import db
 from datetime import datetime
 import os
 from sqlalchemy import desc, extract, asc, select
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 from .cashflow import update_cash, plot_cash
 from .auth import admin_required
 from .files import export, upload, version
@@ -285,9 +285,17 @@ def changepw():
     if request.method == 'POST':
         curr_user = current_user.id
         my_user = User.query.filter_by(id=curr_user).first()
+        current = request.form['current']
         password = request.form['password']
-        my_user.password = generate_password_hash(password, method='scrypt')
-        db.session.commit()
+        password2 = request.form['password2']
+        if password == password2 and check_password_hash(my_user.password, current):
+            my_user.password = generate_password_hash(password, method='scrypt')
+            db.session.commit()
+            flash('Password change successful')
+        elif password != password2:
+            flash('Passwords do not match')
+        elif not check_password_hash(my_user.password, current):
+            flash('Incorrect password')
 
         return redirect(url_for('main.profile'))
 
