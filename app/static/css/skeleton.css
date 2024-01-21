@@ -31,7 +31,7 @@
 .container {
   position: relative;
   width: 100vw;
-  max-width: 1024px;
+  max-width: 2048px;
   margin: 0 auto;
   padding: 0 0;
   box-sizing: border-box; }
