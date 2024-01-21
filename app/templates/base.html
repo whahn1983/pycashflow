@@ -17,7 +17,6 @@
     <link rel=”stylesheet” href=”https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="./static/css/style.css"/>
     <link rel="stylesheet" href="./static/css/dark.css"/>
-    <link rel="stylesheet" href="./static/css/normalize.css"/>
     <link rel="stylesheet" href="./static/css/skeleton.css"/>
     <link rel="icon" href="{{url_for('static', filename='icons/icon_144x144.png')}}" type="image/png">
     <link rel="icon" href="{{url_for('static', filename='icons/icon_192x192.png')}}" type="image/png">
@@ -43,12 +42,12 @@
 <body>
     <div class="container">
         <div class="topnav1" id="myTopnav">
-            <a href="/" class="active">PyCashFlow</a>
             <div class="dropdown1">
-                <button class="dropbtn">Menu
-                    <i class="fa fa-caret-down"></i>
+                <button class="dropbtn">
+                    <i class="fa fa-bars"></i>
                 </button>
                 <div class="dropdown-content1">
+                    <a href="/">Home </a>
                     <a href="/schedule">Schedules </a>
                     <a href="/transactions">Transactions </a>
                     <a href="/holds">Holds/Skips </a>

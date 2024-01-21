@@ -7,7 +7,7 @@
                 data-toggle="modal" data-target="#balancemodal">{{ balance }}</button></b></p>
   <div class="d-table w-100">
       <p class="d-table-cell" style="font-size:20px">Lowest Balance: <span style="color:white; font-weight:bold">${{ minbalance }}</span></p>
-      <div style = "display: flex; justify-content:flex-end; padding:0;">
+      <div style = "display: flex; justify-content:flex-end; padding-bottom:20px;">
           <button id="refresh-button" class="refresh-end" onclick="refreshContent();location.href='/refresh';"
             >refresh <img id="refresh-icon"
                           class="refresh-start"
@@ -17,7 +17,9 @@
                     />
           </button>
       </div>
+
   </div>
+    <div id="chart" class="chart"></div>
 </h1>
 <head>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
@@ -32,10 +34,6 @@
         }
     </script>
 </head>
-
-<body style="font-family:arial, sans-serif">
-    <div id="chart" class="chart"></div>
-</body>
 
 <script>
     d = {{ graphJSON | safe }};

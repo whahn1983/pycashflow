@@ -10,13 +10,13 @@
     <link rel="apple-touch-icon" href="{{ url_for('main.appleicon') }}">
     <link rel="icon" href="./static/favicon.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.2/css/bulma.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
     <link rel=”stylesheet” href=”https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="./static/css/style.css"/>
     <link rel="stylesheet" href="./static/css/dark.css"/>
-    <link rel="stylesheet" href="./static/css/normalize.css"/>
     <link rel="stylesheet" href="./static/css/skeleton.css"/>
     <link rel="icon" href="{{url_for('static', filename='icons/icon_144x144.png')}}" type="image/png">
     <link rel="icon" href="{{url_for('static', filename='icons/icon_192x192.png')}}" type="image/png">
@@ -40,14 +40,14 @@
 </head>
 
 <body>
-    <div class="container">
+     <div class="container">
         <div class="topnav1" id="myTopnav">
-            <a href="/" class="active">PyCashFlow</a>
             <div class="dropdown1">
-                <button class="dropbtn">Menu
-                    <i class="fa fa-caret-down"></i>
+                <button class="dropbtn">
+                    <i class="fa fa-bars"></i>
                 </button>
                 <div class="dropdown-content1">
+                    <a href="/">Home </a>
                     <a href="/profile">Profile </a>
                     <a href="/logout">Log Out </a>
                 </div>
@@ -62,7 +62,7 @@
     <br />
     <br />
 </h1>
-  <p><b style="color:white"><button type="button" style="font-size : 20px" class="btn btn-success float-center"
+  <p><b style="color:white"><button type="button" style="font-size : 20px; margin-left:5%" class="btn btn-success float-center"
                 data-toggle="modal" data-target="#pwmodal">Change Password</button></b></p>
         <div id = "pwmodal" class = "modal fade" role="dialog">
             <div class = "modal-dialog">

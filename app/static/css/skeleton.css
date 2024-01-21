@@ -30,10 +30,10 @@
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
 .container {
   position: relative;
-  width: 100%;
-  max-width: 960px;
+  width: 100vw;
+  max-width: 1024px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 0;
   box-sizing: border-box; }
 .column,
 .columns {
@@ -44,17 +44,17 @@
 /* For devices larger than 400px */
 @media (min-width: 400px) {
   .container {
-    width: 85%;
+    width: 100%;
     padding: 0; }
 }
 
 /* For devices larger than 550px */
 @media (min-width: 550px) {
   .container {
-    width: 80%; }
+    width: 100%; }
   .column,
   .columns {
-    margin-left: 4%; }
+    margin-left: 0%; }
   .column:first-child,
   .columns:first-child {
     margin-left: 0; }
@@ -125,13 +125,17 @@ body {
   line-height: 1.6;
   font-weight: 400;
   font-family: "Raleway", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  color: #222; }
+  color: #222;
+  margin: 0;
+}
 
 
 /* Typography
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
 h1, h2, h3, h4, h5, h6 {
   margin-top: 0;
+  margin-left: 5%;
+  margin-right: 5%;
   margin-bottom: 2rem;
   font-weight: 300; }
 h1 { font-size: 4.0rem; line-height: 1.2;  letter-spacing: -.1rem;}
