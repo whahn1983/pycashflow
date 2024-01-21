@@ -18,7 +18,7 @@ Python Flask application for future cash flow calculation and management.
 * Import/Export CSV of the schedule table
 
 
-![screenshot](https://github.com/whahn1983/pycashflow/assets/7118098/d1ac3862-1ed0-4ebd-886e-a2cdb5f42eb5)
+![screenshot](https://github.com/whahn1983/pycashflow/assets/7118098/ac7c3556-232e-4571-9840-64d0341eeebe)
 
 
 <br />
