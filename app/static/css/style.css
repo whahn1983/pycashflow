@@ -64,11 +64,11 @@
 
 /* Style the dropdown button to fit inside the topnav */
 .dropdown1 .dropbtn {
-  font-size: 17px;
+  font-size: 35px;
   border: none;
   outline: none;
   color: white;
-  padding: 14px 16px;
+  padding: 5px 5px;
   background-color: inherit;
   font-family: inherit;
   line-height: 30px;
