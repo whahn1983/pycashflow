@@ -93,6 +93,7 @@ def calc_schedule():
         existing = Schedule.query.filter_by(name=name).first()
         if not firstdate:
             existing.firstdate = datetime.strptime(startdate, format).date()
+            firstdate = existing.firstdate.strftime(format)
             db.session.commit()
         if frequency == 'Monthly':
             for k in range(months):

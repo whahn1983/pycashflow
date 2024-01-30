@@ -20,10 +20,11 @@ def export():
     df = df.sort_values(by="startdate",
                         key=lambda x: np.argsort(index_natsorted(df["startdate"]))).reset_index(drop=True)
 
-    csv_data = "Name,Amount,Type,Frequency,Next Date\n"
+    csv_data = "Name,Amount,Type,Frequency,Next Date,First Date\n"
     for i in range(len(df.index)):
         # Create a CSV string from the data
-        csv_data += f"{df['name'][i]},{df['amount'][i]},{df['type'][i]},{df['frequency'][i]},{df['startdate'][i]}\n"
+        csv_data += (f"{df['name'][i]},{df['amount'][i]},{df['type'][i]},{df['frequency'][i]},{df['startdate'][i]}"
+                     f",{df['firstdate'][i]}\n")
 
     return csv_data
 
@@ -33,7 +34,7 @@ def upload(csv_file):
     csv_reader = csv.reader(csv_file, delimiter=',')
     next(csv_reader)
 
-    format = '%Y-%m-%d %H:%M:%S'
+    format = '%Y-%m-%d'
     for row in csv_reader:
         try:
             name = row[0]
@@ -42,13 +43,16 @@ def upload(csv_file):
             frequency = row[3]
             next_date = row[4]
             next_date = datetime.strptime(next_date, format).date()
+            first_date = row[5]
+            first_date = datetime.strptime(first_date, format).date()
 
             existing = Schedule.query.filter_by(name=name).first()
 
             if (not existing and (type == "Income" or type == "Expense")
                     and (frequency == "Monthly" or frequency == "Quarterly" or frequency == "Yearly" or
                          frequency == "Weekly" or frequency == "BiWeekly" or frequency == "Onetime")):
-                schedule = Schedule(name=name, amount=amount, type=type, frequency=frequency, startdate=next_date)
+                schedule = Schedule(name=name, amount=amount, type=type, frequency=frequency, startdate=next_date,
+                                    firstdate=first_date)
                 db.session.add(schedule)
                 db.session.commit()
             elif (existing and (type == "Income" or type == "Expense")
@@ -58,6 +62,7 @@ def upload(csv_file):
                 existing.frequency = frequency
                 existing.startdate = next_date
                 existing.type = type
+                existing.firstdate = first_date
                 db.session.commit()
         except:
             pass
