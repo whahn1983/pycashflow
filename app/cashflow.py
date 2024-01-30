@@ -86,15 +86,39 @@ def calc_schedule():
         format = '%Y-%m-%d'
         name = df['name'][i]
         startdate = df['startdate'][i]
+        firstdate = df['firstdate'][i]
         frequency = df['frequency'][i]
         amount = df['amount'][i]
         type = df['type'][i]
         existing = Schedule.query.filter_by(name=name).first()
+        if not firstdate:
+            existing.firstdate = datetime.strptime(startdate, format).date()
+            db.session.commit()
         if frequency == 'Monthly':
             for k in range(months):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
+                futuredateday = futuredate.day
+                firstdateday = datetime.strptime(firstdate, format).date().day
+                if firstdateday > futuredateday:
+                    try:
+                        for m in range(3):
+                            futuredateday += 1
+                            if firstdateday >= futuredateday:
+                                futuredate = futuredate.replace(day=futuredateday)
+                    except ValueError:
+                        pass
                 if futuredate <= todaydate:
                     existing.startdate = futuredate + relativedelta(months=1)
+                    daycheckdate = futuredate + relativedelta(months=1)
+                    daycheck = daycheckdate.day
+                    if firstdateday > daycheck:
+                        try:
+                            for m in range(3):
+                                daycheck += 1
+                                if firstdateday >= daycheck:
+                                    existing.startdate = daycheckdate.replace(day=daycheck)
+                        except ValueError:
+                            pass
                 if type == 'Income':
                     rollbackdate = datetime.combine(futuredate, datetime.min.time())
                     total = Total(type=type, name=name, amount=amount,

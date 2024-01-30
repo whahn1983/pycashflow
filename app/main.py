@@ -102,10 +102,11 @@ def create():
         startdate = request.form['startdate']
         type = request.form['type']
         schedule = Schedule(name=name,
-                          type=type,
-                          amount=amount,
-                          frequency=frequency,
-                          startdate=datetime.strptime(startdate, format).date())
+                            type=type,
+                            amount=amount,
+                            frequency=frequency,
+                            startdate=datetime.strptime(startdate, format).date(),
+                            firstdate=datetime.strptime(startdate, format).date())
         existing = Schedule.query.filter_by(name=name).first()
         if existing:
             flash("Schedule already exists")
@@ -138,8 +139,10 @@ def update():
         my_data.amount = request.form['amount']
         my_data.type = request.form['type']
         my_data.frequency = request.form['frequency']
-        my_data.startdate = request.form['startdate']
         startdate = request.form['startdate']
+        if (datetime.strptime(startdate, format).date() != my_data.startdate and my_data.startdate.day !=
+                datetime.strptime(startdate, format).day):
+            my_data.firstdate = datetime.strptime(startdate, format).date()
         my_data.startdate = datetime.strptime(startdate, format).date()
         db.session.commit()
         flash("Updated Successfully")

@@ -17,14 +17,7 @@ class Schedule(db.Model):
     frequency = db.Column(db.String(100))
     startdate = db.Column(db.Date)
     type = db.Column(db.String(100))
-
-    def to_dict(self):
-        return {
-            'name': self.name,
-            'amount': self.amount,
-            'frequency': self.frequency,
-            'startdate': self.startdate,
-        }
+    firstdate = db.Column(db.Date)
 
 
 class Balance(db.Model):
