@@ -1,6 +1,5 @@
 ![logo](./app/static/apple-touch-icon.png)
 # pycashflow
-[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/whahn1983/pycashflow/badges/quality-score.png?b=master)](https://scrutinizer-ci.com/g/whahn1983/pycashflow/?branch=master)
 [![Build Status](https://scrutinizer-ci.com/g/whahn1983/pycashflow/badges/build.png?b=master)](https://scrutinizer-ci.com/g/whahn1983/pycashflow/build-status/master)
 ![Docker Pulls](https://img.shields.io/docker/pulls/whahn1983/pycashflow)
 ![GitHub License](https://img.shields.io/github/license/whahn1983/pycashflow)
