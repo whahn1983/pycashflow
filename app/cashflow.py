@@ -144,8 +144,28 @@ def calc_schedule():
         elif frequency == 'Quarterly':
             for k in range(quarters):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=3 * k)
+                futuredateday = futuredate.day
+                firstdateday = datetime.strptime(firstdate, format).date().day
+                if firstdateday > futuredateday:
+                    try:
+                        for m in range(3):
+                            futuredateday += 1
+                            if firstdateday >= futuredateday:
+                                futuredate = futuredate.replace(day=futuredateday)
+                    except ValueError:
+                        pass
                 if futuredate <= todaydate:
                     existing.startdate = futuredate + relativedelta(months=3)
+                    daycheckdate = futuredate + relativedelta(months=3)
+                    daycheck = daycheckdate.day
+                    if firstdateday > daycheck:
+                        try:
+                            for m in range(3):
+                                daycheck += 1
+                                if firstdateday >= daycheck:
+                                    existing.startdate = daycheckdate.replace(day=daycheck)
+                        except ValueError:
+                            pass
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'BiWeekly':
