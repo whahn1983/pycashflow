@@ -7,6 +7,7 @@ import numpy as np
 from io import TextIOWrapper
 import csv
 from .models import Schedule
+import platform
 
 
 def export():
@@ -73,6 +74,8 @@ def upload(csv_file):
 def version():
     # read VERSION file and store string
     basedir = os.path.abspath(os.path.dirname(__file__))
+    pyversion = platform.python_version()
     version = open(os.path.join(basedir, 'VERSION'), 'r').read()
+    version = version + " :: python: " + pyversion
 
     return version
