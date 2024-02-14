@@ -72,10 +72,16 @@ def upload(csv_file):
 
 
 def version():
-    # read VERSION file and store string
-    basedir = os.path.abspath(os.path.dirname(__file__))
+    # get current python version
     pyversion = platform.python_version()
-    version = open(os.path.join(basedir, 'VERSION'), 'r').read()
-    version = version + " :: python: " + pyversion
+    # check for docker env variable
+    try:
+        app_version = os.environ['APP_VERSION']
+        version = "pycashflow: " + app_version + " :: python: " + pyversion
+    except KeyError:
+        # read VERSION file and store string
+        basedir = os.path.abspath(os.path.dirname(__file__))
+        app_version = open(os.path.join(basedir, 'VERSION'), 'r').read()
+        version = "pycashflow: " + app_version + " :: python: " + pyversion
 
     return version

@@ -5,7 +5,7 @@ from .models import Schedule, Balance, User, Settings, Transactions, Email, Hold
 from app import db
 from datetime import datetime
 import os
-from sqlalchemy import desc, extract, asc, select
+from sqlalchemy import desc, extract, asc
 from werkzeug.security import generate_password_hash, check_password_hash
 from .cashflow import update_cash, plot_cash
 from .auth import admin_required

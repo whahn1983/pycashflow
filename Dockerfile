@@ -2,6 +2,9 @@
 
 FROM python:3.12.2-alpine
 
+ARG DOCKER_TAG
+ENV APP_VERSION=$DOCKER_TAG
+
 WORKDIR /app
 
 COPY requirements.txt requirements.txt
