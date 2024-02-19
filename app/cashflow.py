@@ -108,7 +108,7 @@ def calc_schedule():
                                 futuredate = futuredate.replace(day=futuredateday)
                     except ValueError:
                         pass
-                if futuredate <= todaydate:
+                if futuredate <= todaydate and datetime.today().weekday() < 5:
                     existing.startdate = futuredate + relativedelta(months=1)
                     daycheckdate = futuredate + relativedelta(months=1)
                     daycheck = daycheckdate.day
@@ -130,14 +130,14 @@ def calc_schedule():
         elif frequency == 'Weekly':
             for k in range(weeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
-                if futuredate <= todaydate:
+                if futuredate <= todaydate and datetime.today().weekday() < 5:
                     existing.startdate = futuredate + relativedelta(weeks=1)
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
         elif frequency == 'Yearly':
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
-                if futuredate <= todaydate:
+                if futuredate <= todaydate and datetime.today().weekday() < 5:
                     existing.startdate = futuredate + relativedelta(years=1)
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
@@ -154,7 +154,7 @@ def calc_schedule():
                                 futuredate = futuredate.replace(day=futuredateday)
                     except ValueError:
                         pass
-                if futuredate <= todaydate:
+                if futuredate <= todaydate and datetime.today().weekday() < 5:
                     existing.startdate = futuredate + relativedelta(months=3)
                     daycheckdate = futuredate + relativedelta(months=3)
                     daycheck = daycheckdate.day
@@ -171,7 +171,7 @@ def calc_schedule():
         elif frequency == 'BiWeekly':
             for k in range(biweeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
-                if futuredate <= todaydate:
+                if futuredate <= todaydate and datetime.today().weekday() < 5:
                     existing.startdate = futuredate + relativedelta(weeks=2)
                 total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
                 db.session.add(total)
