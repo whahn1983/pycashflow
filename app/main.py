@@ -24,6 +24,14 @@ def index():
     # query the latest balance information
     balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
 
+    try:
+        float(balance.amount)
+    except:
+        balance = Balance(amount='0',
+                          date=datetime.today())
+        db.session.add(balance)
+        db.session.commit()
+
     refresh=0
 
     update_cash(balance, refresh)
