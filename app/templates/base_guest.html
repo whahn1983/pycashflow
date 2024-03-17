@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=0.65">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PyCashFlow</title>
     <link rel="shortcut icon" href="{{ url_for('main.favicon') }}">
     <link rel="apple-touch-icon" href="{{ url_for('main.appleicon') }}">
@@ -25,31 +24,24 @@
     <link rel="apple-touch-icon" href="{{url_for('static', filename='icons/icon_512x512.png')}}" type="image/png">
     <link rel="manifest" href="/manifest.json">
       <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register("/sw.js").then(function(registration) {
-          console.log('ServiceWorker registration successful with scope: ', registration.scope);
-        }, function(err) {
-          console.log('ServiceWorker registration failed: ', err);
-        });
-      });
-    }
-  </script>
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function() {
+            navigator.serviceWorker.register("/sw.js").then(function(registration) {
+              console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            }, function(err) {
+              console.log('ServiceWorker registration failed: ', err);
+            });
+          });
+        }
+      </script>
+    <meta name="viewport" content="width=device-width, initial-scale=0.65">
 </head>
-
 <body>
     <div class="container">
         <div class="topnav1" id="myTopnav">
             <div class="dropdown1">
-                <button class="dropbtn">
-                    <i class="fa fa-bars"></i>
-                </button>
-                <div class="dropdown-content1">
-                    <a href="/">Home </a>
-                    <a href="/schedule">Schedules </a>
-                    <a href="/transactions">Transactions </a>
-                    <a href="/holds">Holds/Skips </a>
-                </div>
+                <a href="/" class="dropbtn">
+                    <i class="fa fa-home"></i></a>
             </div>
             <div class="dropdown1" style="float:right">
                 <button class="dropbtn">
@@ -60,17 +52,10 @@
                     <a href="/logout">Log Out </a>
                 </div>
             </div>
-            <div class="dropdown1" style="float:right">
-                <a href="/settings" class="dropbtn">
-                    <i class="fa fa-gear"></i></a>
-            </div>
         </div>
-            <div style="clear: both">
-                &nbsp;
-
-                {% block content%}{% endblock %}
-
-            </div>
+        <div style="clear: both">
+            {% block content%}{% endblock %}
         </div>
-    </body>
+    </div>
+</body>
 </html>
