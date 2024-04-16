@@ -322,17 +322,21 @@ def signups():
         signupsettingname = Settings.query.filter_by(name='signup').first()
 
         if signupsettingname:
-            signupvalue = request.form['signupvalue']
-            signupsettingname.value = eval(signupvalue)
+            if request.form['signupvalue'] == "True":
+                signupvalue = True
+            else:
+                signupvalue = False
+            signupsettingname.value = signupvalue
             db.session.commit()
 
             return redirect(url_for('main.settings'))
 
         # store the signup option value in the database to check when the user clicks signup
-        signupvalue = request.form['signupvalue']
-        signupvalue = eval(signupvalue)
-        settings = Settings(name="signup",
-                          value=signupvalue)
+        if request.form['signupvalue'] == "True":
+            signupvalue = True
+        else:
+            signupvalue = False
+        settings = Settings(name="signup", value=signupvalue)
         db.session.add(settings)
         db.session.commit()
 
@@ -415,7 +419,11 @@ def update_user():
         my_data = User.query.get(request.form.get('id'))
         my_data.name = request.form['name']
         my_data.email = request.form['email']
-        my_data.admin = eval(request.form['admin'])
+        if request.form['admin'] == "True":
+            adminvalue = True
+        else:
+            adminvalue = False
+        my_data.admin = adminvalue
         db.session.commit()
         flash("Updated Successfully")
 
@@ -447,9 +455,12 @@ def create_user():
     if request.method == 'POST':
         name = request.form['name']
         email = request.form['email']
-        admin = eval(request.form['admin'])
+        if request.form['admin'] == "True":
+            adminvalue = True
+        else:
+            adminvalue = False
         password = generate_password_hash(request.form['password'], method='scrypt')
-        user = User(name=name, email=email, admin=admin, password=password)
+        user = User(name=name, email=email, admin=adminvalue, password=password)
         existing = User.query.filter_by(email=email).first()
         if existing:
             flash("User already exists")
