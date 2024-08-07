@@ -4,7 +4,7 @@ checks:
         duplicate_code: true
 build:
     environment:
-        python: 3.12.4
+        python: 3.12.5
     nodes:
         analysis:
             project_setup:
