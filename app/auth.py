@@ -6,9 +6,29 @@ from app import db
 import pandas as pd
 import os
 from functools import wraps
+from typing import List
+from corbado_python_sdk.entities.session_validation_result import (
+    SessionValidationResult,
+)
+from corbado_python_sdk.generated.models.identifier import Identifier
+from werkzeug.exceptions import Unauthorized
+from corbado_python_sdk import (
+    Config,
+    CorbadoSDK,
+)
 
 
 auth = Blueprint('auth', __name__)
+
+
+# Config has a default values for 'short_session_cookie_name' and 'BACKEND_API'
+config: Config = Config(
+    api_secret=os.environ['API_SECRET'],
+    project_id=os.environ['PROJECT_ID']
+)
+
+# Initialize SDK
+sdk: CorbadoSDK = CorbadoSDK(config=config)
 
 
 @auth.route('/login')
@@ -108,3 +128,48 @@ def admin_required(f):
         else:
             return redirect(url_for('main.index'))
     return decorated_function
+
+
+@auth.route('/passkey_login')
+def login_passkey():
+    project_id = os.environ['PROJECT_ID']
+
+    return render_template('passkey_login.html', project_id=project_id)
+
+
+@auth.route('/passkey_login_post')
+def login_passkey_post():
+
+    token: str = request.cookies.get(config.short_session_cookie_name) or ""
+    validation_result: SessionValidationResult = sdk.sessions.get_current_user(
+        short_session=token
+    )
+
+    if validation_result.authenticated:
+        session_user = sdk.sessions.get_current_user(token)
+        email_identifiers: List[Identifier] = sdk.identifiers.list_all_emails_by_user_id(
+            user_id=session_user.user_id)
+        email = email_identifiers[0].value
+    else:
+        raise Unauthorized()
+
+    user = User.query.filter_by(email=email).first()
+
+    # check if the user actually exists
+    # take the user-supplied password, hash it, and compare it to the hashed password in the database
+    if not user:
+        flash('Please check your login details and try again.')
+        return redirect(url_for('auth.login'))  # if the user doesn't exist or password is wrong, reload the page
+
+    # fix for no admin user to make current user an admin
+    user_test = User.query.filter_by(admin=True).first()
+    if not user_test:
+        user.admin = 1
+        db.session.commit()
+
+    # if the above check passes, then we know the user has the right credentials
+    login_user(user, remember=True)
+    session['name'] = user.name
+    session['email'] = user.email
+
+    return redirect(url_for('main.index'))

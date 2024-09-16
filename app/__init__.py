@@ -4,6 +4,7 @@ from flask_login import LoginManager
 import secrets
 import os
 from flask_migrate import Migrate
+from dotenv import load_dotenv
 
 
 # init SQLAlchemy so we can use it later in our models
@@ -12,7 +13,20 @@ migrate = Migrate()
 
 
 def create_app():
+
     app = Flask(__name__, static_url_path='/static')
+
+    # Load environment variables from .env file
+    load_dotenv()
+
+    PROJECT_ID: str = os.environ.get("PROJECT_ID") or ""
+    API_SECRET: str = os.environ.get("API_SECRET") or ""
+
+    # Use the API_SECRET from the environment variables
+    app.config["API_SECRET"] = API_SECRET
+
+    # Pass PROJECT_ID as a context variable to templates
+    app.config["PROJECT_ID"] = PROJECT_ID
 
     basedir = os.path.abspath(os.path.dirname(__file__))
     secret = secrets.token_urlsafe(16)

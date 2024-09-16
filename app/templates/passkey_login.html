@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+        <link
+          rel="stylesheet"
+          href="https://unpkg.com/@corbado/web-js@2/dist/bundle/index.css"
+        />
+        <script src="https://unpkg.com/@corbado/web-js@2/dist/bundle/index.js"></script>
+
+        <script type="module">
+            const CORBADO_PROJECT_ID = "{{ project_id }}";
+
+            await Corbado.load({
+                // If you want to set other options like styling and translations check the full list of options at
+                // https://docs.corbado.com/frontend-integration/ui-components/corbadoprovider#api-reference
+                projectId: CORBADO_PROJECT_ID,
+
+                darkMode: "off",
+                // We activated short-term session cookie dropping here because you need it for multi-page
+                // applications (MPA). If you implement a single-page application (SPA) you can most likely
+                // deactivate this option.
+                setShortSessionCookie: true,
+            });
+
+            const authElement = document.getElementById("corbado-auth");
+            Corbado.mountAuthUI(authElement, {
+                onLoggedIn: () => (window.location.href = "/passkey_login_post"),
+            });
+    </script>
+    <div id="corbado-auth"></div>
+{% endblock %}

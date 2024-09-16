@@ -30,8 +30,9 @@
                 </label>
             </div>
             <button class="button is-block is-info is-large is-fullwidth">Login</button>
+            <a href="{{url_for('auth.login_passkey')}}" class="button is-block is-info is-large is-fullwidth">Passkey</a>
+            <a style="color:black; float:right" href="{{url_for('auth.signup')}}">Sign Up</a>
         </form>
-        <a style="color:black" href="{{url_for('auth.signup')}}">Sign Up</a>
     </div>
 </div>
 {% endblock %}
