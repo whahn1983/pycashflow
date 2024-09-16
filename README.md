@@ -15,6 +15,7 @@ Python Flask application for future cash flow calculation and management.
 * Enable reading emails via IMAP to search for balance alerts from bank to automatically update balance
 * User management with guest user access to view cash flow plot only
 * Import/Export CSV of the schedule table
+* Passkey Support through Corbado
 
 
 ![screenshot](https://github.com/whahn1983/pycashflow/assets/7118098/ac7c3556-232e-4571-9840-64d0341eeebe)
@@ -44,6 +45,13 @@ Also consider mounting the Flask Migrate folder to save your database migration 
 
 ```
 -v /mnt/migrations:/app/migrations
+```
+<br />
+
+For Passkey support, ensure a .env file with your Corbado API key and Project ID is mounted 
+
+```
+-v /mnt/.env:/app/app/.env
 ```
 
 <br />
