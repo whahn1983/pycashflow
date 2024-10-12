@@ -21,11 +21,14 @@ from corbado_python_sdk import (
 auth = Blueprint('auth', __name__)
 
 
+short_session_cookie_name = "cbo_short_session"
 # Config has a default values for 'short_session_cookie_name' and 'BACKEND_API'
 config: Config = Config(
     api_secret=os.environ['API_SECRET'],
-    project_id=os.environ['PROJECT_ID']
+    project_id=os.environ['PROJECT_ID'],
+    frontend_api=os.environ['FRONTEND_URI'],
 )
+config.frontend_api = os.environ['FRONTEND_URI']
 
 # Initialize SDK
 sdk: CorbadoSDK = CorbadoSDK(config=config)
@@ -133,8 +136,9 @@ def admin_required(f):
 @auth.route('/passkey_login')
 def login_passkey():
     project_id = os.environ['PROJECT_ID']
+    frontend_uri = os.environ['FRONTEND_URI']
 
-    return render_template('passkey_login.html', project_id=project_id)
+    return render_template('passkey_login.html', project_id=project_id, frontend_uri=frontend_uri)
 
 
 @auth.route('/passkey_login_post')

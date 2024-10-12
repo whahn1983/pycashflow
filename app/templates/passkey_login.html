@@ -9,11 +9,13 @@
 
         <script type="module">
             const CORBADO_PROJECT_ID = "{{ project_id }}";
+            const FRONTEND_URI = "{{ frontend_uri }}";
 
             await Corbado.load({
                 // If you want to set other options like styling and translations check the full list of options at
                 // https://docs.corbado.com/frontend-integration/ui-components/corbadoprovider#api-reference
                 projectId: CORBADO_PROJECT_ID,
+                frontendApiUrl: FRONTEND_URI,
 
                 darkMode: "off",
                 // We activated short-term session cookie dropping here because you need it for multi-page
