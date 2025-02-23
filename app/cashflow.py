@@ -1,5 +1,5 @@
 from app import db
-from .models import Schedule, Total, Running, Transactions, Skip, Balance
+from .models import Schedule, Skip
 from datetime import datetime, date
 import pandas as pd
 import json
@@ -11,58 +11,16 @@ from natsort import index_natsorted
 import numpy as np
 import decimal
 import plotly.graph_objs as go
-from pathlib import Path
 
 
-def update_cash(balance, refresh):
-    # if the database has been modified, update the calculations
-    try:
-        modifiedtime = os.path.getmtime(os.environ.get('DATABASE_URL').replace('sqlite:///', ''))
-        modifiedtime = datetime.fromtimestamp(modifiedtime)
-        modpath = os.environ.get('DATABASE_URL').replace('sqlite:///', '')
-        modpath = modpath.replace('db.sqlite', 'modified')
-        os.close(os.open(modpath, os.O_CREAT))
-        dbmodified = os.path.getmtime(modpath)
-        dbmodified = datetime.fromtimestamp(dbmodified)
-    except:
-        basedir = os.path.abspath(os.path.dirname(__file__))
-        datafile = os.path.join(basedir, "data/db.sqlite")
-        modifiedtime = os.path.getmtime(datafile)
-        modifiedtime = datetime.fromtimestamp(modifiedtime)
-        modpath = os.path.join(basedir, "data/modified")
-        os.close(os.open(modpath, os.O_CREAT))
-        dbmodified = os.path.getmtime(modpath)
-        dbmodified = datetime.fromtimestamp(dbmodified)
+def update_cash(balance):
+    # calculate total events for the year amount
+    total = calc_schedule()
 
-    dt = date.today()
-    today = datetime.combine(dt, datetime.min.time())
+    # calculate sum of running transactions
+    trans, run = calc_transactions(balance, total)
 
-    if modifiedtime > dbmodified or dbmodified < today or refresh == 1:
-        try:
-            if balance.amount:
-                db.session.query(Balance).delete()
-                balance = Balance(amount=balance.amount, date=datetime.today())
-                db.session.add(balance)
-                db.session.commit()
-        except:
-            balance = Balance(amount='0',
-                              date=datetime.today())
-            db.session.add(balance)
-            db.session.commit()
-
-        # empty the tables to create fresh data from the schedule
-        db.session.query(Total).delete()
-        db.session.query(Running).delete()
-        db.session.query(Transactions).delete()
-        db.session.commit()
-
-        # calculate total events for the year amount
-        calc_schedule()
-
-        # calculate sum of running transactions
-        calc_transactions(balance)
-
-        Path(modpath).touch()
+    return trans, run
 
 
 def calc_schedule():
@@ -79,6 +37,7 @@ def calc_schedule():
 
     # pull the schedule information
     df = pd.read_sql('SELECT * FROM schedule;', engine)
+    total = pd.DataFrame(columns=['type', 'name', 'amount', 'date'])
 
     # loop through the schedule and create transactions in a table out to the future number of years
     todaydate = datetime.today().date()
@@ -122,25 +81,55 @@ def calc_schedule():
                             pass
                 if type == 'Income':
                     rollbackdate = datetime.combine(futuredate, datetime.min.time())
-                    total = Total(type=type, name=name, amount=amount,
-                                  date=pd.tseries.offsets.BDay(1).rollback(rollbackdate).date())
+
+                    # Create a new row
+                    new_row = {
+                        'type': type,
+                        'name': name,
+                        'amount': amount,
+                        'date': pd.tseries.offsets.BDay(1).rollback(rollbackdate).date()
+                    }
+                    # Append the row to the DataFrame
+                    total = pd.concat([total, pd.DataFrame([new_row])], ignore_index=True)
                 else:
-                    total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
-                db.session.add(total)
+                    # Create a new row
+                    new_row = {
+                        'type': type,
+                        'name': name,
+                        'amount': amount,
+                        'date': (futuredate - pd.tseries.offsets.BDay(0)).date()
+                    }
+                    # Append the row to the DataFrame
+                    total = pd.concat([total, pd.DataFrame([new_row])], ignore_index=True)
         elif frequency == 'Weekly':
             for k in range(weeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
                 if futuredate <= todaydate and datetime.today().weekday() < 5:
                     existing.startdate = futuredate + relativedelta(weeks=1)
-                total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
-                db.session.add(total)
+                # Create a new row
+                new_row = {
+                    'type': type,
+                    'name': name,
+                    'amount': amount,
+                    'date': (futuredate - pd.tseries.offsets.BDay(0)).date()
+                }
+                # Append the row to the DataFrame
+                total = pd.concat([total, pd.DataFrame([new_row])], ignore_index=True)
         elif frequency == 'Yearly':
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
                 if futuredate <= todaydate and datetime.today().weekday() < 5:
                     existing.startdate = futuredate + relativedelta(years=1)
-                total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
-                db.session.add(total)
+                # Create a new row
+                new_row = {
+                    'type': type,
+                    'name': name,
+                    'amount': amount,
+                    'date': (futuredate - pd.tseries.offsets.BDay(0)).date()
+                }
+
+                # Append the row to the DataFrame
+                total = pd.concat([total, pd.DataFrame([new_row])], ignore_index=True)
         elif frequency == 'Quarterly':
             for k in range(quarters):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=3 * k)
@@ -166,22 +155,43 @@ def calc_schedule():
                                     existing.startdate = daycheckdate.replace(day=daycheck)
                         except ValueError:
                             pass
-                total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
-                db.session.add(total)
+                # Create a new row
+                new_row = {
+                    'type': type,
+                    'name': name,
+                    'amount': amount,
+                    'date': (futuredate - pd.tseries.offsets.BDay(0)).date()
+                }
+                # Append the row to the DataFrame
+                total = pd.concat([total, pd.DataFrame([new_row])], ignore_index=True)
         elif frequency == 'BiWeekly':
             for k in range(biweeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
                 if futuredate <= todaydate and datetime.today().weekday() < 5:
                     existing.startdate = futuredate + relativedelta(weeks=2)
-                total = Total(type=type, name=name, amount=amount, date=futuredate - pd.tseries.offsets.BDay(0))
-                db.session.add(total)
+                # Create a new row
+                new_row = {
+                    'type': type,
+                    'name': name,
+                    'amount': amount,
+                    'date': (futuredate - pd.tseries.offsets.BDay(0)).date()
+                }
+                # Append the row to the DataFrame
+                total = pd.concat([total, pd.DataFrame([new_row])], ignore_index=True)
         elif frequency == 'Onetime':
             futuredate = datetime.strptime(startdate, format).date()
             if futuredate < todaydate:
                 db.session.delete(existing)
             else:
-                total = Total(type=type, name=name, amount=amount, date=futuredate)
-                db.session.add(total)
+                # Create a new row
+                new_row = {
+                    'type': type,
+                    'name': name,
+                    'amount': amount,
+                    'date': futuredate
+                }
+                # Append the row to the DataFrame
+                total = pd.concat([total, pd.DataFrame([new_row])], ignore_index=True)
     db.session.commit()
 
     # add the hold items
@@ -190,9 +200,15 @@ def calc_schedule():
         name = df['name'][i]
         amount = df['amount'][i]
         type = df['type'][i]
-        total = Total(type=type, name=name, amount=amount, date=todaydate + relativedelta(days=1))
-        db.session.add(total)
-    db.session.commit()
+        # Create a new row
+        new_row = {
+            'type': type,
+            'name': name,
+            'amount': amount,
+            'date': todaydate + relativedelta(days=1)
+        }
+        # Append the row to the DataFrame
+        total = pd.concat([total, pd.DataFrame([new_row])], ignore_index=True)
 
     # add the skip items
     df = pd.read_sql('SELECT * FROM skip;', engine)
@@ -206,41 +222,48 @@ def calc_schedule():
             skip = Skip.query.filter_by(name=name).first()
             db.session.delete(skip)
         else:
-            total = Total(type=type, name=name, amount=amount, date=datetime.strptime(date, format).date())
-            db.session.add(total)
-    db.session.commit()
+            # Create a new row
+            new_row = {
+                'type': type,
+                'name': name,
+                'amount': amount,
+                'date': datetime.strptime(date, format).date()
+            }
+            # Append the row to the DataFrame
+            total = pd.concat([total, pd.DataFrame([new_row])], ignore_index=True)
+
+    return total
 
 
-def calc_transactions(balance):
-    try:
-        engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
-    except:
-        engine = db.create_engine('sqlite:///db.sqlite').connect()
-
+def calc_transactions(balance, total):
     # retrieve the total future transactions
-    df = pd.read_sql('SELECT * FROM total;', engine)
-    df = df.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(df["date"])))
-
+    df = total.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(total["date"])))
+    trans = pd.DataFrame(columns=['name', 'type', 'amount', 'date'])
     # collect the next 60 days of transactions for the transactions table
     format = '%Y-%m-%d'
     todaydate = datetime.today().date()
     todaydateplus = todaydate + relativedelta(months=2)
-    for i in df.iterrows():
+    for i in df.itertuples(index=False):
         if todaydateplus > \
-                datetime.strptime(i[1].date, format).date() > todaydate and "(SKIP)" not in i[1].iloc[3]:
-            transactions = Transactions(name=i[1].iloc[3], type=i[1].type, amount=i[1].amount,
-                                        date=datetime.strptime(i[1].date, format).date())
-            db.session.add(transactions)
-    db.session.commit()
+                i.date > todaydate and "(SKIP)" not in i.name:
+            # Create a new row from i[1]
+            new_row = {
+                'name': i.name,  # Accessing the 4th column value
+                'type': i.type,
+                'amount': i.amount,
+                'date': i.date
+            }
+            # Append the row to the DataFrame
+            trans = pd.concat([trans, pd.DataFrame([new_row])], ignore_index=True)
 
     # for schedules marked as expenses, make the value negative for the sum
-    for i in df.iterrows():
-        id = i[1].id
-        amount = i[1].amount
-        type = i[1].type
+    for i in df.itertuples(index=False):
+        name = i.name
+        amount = i.amount
+        type = i.type
         if type == 'Expense':
             amount = float(amount) * -1
-            df.at[id - 1, 'amount'] = amount
+            df.loc[df['name'] == name, 'amount'] = amount
         elif type == 'Income':
             pass
 
@@ -248,30 +271,34 @@ def calc_transactions(balance):
     df = df.groupby("date")['amount'].sum().reset_index()
 
     # loop through the total transactions by date and add the sums to the total balance amount
-    runbalance = float(balance.amount)
-    running = Running(amount=runbalance, date=datetime.today().date())
-    db.session.add(running)
-    for i in df.iterrows():
-        format = '%Y-%m-%d'
-        rundate = i[1].date
-        amount = i[1].amount
-        if datetime.strptime(rundate, format).date() > todaydate:
+    runbalance = balance
+    run = pd.DataFrame(columns=['amount', 'date'])
+    # Create a new row
+    new_row = {
+        'amount': runbalance,
+        'date': datetime.today().date()
+    }
+    # Append the row to the DataFrame
+    run = pd.concat([run, pd.DataFrame([new_row])], ignore_index=True)
+    for i in df.itertuples(index=False):
+        rundate = i.date
+        amount = i.amount
+        if i.date > todaydate:
             runbalance += amount
-            running = Running(amount=runbalance, date=datetime.strptime(rundate, format).date())
-            db.session.add(running)
-    db.session.commit()
+            # Create a new row
+            new_row = {
+                'amount': runbalance,
+                'date': rundate
+            }
+            # Append the row to the DataFrame
+            run = pd.concat([run, pd.DataFrame([new_row])], ignore_index=True)
+
+    return trans, run
 
 
-def plot_cash():
-    try:
-        engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
-    except:
-        engine = db.create_engine('sqlite:///db.sqlite').connect()
-
+def plot_cash(run):
     # plot the running balances by date on a line plot
-    df = pd.read_sql('SELECT * FROM running;', engine)
-    df = df.sort_values(by='date', ascending=False)
-    format = '%Y-%m-%d'
+    df = run.sort_values(by='date', ascending=False)
     minbalance = df['amount'].min()
     minbalance = decimal.Decimal(str(minbalance)).quantize(decimal.Decimal('.01'))
     if float(minbalance) >= 0:
@@ -281,10 +308,10 @@ def plot_cash():
     maxbalance = 0
     todaydate = datetime.today().date()
     todaydateplus = todaydate + relativedelta(months=2)
-    for i in df.iterrows():
-        if todaydateplus > datetime.strptime(i[1].date, format).date() > todaydate:
-            if i[1].amount > maxbalance:
-                maxbalance = i[1].amount
+    for i in df.itertuples(index=False):
+        if todaydateplus > i.date > todaydate:
+            if i.amount > maxbalance:
+                maxbalance = i.amount
     maxrange = maxbalance * 1.1
     start_date = str(datetime.today().date())
     end_date = str(datetime.today().date() + relativedelta(months=2))

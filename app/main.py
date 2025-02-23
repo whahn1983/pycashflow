@@ -1,7 +1,7 @@
 from flask import request, redirect, url_for, send_from_directory, flash, send_file, Response
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Balance, User, Settings, Transactions, Email, Hold, Skip
+from .models import Schedule, Balance, User, Settings, Email, Hold, Skip
 from app import db
 from datetime import datetime
 import os
@@ -26,18 +26,20 @@ def index():
 
     try:
         float(balance.amount)
+        db.session.query(Balance).delete()
+        balance = Balance(amount=balance.amount, date=datetime.today())
+        db.session.add(balance)
+        db.session.commit()
     except:
         balance = Balance(amount='0',
                           date=datetime.today())
         db.session.add(balance)
         db.session.commit()
 
-    refresh=0
-
-    update_cash(balance, refresh)
+    trans, run = update_cash(float(balance.amount))
 
     # plot cash flow results
-    minbalance, graphJSON = plot_cash()
+    minbalance, graphJSON = plot_cash(run)
 
     if current_user.admin:
         return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
@@ -50,10 +52,6 @@ def index():
 @main.route('/refresh')
 @login_required
 def refresh():
-    balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
-    refresh=1
-
-    update_cash(balance, refresh)
 
     return redirect(url_for('main.index'))
 
@@ -179,13 +177,15 @@ def addhold(id):
 @admin_required
 def addskip(id):
     # add a skip item from the schedule
-    transaction = Transactions.query.filter_by(id=id).first()
+    balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
+    trans , run = update_cash(float(balance.amount))
+    transaction = trans.loc[int(id)]
     trans_type = ""
-    if transaction.type == "Expense":
+    if transaction[1] == "Expense":
         trans_type = "Income"
-    elif transaction.type == "Income":
+    elif transaction[1] == "Income":
         trans_type = "Expense"
-    skip = Skip(name=transaction.name + " (SKIP)", type=trans_type, amount=transaction.amount, date=transaction.date)
+    skip = Skip(name=transaction[0] + " (SKIP)", type=trans_type, amount=transaction[2], date=transaction[3])
     db.session.add(skip)
     db.session.commit()
     flash("Added Skip")
@@ -349,9 +349,10 @@ def signups():
 @login_required
 @admin_required
 def transactions():
-    total = Transactions.query
+    balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
+    trans, run = update_cash(float(balance.amount))
 
-    return render_template('transactions_table.html', total=total)
+    return render_template('transactions_table.html', total=trans.to_dict(orient='records'))
 
 
 @main.route('/email', methods=('GET', 'POST'))

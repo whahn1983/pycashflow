@@ -26,14 +26,6 @@ class Balance(db.Model):
     date = db.Column(db.Date)
 
 
-class Total(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    amount = db.Column(db.Numeric(10, 2))
-    date = db.Column(db.Date)
-    name = db.Column(db.String(100))
-    type = db.Column(db.String(100))
-
-
 class Hold(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     amount = db.Column(db.Numeric(10, 2))
@@ -49,24 +41,10 @@ class Skip(db.Model):
     type = db.Column(db.String(100))
 
 
-class Running(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    amount = db.Column(db.Numeric(10, 2))
-    date = db.Column(db.Date)
-
-
 class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True)
     value = db.Column(db.Boolean)
-
-
-class Transactions(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    date = db.Column(db.Date)
-    amount = db.Column(db.Numeric(10, 2))
-    type = db.Column(db.String(100))
 
 
 class Email(db.Model):

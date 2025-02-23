@@ -7,9 +7,10 @@ import pandas as pd
 import os
 from functools import wraps
 from typing import List
-from corbado_python_sdk.entities.session_validation_result import (
-    SessionValidationResult,
-)
+#from corbado_python_sdk.entities.session_validation_result import (
+#    SessionValidationResult,
+#)
+import corbado_python_sdk as corbado
 from corbado_python_sdk.generated.models.identifier import Identifier
 from werkzeug.exceptions import Unauthorized
 from corbado_python_sdk import (
@@ -27,6 +28,7 @@ config: Config = Config(
     api_secret=os.environ['API_SECRET'],
     project_id=os.environ['PROJECT_ID'],
     frontend_api=os.environ['FRONTEND_URI'],
+    backend_api="https://backendapi.cloud.corbado.io",
 )
 config.frontend_api = os.environ['FRONTEND_URI']
 
@@ -145,7 +147,7 @@ def login_passkey():
 def login_passkey_post():
 
     token: str = request.cookies.get(config.short_session_cookie_name) or ""
-    validation_result: SessionValidationResult = sdk.sessions.get_current_user(
+    validation_result: corbado.CorbadoSDK.SessionValidationResult = sdk.sessions.get_current_user(
         short_session=token
     )
 

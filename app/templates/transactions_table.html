@@ -36,13 +36,13 @@
 
                     {% for row in total %}
                     <tr>
-                        <td style="display:none;">{{row.id}}</td>
+                        <td style="display:none;">{{loop.index0}}</td>
                         <td style="color:white">{{row.name}}</td>
                         <td style="color:white">{{row.date}}</td>
                         <td style="color:white">{{row.type}}</td>
                         <td style="color:white">{{row.amount}}</td>
                         <td>
-                            <a href = "/addskip/{{row.id}}" class="btn btn-success btn-xs">Skip</a>
+                            <a href = "/addskip/{{loop.index0}}" class="btn btn-success btn-xs">Skip</a>
                         </td>
                     </tr>
                     {% endfor %}
