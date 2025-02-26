@@ -4,7 +4,6 @@ from datetime import datetime, date
 import pandas as pd
 import json
 import plotly
-import plotly.express as px
 import os
 from dateutil.relativedelta import relativedelta
 from natsort import index_natsorted
@@ -317,11 +316,12 @@ def plot_cash(run):
     end_date = str(datetime.today().date() + relativedelta(months=2))
     layout = go.Layout(yaxis=dict(range=[minrange, maxrange]), xaxis=dict(range=[start_date, end_date]),
                        margin=dict(l=5, r=20, t=35, b=5), dragmode='pan')
-    fig = px.line(df, x="date", y="amount", template="plotly", title="Cash Flow", line_shape="spline")
+    fig = go.Figure(data=go.Scatter(x=df['date'], y=df['amount'], mode='lines', line=dict(shape='spline', smoothing=0.8)))
     fig.update_layout(layout)
     fig.update_xaxes(title_text='Date')
     fig.update_yaxes(title_text='Amount')
     fig.update_layout(paper_bgcolor="PaleTurquoise")
+    fig.update_layout(title="Cash Flow")
 
     graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
