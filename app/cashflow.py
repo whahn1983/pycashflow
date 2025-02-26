@@ -323,6 +323,7 @@ def plot_cash(run):
     fig.update_layout(paper_bgcolor="PaleTurquoise")
     fig.update_layout(title="Cash Flow")
     fig.update_layout(xaxis_type='date')
+    fig.update_layout(yaxis_tickformat='$,.2f')
 
     graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
