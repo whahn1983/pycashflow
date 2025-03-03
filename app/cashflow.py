@@ -256,14 +256,13 @@ def calc_transactions(balance, total):
             trans = pd.concat([trans, pd.DataFrame([new_row])], ignore_index=True)
 
     # for schedules marked as expenses, make the value negative for the sum
-    for i in df.itertuples(index=False):
-        name = i.name
+    for i in df.itertuples():
         amount = i.amount
-        type = i.type
-        if type == 'Expense':
+        exp_type = i.type
+        if exp_type == 'Expense':
             amount = float(amount) * -1
-            df.loc[df['name'] == name, 'amount'] = amount
-        elif type == 'Income':
+            df.loc[i.Index, 'amount'] = amount
+        elif exp_type == 'Income':
             pass
 
     # group total transactions by date and sum the amounts for each date
