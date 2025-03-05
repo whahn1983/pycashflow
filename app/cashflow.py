@@ -36,7 +36,7 @@ def calc_schedule():
 
     # pull the schedule information
     df = pd.read_sql('SELECT * FROM schedule;', engine)
-    total = pd.DataFrame(columns=['type', 'name', 'amount', 'date'])
+    total_dict = {}
 
     # loop through the schedule and create transactions in a table out to the future number of years
     todaydate = datetime.today().date()
@@ -88,7 +88,7 @@ def calc_schedule():
                         'date': pd.tseries.offsets.BDay(1).rollback(rollbackdate).date()
                     }
                     # Append the row to the DataFrame
-                    total.loc[len(total)] = new_row
+                    total_dict[len(total_dict)] = new_row
                 else:
                     # Create a new row
                     new_row = {
@@ -98,7 +98,7 @@ def calc_schedule():
                         'date': (futuredate - pd.tseries.offsets.BDay(0)).date()
                     }
                     # Append the row to the DataFrame
-                    total.loc[len(total)] = new_row
+                    total_dict[len(total_dict)] = new_row
         elif frequency == 'Weekly':
             for k in range(weeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
@@ -112,7 +112,7 @@ def calc_schedule():
                     'date': (futuredate - pd.tseries.offsets.BDay(0)).date()
                 }
                 # Append the row to the DataFrame
-                total.loc[len(total)] = new_row
+                total_dict[len(total_dict)] = new_row
         elif frequency == 'Yearly':
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
@@ -126,7 +126,7 @@ def calc_schedule():
                     'date': (futuredate - pd.tseries.offsets.BDay(0)).date()
                 }
                 # Append the row to the DataFrame
-                total.loc[len(total)] = new_row
+                total_dict[len(total_dict)] = new_row
         elif frequency == 'Quarterly':
             for k in range(quarters):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=3 * k)
@@ -160,7 +160,7 @@ def calc_schedule():
                     'date': (futuredate - pd.tseries.offsets.BDay(0)).date()
                 }
                 # Append the row to the DataFrame
-                total.loc[len(total)] = new_row
+                total_dict[len(total_dict)] = new_row
         elif frequency == 'BiWeekly':
             for k in range(biweeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
@@ -174,7 +174,7 @@ def calc_schedule():
                     'date': (futuredate - pd.tseries.offsets.BDay(0)).date()
                 }
                 # Append the row to the DataFrame
-                total.loc[len(total)] = new_row
+                total_dict[len(total_dict)] = new_row
         elif frequency == 'Onetime':
             futuredate = datetime.strptime(startdate, format).date()
             if futuredate < todaydate:
@@ -188,7 +188,7 @@ def calc_schedule():
                     'date': futuredate
                 }
                 # Append the row to the DataFrame
-                total.loc[len(total)] = new_row
+                total_dict[len(total_dict)] = new_row
     db.session.commit()
 
     # add the hold items
@@ -205,7 +205,7 @@ def calc_schedule():
             'date': todaydate + relativedelta(days=1)
         }
         # Append the row to the DataFrame
-        total.loc[len(total)] = new_row
+        total_dict[len(total_dict)] = new_row
 
     # add the skip items
     df = pd.read_sql('SELECT * FROM skip;', engine)
@@ -227,7 +227,9 @@ def calc_schedule():
                 'date': datetime.strptime(date, format).date()
             }
             # Append the row to the DataFrame
-            total.loc[len(total)] = new_row
+            total_dict[len(total_dict)] = new_row
+
+    total = pd.DataFrame.from_dict(total_dict, orient="index")
 
     return total
 
@@ -235,7 +237,7 @@ def calc_schedule():
 def calc_transactions(balance, total):
     # retrieve the total future transactions
     df = total.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(total["date"])))
-    trans = pd.DataFrame(columns=['name', 'type', 'amount', 'date'])
+    trans_dict = {}
     # collect the next 60 days of transactions for the transactions table
     todaydate = datetime.today().date()
     todaydateplus = todaydate + relativedelta(months=2)
@@ -250,7 +252,9 @@ def calc_transactions(balance, total):
                 'date': i.date
             }
             # Append the row to the DataFrame
-            trans.loc[len(trans)] = new_row
+            trans_dict[len(trans_dict)] = new_row
+
+    trans = pd.DataFrame.from_dict(trans_dict, orient="index")
 
     # for schedules marked as expenses, make the value negative for the sum
     for i in df.itertuples():
@@ -267,14 +271,14 @@ def calc_transactions(balance, total):
 
     # loop through the total transactions by date and add the sums to the total balance amount
     runbalance = balance
-    run = pd.DataFrame(columns=['amount', 'date'])
+    run_dict = {}
     # Create a new row
     new_row = {
         'amount': runbalance,
         'date': datetime.today().date()
     }
     # Append the row to the DataFrame
-    run.loc[len(run)] = new_row
+    run_dict[len(run_dict)] = new_row
     for i in df.itertuples(index=False):
         rundate = i.date
         amount = i.amount
@@ -286,7 +290,9 @@ def calc_transactions(balance, total):
                 'date': rundate
             }
             # Append the row to the DataFrame
-            run.loc[len(run)] = new_row
+            run_dict[len(run_dict)] = new_row
+
+    run = pd.DataFrame.from_dict(run_dict, orient="index")
 
     return trans, run
 
