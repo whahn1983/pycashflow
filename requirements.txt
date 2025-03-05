@@ -12,4 +12,4 @@ waitress>=2.1.2
 werkzeug>=2.3.7
 passkeys>=2.0.0
 python-dotenv>=1.0.1
-pydantic_core==2.29.0
+pydantic_core<=2.29.0
