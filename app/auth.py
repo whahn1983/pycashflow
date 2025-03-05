@@ -6,16 +6,8 @@ from app import db
 import pandas as pd
 import os
 from functools import wraps
-from typing import List
-from corbado_python_sdk.entities.session_validation_result import (
-    SessionValidationResult,
-)
-from corbado_python_sdk.generated.models.identifier import Identifier
 from werkzeug.exceptions import Unauthorized
-from corbado_python_sdk import (
-    Config,
-    CorbadoSDK,
-)
+from corbado_python_sdk import Config, CorbadoSDK, UserEntity
 
 
 auth = Blueprint('auth', __name__)
@@ -145,17 +137,12 @@ def login_passkey():
 @auth.route('/passkey_login_post')
 def login_passkey_post():
 
-    token: str = request.cookies.get(config.short_session_cookie_name) or ""
-    validation_result: SessionValidationResult = sdk.sessions.get_current_user(
-        short_session=token
-    )
-
-    if validation_result.authenticated:
-        session_user = sdk.sessions.get_current_user(token)
-        email_identifiers: List[Identifier] = sdk.identifiers.list_all_emails_by_user_id(
-            user_id=session_user.user_id)
+    auth_user = get_authenticated_user_from_cookie()
+    if auth_user:
+        email_identifiers = sdk.identifiers.list_all_emails_by_user_id(user_id=auth_user.user_id)
         email = email_identifiers[0].value
     else:
+        # use more sophisticated error handling in production
         raise Unauthorized()
 
     user = User.query.filter_by(email=email).first()
@@ -178,3 +165,13 @@ def login_passkey_post():
     session['email'] = user.email
 
     return redirect(url_for('main.index'))
+
+
+def get_authenticated_user_from_cookie() -> UserEntity | None:
+    session_token = request.cookies.get('cbo_session_token')
+    if not session_token:
+        return None
+    try:
+        return sdk.sessions.validate_token(session_token)
+    except:
+        raise Unauthorized()
