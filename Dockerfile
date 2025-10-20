@@ -8,9 +8,10 @@ ENV APP_VERSION=$DOCKER_TAG
 WORKDIR /app
 
 COPY requirements.txt requirements.txt
+COPY constraints.txt constraints.txt
 # RUN pip3 install -r requirements.txt
-# install everything except greenlet (ignore failure)
-RUN pip install --no-cache-dir -r requirements.txt || true
+# install everything except greenlet
+RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt
 
 COPY . .
 
