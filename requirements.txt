@@ -12,4 +12,3 @@ waitress
 werkzeug
 passkeys
 python-dotenv
-greenlet==3.2.4
