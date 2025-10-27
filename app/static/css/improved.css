@@ -51,14 +51,21 @@
   box-sizing: border-box;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   font-family: 'Inter', 'Segoe UI', 'Open Sans', sans-serif;
   line-height: 1.6;
   font-size: 16px;
   background: linear-gradient(135deg, var(--secondary-dark) 0%, var(--primary-dark) 100%);
+  background-attachment: fixed;
   color: var(--text-primary);
   margin: 0;
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Improved Navigation */
@@ -70,6 +77,7 @@ body {
   top: 0;
   z-index: 1000;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .navbar-improved .brand {
@@ -268,6 +276,7 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: var(--spacing-lg);
   margin-bottom: var(--spacing-xl);
+  width: 100%;
 }
 
 .metric-card {
@@ -344,6 +353,7 @@ body {
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   margin-bottom: var(--spacing-xl);
+  width: 100%;
 }
 
 .chart-header {
@@ -378,6 +388,7 @@ body {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
+  width: 100%;
 }
 
 .table-header {
@@ -652,6 +663,8 @@ table.modern-table td {
   max-width: 1200px;
   margin: 0 auto;
   padding: var(--spacing-xl) var(--spacing-lg);
+  width: 100%;
+  flex: 1;
 }
 
 .page-header {
