@@ -1,37 +1,71 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="column is-4 is-offset-4">
-    <h3 class="title">Sign Up</h3>
-    <div class="box" style="margin: 5%">
+
+<div style="max-width: 450px; margin: 4rem auto;">
+    <!-- Logo/Header -->
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 style="color: var(--accent); font-size: 2.5rem; margin-bottom: 0.5rem;">
+            <i class="fa-solid fa-chart-line"></i> PyCashFlow
+        </h1>
+        <p style="color: var(--text-secondary);">Create your account to get started</p>
+    </div>
+
+    <!-- Signup Card -->
+    <div class="metric-card" style="padding: 2rem;">
+        <h2 style="color: var(--text-primary); margin-bottom: 1.5rem; font-size: 1.5rem;">
+            Sign Up
+        </h2>
+
+        <!-- Flash messages -->
         {% with messages = get_flashed_messages() %}
         {% if messages %}
-            <div class="notification is-danger">
-                {{ messages[0] }}. Go to <a href="{{ url_for('auth.login') }}">login page</a>.
+            <div class="alert alert-dismissible fade show" role="alert" style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--text-primary); border-radius: var(--radius-md); margin-bottom: 1.5rem;">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                {{ messages[0] }}. Go to <a href="{{ url_for('auth.login') }}" style="color: var(--accent); text-decoration: underline;">login page</a>.
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         {% endif %}
         {% endwith %}
+
+        <!-- Signup Form -->
         <form method="POST" action="/signup">
-            <div class="field">
-                <div class="control">
-                    <input class="input is-large" type="email" name="email" placeholder="Email" autofocus="">
-                </div>
+            <div class="form-group-modern">
+                <label class="form-label-modern">
+                    <i class="fa-solid fa-envelope"></i> Email Address
+                </label>
+                <input type="email" class="form-control-modern" name="email" placeholder="your@email.com" required autofocus>
             </div>
 
-            <div class="field">
-                <div class="control">
-                    <input class="input is-large" type="text" name="name" placeholder="Name" autofocus="">
-                </div>
+            <div class="form-group-modern">
+                <label class="form-label-modern">
+                    <i class="fa-solid fa-user"></i> Name
+                </label>
+                <input type="text" class="form-control-modern" name="name" placeholder="Your full name" required>
             </div>
 
-            <div class="field">
-                <div class="control">
-                    <input class="input is-large" type="password" name="password" placeholder="Password">
-                </div>
+            <div class="form-group-modern">
+                <label class="form-label-modern">
+                    <i class="fa-solid fa-lock"></i> Password
+                </label>
+                <input type="password" class="form-control-modern" name="password" placeholder="Choose a strong password" required>
             </div>
 
-            <button class="button is-block is-info is-large is-fullwidth">Sign Up</button>
+            <button type="submit" class="btn-primary-modern btn-modern" style="width: 100%;">
+                <i class="fa-solid fa-user-plus"></i>
+                Create Account
+            </button>
         </form>
+
+        <!-- Login link -->
+        <div style="margin-top: 1.5rem; text-align: center; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Already have an account?</p>
+            <a href="{{url_for('auth.login')}}" style="color: var(--accent); text-decoration: none; font-weight: 600;">
+                <i class="fa-solid fa-right-to-bracket"></i>
+                Sign In
+            </a>
+        </div>
     </div>
 </div>
+
 {% endblock %}
