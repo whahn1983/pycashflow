@@ -1,0 +1,247 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" style="background: #f5f5f5;">
+  <defs>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 24px; font-weight: bold; fill: #333; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 14px; fill: #666; }
+      .old-bg { fill: #00CED1; }
+      .old-table { fill: #2F4F4F; stroke: #5F9EA0; stroke-width: 2; }
+      .new-bg { fill: #0f172a; }
+      .new-card { fill: #1e293b; stroke: #475569; stroke-width: 1; }
+      .old-text { font-family: 'Open Sans', Arial; font-size: 12px; fill: #fff; }
+      .new-text { font-family: 'Inter', Arial; font-size: 12px; fill: #f1f5f9; }
+      .table-header { font-family: Arial; font-size: 11px; fill: #94a3b8; text-transform: uppercase; font-weight: bold; }
+      .badge-income { fill: #10b981; }
+      .badge-expense { fill: #ef4444; }
+      .badge-frequency { fill: #3b82f6; }
+      .btn-sm { font-size: 9px; fill: #fff; }
+      .comparison-divider { stroke: #333; stroke-width: 2; stroke-dasharray: 5,5; }
+    </style>
+  </defs>
+
+  <!-- Title -->
+  <text x="700" y="30" class="title" text-anchor="middle">Schedule Table UI Comparison</text>
+
+  <!-- Divider line -->
+  <line x1="700" y1="50" x2="700" y2="880" class="comparison-divider"/>
+
+  <!-- BEFORE (Left Side) -->
+  <text x="350" y="70" class="title" text-anchor="middle" fill="#666">BEFORE (Current)</text>
+
+  <!-- Old Background -->
+  <rect x="50" y="90" width="600" height="780" class="old-bg" rx="5"/>
+
+  <!-- Old Title -->
+  <text x="350" y="140" class="old-text" text-anchor="middle" font-size="24" font-weight="bold">Schedules</text>
+
+  <!-- Old Table with heavy shadow -->
+  <rect x="80" y="170" width="540" height="380" class="old-table" rx="5" filter="drop-shadow(3px 3px 8px rgba(0,0,0,0.4))"/>
+
+  <!-- Old Table Header -->
+  <rect x="80" y="170" width="540" height="35" fill="#1e4a4a"/>
+  <text x="95" y="192" class="old-text" font-weight="bold">Name</text>
+  <text x="215" y="192" class="old-text" font-weight="bold">Amount</text>
+  <text x="315" y="192" class="old-text" font-weight="bold">Type</text>
+  <text x="395" y="192" class="old-text" font-weight="bold">Frequency</text>
+  <text x="500" y="192" class="old-text" font-weight="bold">Actions</text>
+
+  <!-- Old Table Rows -->
+  <!-- Row 1 -->
+  <line x1="80" y1="205" x2="620" y2="205" stroke="#5F9EA0" stroke-width="1"/>
+  <text x="95" y="227" class="old-text">Monthly Salary</text>
+  <text x="215" y="227" class="old-text">4500.00</text>
+  <text x="315" y="227" class="old-text">Income</text>
+  <text x="395" y="227" class="old-text">Monthly</text>
+  <!-- Old-style buttons (links styled as buttons) -->
+  <rect x="495" y="215" width="35" height="18" fill="#28a745" rx="2"/>
+  <text x="512" y="227" class="btn-sm" text-anchor="middle" font-size="8">Hold</text>
+  <rect x="535" y="215" width="35" height="18" fill="#ffc107" rx="2"/>
+  <text x="552" y="227" class="btn-sm" text-anchor="middle" font-size="8">Edit</text>
+  <rect x="575" y="215" width="35" height="18" fill="#dc3545" rx="2"/>
+  <text x="592" y="227" class="btn-sm" text-anchor="middle" font-size="8">Delete</text>
+
+  <!-- Row 2 -->
+  <line x1="80" y1="240" x2="620" y2="240" stroke="#5F9EA0" stroke-width="1"/>
+  <text x="95" y="262" class="old-text">Rent Payment</text>
+  <text x="215" y="262" class="old-text">1200.00</text>
+  <text x="315" y="262" class="old-text">Expense</text>
+  <text x="395" y="262" class="old-text">Monthly</text>
+  <rect x="495" y="250" width="35" height="18" fill="#28a745" rx="2"/>
+  <text x="512" y="262" class="btn-sm" text-anchor="middle" font-size="8">Hold</text>
+  <rect x="535" y="250" width="35" height="18" fill="#ffc107" rx="2"/>
+  <text x="552" y="262" class="btn-sm" text-anchor="middle" font-size="8">Edit</text>
+  <rect x="575" y="250" width="35" height="18" fill="#dc3545" rx="2"/>
+  <text x="592" y="262" class="btn-sm" text-anchor="middle" font-size="8">Delete</text>
+
+  <!-- Row 3 -->
+  <line x1="80" y1="275" x2="620" y2="275" stroke="#5F9EA0" stroke-width="1"/>
+  <text x="95" y="297" class="old-text">Grocery Budget</text>
+  <text x="215" y="297" class="old-text">150.00</text>
+  <text x="315" y="297" class="old-text">Expense</text>
+  <text x="395" y="297" class="old-text">Weekly</text>
+  <rect x="495" y="285" width="35" height="18" fill="#28a745" rx="2"/>
+  <text x="512" y="297" class="btn-sm" text-anchor="middle" font-size="8">Hold</text>
+  <rect x="535" y="285" width="35" height="18" fill="#ffc107" rx="2"/>
+  <text x="552" y="297" class="btn-sm" text-anchor="middle" font-size="8">Edit</text>
+  <rect x="575" y="285" width="35" height="18" fill="#dc3545" rx="2"/>
+  <text x="592" y="297" class="btn-sm" text-anchor="middle" font-size="8">Delete</text>
+
+  <!-- Row 4 -->
+  <line x1="80" y1="310" x2="620" y2="310" stroke="#5F9EA0" stroke-width="1"/>
+  <text x="95" y="332" class="old-text">Car Insurance</text>
+  <text x="215" y="332" class="old-text">120.00</text>
+  <text x="315" y="332" class="old-text">Expense</text>
+  <text x="395" y="332" class="old-text">Monthly</text>
+  <rect x="495" y="320" width="35" height="18" fill="#28a745" rx="2"/>
+  <text x="512" y="332" class="btn-sm" text-anchor="middle" font-size="8">Hold</text>
+  <rect x="535" y="320" width="35" height="18" fill="#ffc107" rx="2"/>
+  <text x="552" y="332" class="btn-sm" text-anchor="middle" font-size="8">Edit</text>
+  <rect x="575" y="320" width="35" height="18" fill="#dc3545" rx="2"/>
+  <text x="592" y="332" class="btn-sm" text-anchor="middle" font-size="8">Delete</text>
+
+  <!-- Old Problems -->
+  <text x="100" y="590" class="subtitle" font-size="13" fill="#fff">❌ Issues:</text>
+  <text x="100" y="615" class="subtitle" font-size="11" fill="#fff">• Heavy inset box-shadows (outdated)</text>
+  <text x="100" y="635" class="subtitle" font-size="11" fill="#fff">• No visual distinction for income/expense</text>
+  <text x="100" y="655" class="subtitle" font-size="11" fill="#fff">• Plain text for type and frequency</text>
+  <text x="100" y="675" class="subtitle" font-size="11" fill="#fff">• Action buttons are &lt;a&gt; tags styled as buttons</text>
+  <text x="100" y="695" class="subtitle" font-size="11" fill="#fff">• No icons for visual clarity</text>
+  <text x="100" y="715" class="subtitle" font-size="11" fill="#fff">• Basic hover effects only</text>
+  <text x="100" y="735" class="subtitle" font-size="11" fill="#fff">• Poor mobile responsiveness</text>
+  <text x="100" y="755" class="subtitle" font-size="11" fill="#fff">• No table header actions visible</text>
+  <text x="100" y="775" class="subtitle" font-size="11" fill="#fff">• Inline style="color:white" everywhere</text>
+  <text x="100" y="795" class="subtitle" font-size="11" fill="#fff">• No secondary info (descriptions)</text>
+
+  <!-- AFTER (Right Side) -->
+  <text x="1050" y="70" class="title" text-anchor="middle" fill="#3b82f6">AFTER (Improved)</text>
+
+  <!-- New Background -->
+  <rect x="750" y="90" width="600" height="780" class="new-bg" rx="5"/>
+
+  <!-- New Page Header -->
+  <text x="780" y="135" class="new-text" font-size="24" font-weight="bold">Schedule Management</text>
+  <text x="780" y="160" class="new-text" font-size="13" fill="#cbd5e1">Manage your recurring income and expenses</text>
+
+  <!-- Table Card Container -->
+  <rect x="780" y="180" width="540" height="410" class="new-card" rx="8"/>
+
+  <!-- Table Card Header -->
+  <rect x="780" y="180" width="540" height="45" fill="#334155" rx="8"/>
+  <text x="800" y="208" class="new-text" font-size="14" font-weight="600">📅 All Schedules</text>
+  <!-- Badge showing count -->
+  <rect x="965" y="195" width="55" height="20" class="badge-frequency" rx="4"/>
+  <text x="992" y="208" class="new-text" text-anchor="middle" font-size="10">5 items</text>
+
+  <!-- Header action buttons -->
+  <rect x="1145" y="192" width="70" height="26" fill="#3b82f6" rx="5"/>
+  <text x="1180" y="210" class="new-text" text-anchor="middle" font-size="10">➕ Add</text>
+  <rect x="1225" y="192" width="85" height="26" fill="#10b981" rx="5"/>
+  <text x="1267" y="210" class="new-text" text-anchor="middle" font-size="10">⬇️ Export</text>
+
+  <!-- Table -->
+  <rect x="790" y="235" width="520" height="345" fill="#1e293b"/>
+
+  <!-- Table Header Row -->
+  <rect x="790" y="235" width="520" height="30" fill="#334155"/>
+  <text x="805" y="254" class="table-header">NAME</text>
+  <text x="925" y="254" class="table-header">AMOUNT</text>
+  <text x="1025" y="254" class="table-header">TYPE</text>
+  <text x="1125" y="254" class="table-header">FREQUENCY</text>
+  <text x="1215" y="254" class="table-header" text-anchor="end">ACTIONS</text>
+
+  <!-- Table Row 1 - with hover effect -->
+  <rect x="790" y="265" width="520" height="55" fill="rgba(255,255,255,0.02)"/>
+  <line x1="790" y1="320" x2="1310" y2="320" stroke="#475569" stroke-width="1"/>
+  <text x="805" y="285" class="new-text" font-weight="600">Monthly Salary</text>
+  <text x="805" y="303" class="new-text" font-size="10" fill="#94a3b8">Primary income</text>
+  <text x="925" y="292" class="new-text" font-size="16" font-weight="600" fill="#10b981">+$4,500</text>
+  <!-- Income badge -->
+  <rect x="1025" y="280" width="75" height="22" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981" stroke-width="1" rx="4"/>
+  <text x="1062" y="295" class="new-text" font-size="9" fill="#10b981" text-anchor="middle">↗ INCOME</text>
+  <!-- Frequency badge -->
+  <rect x="1125" y="280" width="65" height="22" fill="rgba(59, 130, 246, 0.15)" stroke="#3b82f6" stroke-width="1" rx="4"/>
+  <text x="1157" y="295" class="new-text" font-size="9" fill="#3b82f6" text-anchor="middle">Monthly</text>
+  <!-- Action buttons with icons -->
+  <rect x="1215" y="277" width="30" height="24" fill="#f59e0b" rx="4"/>
+  <text x="1230" y="293" text-anchor="middle" font-size="10">⏸</text>
+  <rect x="1250" y="277" width="30" height="24" fill="#3b82f6" rx="4"/>
+  <text x="1265" y="293" text-anchor="middle" font-size="10">✏️</text>
+  <rect x="1285" y="277" width="30" height="24" fill="#ef4444" rx="4"/>
+  <text x="1300" y="293" text-anchor="middle" font-size="10">🗑</text>
+
+  <!-- Table Row 2 -->
+  <rect x="790" y="320" width="520" height="55" fill="transparent"/>
+  <line x1="790" y1="375" x2="1310" y2="375" stroke="#475569" stroke-width="1"/>
+  <text x="805" y="340" class="new-text" font-weight="600">Rent Payment</text>
+  <text x="805" y="358" class="new-text" font-size="10" fill="#94a3b8">Apartment 4B</text>
+  <text x="925" y="347" class="new-text" font-size="16" font-weight="600" fill="#ef4444">-$1,200</text>
+  <!-- Expense badge -->
+  <rect x="1025" y="335" width="80" height="22" fill="rgba(239, 68, 68, 0.15)" stroke="#ef4444" stroke-width="1" rx="4"/>
+  <text x="1065" y="350" class="new-text" font-size="9" fill="#ef4444" text-anchor="middle">↘ EXPENSE</text>
+  <!-- Frequency badge -->
+  <rect x="1125" y="335" width="65" height="22" fill="rgba(59, 130, 246, 0.15)" stroke="#3b82f6" stroke-width="1" rx="4"/>
+  <text x="1157" y="350" class="new-text" font-size="9" fill="#3b82f6" text-anchor="middle">Monthly</text>
+  <!-- Action buttons -->
+  <rect x="1215" y="332" width="30" height="24" fill="#f59e0b" rx="4"/>
+  <text x="1230" y="348" text-anchor="middle" font-size="10">⏸</text>
+  <rect x="1250" y="332" width="30" height="24" fill="#3b82f6" rx="4"/>
+  <text x="1265" y="348" text-anchor="middle" font-size="10">✏️</text>
+  <rect x="1285" y="332" width="30" height="24" fill="#ef4444" rx="4"/>
+  <text x="1300" y="348" text-anchor="middle" font-size="10">🗑</text>
+
+  <!-- Table Row 3 -->
+  <rect x="790" y="375" width="520" height="55" fill="rgba(255,255,255,0.02)"/>
+  <line x1="790" y1="430" x2="1310" y2="430" stroke="#475569" stroke-width="1"/>
+  <text x="805" y="395" class="new-text" font-weight="600">Grocery Budget</text>
+  <text x="805" y="413" class="new-text" font-size="10" fill="#94a3b8">Weekly shopping</text>
+  <text x="925" y="402" class="new-text" font-size="16" font-weight="600" fill="#ef4444">-$150</text>
+  <!-- Expense badge -->
+  <rect x="1025" y="390" width="80" height="22" fill="rgba(239, 68, 68, 0.15)" stroke="#ef4444" stroke-width="1" rx="4"/>
+  <text x="1065" y="405" class="new-text" font-size="9" fill="#ef4444" text-anchor="middle">↘ EXPENSE</text>
+  <!-- Frequency badge -->
+  <rect x="1125" y="390" width="65" height="22" fill="rgba(59, 130, 246, 0.15)" stroke="#3b82f6" stroke-width="1" rx="4"/>
+  <text x="1157" y="405" class="new-text" font-size="9" fill="#3b82f6" text-anchor="middle">Weekly</text>
+  <!-- Action buttons -->
+  <rect x="1215" y="387" width="30" height="24" fill="#f59e0b" rx="4"/>
+  <text x="1230" y="403" text-anchor="middle" font-size="10">⏸</text>
+  <rect x="1250" y="387" width="30" height="24" fill="#3b82f6" rx="4"/>
+  <text x="1265" y="403" text-anchor="middle" font-size="10">✏️</text>
+  <rect x="1285" y="387" width="30" height="24" fill="#ef4444" rx="4"/>
+  <text x="1300" y="403" text-anchor="middle" font-size="10">🗑</text>
+
+  <!-- Table Row 4 -->
+  <rect x="790" y="430" width="520" height="55" fill="transparent"/>
+  <line x1="790" y1="485" x2="1310" y2="485" stroke="#475569" stroke-width="1"/>
+  <text x="805" y="450" class="new-text" font-weight="600">Freelance Project</text>
+  <text x="805" y="468" class="new-text" font-size="10" fill="#94a3b8">Client ABC Inc.</text>
+  <text x="925" y="457" class="new-text" font-size="16" font-weight="600" fill="#10b981">+$2,000</text>
+  <!-- Income badge -->
+  <rect x="1025" y="445" width="75" height="22" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981" stroke-width="1" rx="4"/>
+  <text x="1062" y="460" class="new-text" font-size="9" fill="#10b981" text-anchor="middle">↗ INCOME</text>
+  <!-- Frequency badge -->
+  <rect x="1125" y="445" width="65" height="22" fill="rgba(59, 130, 246, 0.15)" stroke="#3b82f6" stroke-width="1" rx="4"/>
+  <text x="1157" y="460" class="new-text" font-size="9" fill="#3b82f6" text-anchor="middle">Onetime</text>
+  <!-- Action buttons -->
+  <rect x="1215" y="442" width="30" height="24" fill="#f59e0b" rx="4"/>
+  <text x="1230" y="458" text-anchor="middle" font-size="10">⏸</text>
+  <rect x="1250" y="442" width="30" height="24" fill="#3b82f6" rx="4"/>
+  <text x="1265" y="458" text-anchor="middle" font-size="10">✏️</text>
+  <rect x="1285" y="442" width="30" height="24" fill="#ef4444" rx="4"/>
+  <text x="1300" y="458" text-anchor="middle" font-size="10">🗑</text>
+
+  <!-- Improvements List -->
+  <text x="790" y="635" class="subtitle" font-size="13" fill="#10b981">✅ Improvements:</text>
+  <text x="790" y="660" class="subtitle" font-size="11" fill="#cbd5e1">• Card-based container with header</text>
+  <text x="790" y="680" class="subtitle" font-size="11" fill="#cbd5e1">• Color-coded badges (income=green, expense=red)</text>
+  <text x="790" y="700" class="subtitle" font-size="11" fill="#cbd5e1">• Visual icons in badges (↗ ↘)</text>
+  <text x="790" y="720" class="subtitle" font-size="11" fill="#cbd5e1">• Proper &lt;button&gt; elements, not styled links</text>
+  <text x="790" y="740" class="subtitle" font-size="11" fill="#cbd5e1">• Icon-only action buttons (compact)</text>
+  <text x="1050" y="660" class="subtitle" font-size="11" fill="#cbd5e1">• Hover effects on rows</text>
+  <text x="1050" y="680" class="subtitle" font-size="11" fill="#cbd5e1">• Secondary descriptions (e.g., "Primary income")</text>
+  <text x="1050" y="700" class="subtitle" font-size="11" fill="#cbd5e1">• Better amount formatting (+/- signs)</text>
+  <text x="1050" y="720" class="subtitle" font-size="11" fill="#cbd5e1">• Header actions (Add, Export buttons)</text>
+  <text x="1050" y="740" class="subtitle" font-size="11" fill="#cbd5e1">• Item count badge in header</text>
+  <text x="790" y="760" class="subtitle" font-size="11" fill="#cbd5e1">• Clean borders instead of heavy shadows</text>
+  <text x="1050" y="760" class="subtitle" font-size="11" fill="#cbd5e1">• Better spacing and typography</text>
+  <text x="790" y="780" class="subtitle" font-size="11" fill="#cbd5e1">• All CSS classes (zero inline styles)</text>
+  <text x="1050" y="780" class="subtitle" font-size="11" fill="#cbd5e1">• Mobile-responsive design</text>
+</svg>
