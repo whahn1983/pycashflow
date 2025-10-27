@@ -18,7 +18,7 @@ Python Flask application for future cash flow calculation and management.
 * Passkey Support through Corbado
 
 
-![screenshot](https://github.com/whahn1983/pycashflow/assets/7118098/ac7c3556-232e-4571-9840-64d0341eeebe)
+<img width="912" height="880" alt="image" src="https://github.com/user-attachments/assets/72acb38c-1e60-474e-8d86-b25854d83e59" />
 
 
 <br />
