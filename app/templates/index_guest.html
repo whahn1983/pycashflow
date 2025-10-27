@@ -1,25 +1,65 @@
 {% extends "base_guest.html" %}
 
 {% block content %}
-<h1 class="title" style="color:white">
-    <br />
-  <p style="font-size:20px; float: center; text-align: center"><span style="color:white; font-weight:bold">{{ todaydate }}</span></p>
-  <p style="font-size:20px"><span style="color:white">Balance: {{ balance }}</span></p>
-  <div class="d-table w-100">
-      <p class="d-table-cell" style="font-size:20px">Lowest Balance: <span style="color:white; font-weight:bold">${{ minbalance }}</span></p>
-      <div style = "display: flex; justify-content:flex-end; padding-bottom:20px;">
-          <button id="refresh-button" class="refresh-end" onclick="refreshContent();location.href='/refresh';"
-            >refresh <img id="refresh-icon"
-                          class="refresh-start"
-                          src="../static/icons/refresh-icon.png"
-                          width="20"
-                          loading="lazy"
-                    />
-          </button>
-      </div>
-  </div>
-  <div id="chart" class="chart"></div>
-</h1>
+
+<!-- Page Header -->
+<div class="page-header">
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">
+        <i class="fa-regular fa-calendar"></i>
+        {{ todaydate }}
+    </p>
+</div>
+
+<!-- Metrics Grid -->
+<div class="metrics-grid">
+    <!-- Current Balance Card -->
+    <div class="metric-card highlight">
+        <div class="metric-label">
+            <i class="fa-solid fa-wallet"></i> Current Balance
+        </div>
+        <div class="metric-value">{{ balance }}</div>
+        <div class="metric-sublabel">
+            As of {{ todaydate }}
+        </div>
+    </div>
+
+    <!-- Lowest Balance Card -->
+    <div class="metric-card warning">
+        <div class="metric-label">
+            <i class="fa-solid fa-triangle-exclamation"></i> Lowest Balance (60 days)
+        </div>
+        <div class="metric-value">${{ minbalance }}</div>
+        <div class="metric-sublabel">
+            Monitor your cash flow carefully
+        </div>
+    </div>
+
+    <!-- Info Card -->
+    <div class="metric-card">
+        <div class="metric-label">
+            <i class="fa-solid fa-info-circle"></i> Guest Access
+        </div>
+        <div class="metric-sublabel" style="margin-top: 1rem;">
+            You have view-only access to this dashboard. Contact an admin for full access.
+        </div>
+    </div>
+</div>
+
+<!-- Cash Flow Chart Card -->
+<div class="chart-card">
+    <div class="chart-header">
+        <h2>
+            <i class="fa-solid fa-chart-area"></i>
+            60-Day Cash Flow Projection
+        </h2>
+    </div>
+    <div class="chart-body">
+        <div id="chart" class="chart" style="width: 100%; height: 500px;"></div>
+    </div>
+</div>
+
+<!-- Plotly Chart Scripts -->
 <head>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -27,54 +67,34 @@
         function cb(selection) {
             $.getJSON({
                 url: "/callback", data: { 'data': selection }, success: function (result) {
-                    Plotly.newPlot('chart', result, {staticPlot: true});;
+                    Plotly.newPlot('chart', result, {staticPlot: true});
                 }
             });
         }
     </script>
 </head>
+
 <script>
+    // Plot the chart with improved dark theme
     d = {{ graphJSON | safe }};
     d.config={responsive: true};
+
+    // Apply dark theme to layout
+    if (d.layout) {
+        d.layout.paper_bgcolor = 'transparent';
+        d.layout.plot_bgcolor = 'transparent';
+        d.layout.font = { family: 'Inter, sans-serif', color: '#cbd5e1' };
+        if (d.layout.xaxis) {
+            d.layout.xaxis.gridcolor = '#475569';
+            d.layout.xaxis.titlefont = { color: '#94a3b8' };
+        }
+        if (d.layout.yaxis) {
+            d.layout.yaxis.gridcolor = '#475569';
+            d.layout.yaxis.titlefont = { color: '#94a3b8' };
+        }
+    }
+
     Plotly.newPlot('chart', d, {});
 </script>
-                <div id = "balancemodal" class = "modal fade" role="dialog">
-                    <div class = "modal-dialog">
-                        <div class="modal-content">
-                            <div class = "modal-header">
-                                <h4 class = "modal-title"  style="color:black">Update Balance</h4>
-                            </div>
-                            <div class = "modal-body">
-                                <form action = "{{url_for('main.balance')}}" method="POST">
-                                    <div class = "form-group">
-                                        <label style="color:black"> Balance:</label>
-                                        <input type="number" step="0.01" class="form-control" name="amount" required = "True">
-                                    </div>
-                                    <div class = "form-group">
-                                        <label style="color:black"> Date:</label>
-                                        <input type="date" class="form-control" name="date" required = "True" max="3000-01-01" onfocus="this.max=new Date().toISOString().split('T')[0]" />
-                                    </div>
-                                    <div class = "form-group">
-                                        <button class="btn btn-primary" type = "submit" name="schedule">Update Balance</button>
-                                    </div>
 
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <script>
-                function refreshContent() {
-                    let refreshIcon = document.getElementById("refresh-icon")
-                    let refreshButton = document.getElementById("refresh-button")
-                    refreshButton.removeAttribute("class")
-                    refreshButton.disabled = true
-                }
-            </script>
 {% endblock %}
-
-
