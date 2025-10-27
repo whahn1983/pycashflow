@@ -170,6 +170,8 @@ body {
     box-shadow: var(--shadow-lg);
     padding: var(--spacing-md);
     margin-top: 1px;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
   }
 
   .navbar-collapse.show {
@@ -186,6 +188,77 @@ body {
     width: 100%;
     padding: 0.75rem 1rem;
     justify-content: flex-start;
+  }
+}
+
+/* Landscape Mobile Optimization */
+@media (max-width: 768px) and (orientation: landscape) {
+  /* Compact navbar for landscape */
+  .navbar-improved {
+    padding: 0.5rem 1rem;
+  }
+
+  .navbar-improved .brand {
+    font-size: 1.25rem;
+  }
+
+  /* Reduce container padding */
+  .container-modern {
+    padding: var(--spacing-md) var(--spacing-sm);
+  }
+
+  /* Compact navigation links */
+  .navbar-improved .nav-link {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  /* More compact collapse menu */
+  .navbar-collapse {
+    padding: var(--spacing-sm);
+    max-height: calc(100vh - 60px);
+  }
+
+  .navbar-nav-container {
+    gap: 0.125rem;
+  }
+
+  /* Reduce page header size */
+  .page-header {
+    margin-bottom: var(--spacing-md);
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.875rem;
+  }
+
+  /* Compact metric cards */
+  .metric-card {
+    padding: var(--spacing-md);
+  }
+
+  .metric-value {
+    font-size: 1.5rem;
+  }
+
+  /* Compact table cards */
+  .table-card {
+    font-size: 0.875rem;
+  }
+
+  .table-header {
+    padding: var(--spacing-md);
+  }
+
+  table.modern-table th,
+  table.modern-table td {
+    padding: 0.5rem;
+    font-size: 0.875rem;
   }
 }
 
