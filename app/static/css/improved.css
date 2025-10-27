@@ -150,7 +150,7 @@ body {
 }
 
 /* Desktop: Always show navigation (override Bootstrap collapse) */
-@media (min-width: 769px) {
+@media (min-width: 1025px) {
   .navbar-collapse {
     display: flex !important;
     justify-content: flex-end;
@@ -161,8 +161,8 @@ body {
   }
 }
 
-/* Mobile and Tablet Portrait Navigation Styles */
-@media (max-width: 768px) {
+/* Mobile and Tablet Navigation Styles (includes landscape tablets) */
+@media (max-width: 1024px) {
   .navbar-toggler {
     display: block;
   }
@@ -200,7 +200,7 @@ body {
 }
 
 /* Landscape Mobile Optimization */
-@media (max-width: 768px) and (orientation: landscape) {
+@media (max-width: 1024px) and (orientation: landscape) {
   /* Compact navbar for landscape */
   .navbar-improved {
     padding: 0.5rem 1rem;
@@ -779,12 +779,8 @@ table.modern-table td {
   to { transform: rotate(360deg); }
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  .metrics-grid {
-    grid-template-columns: 1fr;
-  }
-
+/* Responsive Design - Tablets and Mobile */
+@media (max-width: 1024px) {
   .container-modern {
     padding: var(--spacing-md);
   }
@@ -806,6 +802,20 @@ table.modern-table td {
   .table-actions {
     width: 100%;
     flex-wrap: wrap;
+  }
+}
+
+/* Tablet Portrait - 2 column grid */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mobile - 1 column grid */
+@media (max-width: 599px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
   }
 }
 
