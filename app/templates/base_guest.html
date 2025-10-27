@@ -1,21 +1,16 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PyCashFlow</title>
+
+    <!-- Favicons -->
     <link rel="shortcut icon" href="{{ url_for('main.favicon') }}">
     <link rel="apple-touch-icon" href="{{ url_for('main.appleicon') }}">
     <link rel="icon" href="./static/favicon.ico">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.2/css/bulma.min.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="./static/css/style.css"/>
-    <link rel="stylesheet" href="./static/css/dark.css"/>
-    <link rel="stylesheet" href="./static/css/skeleton.css"/>
     <link rel="icon" href="{{url_for('static', filename='icons/icon_144x144.png')}}" type="image/png">
     <link rel="icon" href="{{url_for('static', filename='icons/icon_192x192.png')}}" type="image/png">
     <link rel="icon" href="{{url_for('static', filename='icons/icon_512x512.png')}}" type="image/png">
@@ -23,39 +18,67 @@
     <link rel="apple-touch-icon" href="{{url_for('static', filename='icons/icon_192x192.png')}}" type="image/png">
     <link rel="apple-touch-icon" href="{{url_for('static', filename='icons/icon_512x512.png')}}" type="image/png">
     <link rel="manifest" href="/manifest.json">
-      <script>
+
+    <!-- Bootstrap 5.3 (No jQuery required) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Improved Custom CSS -->
+    <link rel="stylesheet" href="./static/css/improved.css"/>
+
+    <!-- Service Worker Registration -->
+    <script>
         if ('serviceWorker' in navigator) {
-          window.addEventListener('load', function() {
-            navigator.serviceWorker.register("/sw.js").then(function(registration) {
-              console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            }, function(err) {
-              console.log('ServiceWorker registration failed: ', err);
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register("/sw.js").then(function(registration) {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, function(err) {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
             });
-          });
         }
-      </script>
-    <meta name="viewport" content="width=device-width, initial-scale=0.65">
+    </script>
 </head>
+
 <body>
-    <div class="container">
-        <div class="topnav1" id="myTopnav">
-            <div class="dropdown1">
-                <a href="/" class="dropbtn">
-                    <i class="fa fa-home"></i></a>
-            </div>
-            <div class="dropdown1" style="float:right">
-                <button class="dropbtn">
-                    <i class="fa fa-user"></i>
-                </button>
-                <div class="dropdown-content1" style="right: 0;">
-                    <a href="/profile">Profile </a>
-                    <a href="/logout">Log Out </a>
-                </div>
+    <!-- Improved Navigation Bar (Guest View - Limited) -->
+    <nav class="navbar-improved">
+        <div class="container-modern" style="display: flex; justify-content: space-between; align-items: center;">
+            <a href="/" class="brand">
+                <i class="fa-solid fa-chart-line"></i>
+                PyCashFlow
+            </a>
+
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <a href="/" class="nav-link">
+                    <i class="fa-solid fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/profile" class="nav-link">
+                    <i class="fa-solid fa-user"></i>
+                    <span>Profile</span>
+                </a>
+                <a href="/logout" class="nav-link">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Logout</span>
+                </a>
             </div>
         </div>
-        <div style="clear: both">
-            {% block content%}{% endblock %}
-        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-modern">
+        {% block content %}{% endblock %}
     </div>
+
+    <!-- Bootstrap 5 JS Bundle (includes Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
