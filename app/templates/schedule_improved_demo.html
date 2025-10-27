@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyCashFlow - Schedule Management Demo</title>
+
+    <!-- Bootstrap 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Improved Custom CSS -->
+    <link rel="stylesheet" href="../static/css/improved.css">
+
+    <style>
+        .badge-modern {
+            padding: 0.35rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+        .badge-income {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+        .badge-expense {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+        .badge-frequency {
+            background-color: rgba(59, 130, 246, 0.15);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+        }
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: nowrap;
+        }
+        @media (max-width: 768px) {
+            .action-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Improved Navigation Bar -->
+    <nav class="navbar-improved">
+        <div class="container-modern" style="display: flex; justify-content: space-between; align-items: center;">
+            <a href="/" class="brand">
+                <i class="fa-solid fa-chart-line"></i>
+                PyCashFlow
+            </a>
+
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <a href="/" class="nav-link">
+                    <i class="fa-solid fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/schedule" class="nav-link active">
+                    <i class="fa-solid fa-calendar-days"></i>
+                    <span>Schedule</span>
+                </a>
+                <a href="/transactions" class="nav-link">
+                    <i class="fa-solid fa-list"></i>
+                    <span>Transactions</span>
+                </a>
+                <a href="/settings" class="nav-link">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Settings</span>
+                </a>
+                <a href="/profile" class="nav-link">
+                    <i class="fa-solid fa-user"></i>
+                    <span>Profile</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-modern">
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">Schedule Management</h1>
+            <p class="page-subtitle">
+                Manage your recurring income and expenses
+            </p>
+        </div>
+
+        <!-- Success Alert (example) -->
+        <div class="alert alert-success alert-dismissible fade show" role="alert" style="background-color: rgba(16, 185, 129, 0.1); border: 1px solid var(--success); color: var(--text-primary); border-radius: var(--radius-md);">
+            <i class="fa-solid fa-circle-check"></i>
+            <strong>Success!</strong> Schedule item "Monthly Salary" has been updated.
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+        <!-- Schedule Table Card -->
+        <div class="table-card">
+            <div class="table-header">
+                <h2>
+                    <i class="fa-solid fa-calendar-days"></i>
+                    All Schedules
+                    <span class="badge-modern badge-frequency" style="margin-left: 0.5rem;">5 items</span>
+                </h2>
+                <div class="table-actions">
+                    <button class="btn-primary-modern" data-bs-toggle="modal" data-bs-target="#addModal">
+                        <i class="fa-solid fa-plus"></i>
+                        Add Schedule
+                    </button>
+                    <a href="/export" class="btn-success-modern" style="text-decoration: none;">
+                        <i class="fa-solid fa-download"></i>
+                        Export
+                    </a>
+                    <button class="btn-outline-modern" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                        <i class="fa-solid fa-upload"></i>
+                        Import
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="modern-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Amount</th>
+                            <th>Type</th>
+                            <th>Frequency</th>
+                            <th>Next Date</th>
+                            <th style="text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Sample Row 1 -->
+                        <tr>
+                            <td>
+                                <div style="font-weight: 600;">Monthly Salary</div>
+                                <div style="font-size: 0.875rem; color: var(--text-muted);">Primary income</div>
+                            </td>
+                            <td>
+                                <span style="color: var(--success); font-weight: 600; font-size: 1.1rem;">+$4,500.00</span>
+                            </td>
+                            <td>
+                                <span class="badge-modern badge-income">
+                                    <i class="fa-solid fa-arrow-trend-up"></i> Income
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge-modern badge-frequency">Monthly</span>
+                            </td>
+                            <td>
+                                <i class="fa-regular fa-calendar"></i> Nov 1, 2025
+                            </td>
+                            <td>
+                                <div class="action-buttons" style="justify-content: flex-end;">
+                                    <button class="btn-warning-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-pause"></i> Hold
+                                    </button>
+                                    <button class="btn-primary-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;" data-bs-toggle="modal" data-bs-target="#editModal">
+                                        <i class="fa-solid fa-pen"></i> Edit
+                                    </button>
+                                    <button class="btn-danger-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;" onclick="return confirm('Delete this schedule item?')">
+                                        <i class="fa-solid fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Sample Row 2 -->
+                        <tr>
+                            <td>
+                                <div style="font-weight: 600;">Rent Payment</div>
+                                <div style="font-size: 0.875rem; color: var(--text-muted);">Apartment 4B</div>
+                            </td>
+                            <td>
+                                <span style="color: var(--danger); font-weight: 600; font-size: 1.1rem;">-$1,200.00</span>
+                            </td>
+                            <td>
+                                <span class="badge-modern badge-expense">
+                                    <i class="fa-solid fa-arrow-trend-down"></i> Expense
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge-modern badge-frequency">Monthly</span>
+                            </td>
+                            <td>
+                                <i class="fa-regular fa-calendar"></i> Nov 1, 2025
+                            </td>
+                            <td>
+                                <div class="action-buttons" style="justify-content: flex-end;">
+                                    <button class="btn-warning-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-pause"></i> Hold
+                                    </button>
+                                    <button class="btn-primary-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-pen"></i> Edit
+                                    </button>
+                                    <button class="btn-danger-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Sample Row 3 -->
+                        <tr>
+                            <td>
+                                <div style="font-weight: 600;">Grocery Budget</div>
+                                <div style="font-size: 0.875rem; color: var(--text-muted);">Weekly shopping</div>
+                            </td>
+                            <td>
+                                <span style="color: var(--danger); font-weight: 600; font-size: 1.1rem;">-$150.00</span>
+                            </td>
+                            <td>
+                                <span class="badge-modern badge-expense">
+                                    <i class="fa-solid fa-arrow-trend-down"></i> Expense
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge-modern badge-frequency">Weekly</span>
+                            </td>
+                            <td>
+                                <i class="fa-regular fa-calendar"></i> Oct 30, 2025
+                            </td>
+                            <td>
+                                <div class="action-buttons" style="justify-content: flex-end;">
+                                    <button class="btn-warning-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-pause"></i> Hold
+                                    </button>
+                                    <button class="btn-primary-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-pen"></i> Edit
+                                    </button>
+                                    <button class="btn-danger-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Sample Row 4 -->
+                        <tr>
+                            <td>
+                                <div style="font-weight: 600;">Car Insurance</div>
+                                <div style="font-size: 0.875rem; color: var(--text-muted);">State Farm</div>
+                            </td>
+                            <td>
+                                <span style="color: var(--danger); font-weight: 600; font-size: 1.1rem;">-$120.00</span>
+                            </td>
+                            <td>
+                                <span class="badge-modern badge-expense">
+                                    <i class="fa-solid fa-arrow-trend-down"></i> Expense
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge-modern badge-frequency">Monthly</span>
+                            </td>
+                            <td>
+                                <i class="fa-regular fa-calendar"></i> Nov 15, 2025
+                            </td>
+                            <td>
+                                <div class="action-buttons" style="justify-content: flex-end;">
+                                    <button class="btn-warning-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-pause"></i> Hold
+                                    </button>
+                                    <button class="btn-primary-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-pen"></i> Edit
+                                    </button>
+                                    <button class="btn-danger-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Sample Row 5 -->
+                        <tr>
+                            <td>
+                                <div style="font-weight: 600;">Freelance Project</div>
+                                <div style="font-size: 0.875rem; color: var(--text-muted);">Client ABC Inc.</div>
+                            </td>
+                            <td>
+                                <span style="color: var(--success); font-weight: 600; font-size: 1.1rem;">+$2,000.00</span>
+                            </td>
+                            <td>
+                                <span class="badge-modern badge-income">
+                                    <i class="fa-solid fa-arrow-trend-up"></i> Income
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge-modern badge-frequency">Onetime</span>
+                            </td>
+                            <td>
+                                <i class="fa-regular fa-calendar"></i> Nov 10, 2025
+                            </td>
+                            <td>
+                                <div class="action-buttons" style="justify-content: flex-end;">
+                                    <button class="btn-warning-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-pause"></i> Hold
+                                    </button>
+                                    <button class="btn-primary-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-pen"></i> Edit
+                                    </button>
+                                    <button class="btn-danger-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;">
+                                        <i class="fa-solid fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Add Schedule Modal -->
+    <div class="modal fade modal-modern" id="addModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fa-solid fa-calendar-plus"></i> Add New Schedule
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="/create" method="POST">
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-tag"></i> Name
+                            </label>
+                            <input type="text" class="form-control-modern" name="name" placeholder="e.g., Monthly Salary" required>
+                        </div>
+
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-dollar-sign"></i> Amount
+                            </label>
+                            <input type="number" min="0.00" step="0.01" class="form-control-modern" name="amount" placeholder="0.00" required>
+                        </div>
+
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-arrow-right-arrow-left"></i> Type
+                            </label>
+                            <select name="type" class="form-control-modern" required>
+                                <option value="">-- Select Type --</option>
+                                <option value="Income">Income</option>
+                                <option value="Expense">Expense</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-repeat"></i> Frequency
+                            </label>
+                            <select name="frequency" class="form-control-modern" required>
+                                <option value="">-- Select Frequency --</option>
+                                <option value="Weekly">Weekly</option>
+                                <option value="BiWeekly">Bi-Weekly</option>
+                                <option value="Monthly">Monthly</option>
+                                <option value="Quarterly">Quarterly</option>
+                                <option value="Yearly">Yearly</option>
+                                <option value="Onetime">One-time</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-calendar-day"></i> Start Date
+                            </label>
+                            <input type="date" class="form-control-modern" name="startdate" required>
+                        </div>
+
+                        <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                            <button class="btn-primary-modern" type="submit" style="flex: 1;">
+                                <i class="fa-solid fa-check"></i>
+                                Add Schedule
+                            </button>
+                            <button type="button" class="btn-outline-modern" data-bs-dismiss="modal">
+                                <i class="fa-solid fa-xmark"></i>
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Schedule Modal -->
+    <div class="modal fade modal-modern" id="editModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fa-solid fa-pen-to-square"></i> Edit Schedule
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="/update" method="POST">
+                        <input type="hidden" name="id" value="1">
+
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-tag"></i> Name
+                            </label>
+                            <input type="text" class="form-control-modern" name="name" value="Monthly Salary" required>
+                        </div>
+
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-dollar-sign"></i> Amount
+                            </label>
+                            <input type="number" min="0.00" step="0.01" class="form-control-modern" name="amount" value="4500.00" required>
+                        </div>
+
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-arrow-right-arrow-left"></i> Type
+                            </label>
+                            <select name="type" class="form-control-modern" required>
+                                <option value="Income" selected>Income</option>
+                                <option value="Expense">Expense</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-repeat"></i> Frequency
+                            </label>
+                            <select name="frequency" class="form-control-modern" required>
+                                <option value="Weekly">Weekly</option>
+                                <option value="BiWeekly">Bi-Weekly</option>
+                                <option value="Monthly" selected>Monthly</option>
+                                <option value="Quarterly">Quarterly</option>
+                                <option value="Yearly">Yearly</option>
+                                <option value="Onetime">One-time</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-calendar-day"></i> Start Date
+                            </label>
+                            <input type="date" class="form-control-modern" name="startdate" value="2025-11-01" required>
+                        </div>
+
+                        <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                            <button class="btn-primary-modern" type="submit" style="flex: 1;">
+                                <i class="fa-solid fa-check"></i>
+                                Update Schedule
+                            </button>
+                            <button type="button" class="btn-outline-modern" data-bs-dismiss="modal">
+                                <i class="fa-solid fa-xmark"></i>
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="modal fade modal-modern" id="uploadModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fa-solid fa-upload"></i> Import Schedule Data
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div style="background-color: rgba(59, 130, 246, 0.1); border: 1px solid var(--accent); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;">
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 0.875rem;">
+                            <i class="fa-solid fa-circle-info"></i>
+                            Format must match the export template. Download an export first to see the required format.
+                        </p>
+                    </div>
+
+                    <form method="post" action="/import" enctype="multipart/form-data">
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-file-csv"></i> CSV File
+                            </label>
+                            <input type="file" name="file" accept=".csv" class="form-control-modern" required>
+                        </div>
+
+                        <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                            <button class="btn-primary-modern" type="submit" style="flex: 1;">
+                                <i class="fa-solid fa-upload"></i>
+                                Upload File
+                            </button>
+                            <button type="button" class="btn-outline-modern" data-bs-dismiss="modal">
+                                <i class="fa-solid fa-xmark"></i>
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

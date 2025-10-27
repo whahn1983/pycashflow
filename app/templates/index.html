@@ -1,25 +1,166 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1 class="title" style="color:white">
-  <p style="font-size:20px; float: center; text-align: center"><span style="color:white; font-weight:bold">{{ todaydate }}</span></p>
-  <p style="font-size:20px"><b style="color:white">Balance: <button type="button" style="font-size : 20px" class="btn btn-success float-center"
-                data-toggle="modal" data-target="#balancemodal">{{ balance }}</button></b></p>
-  <div class="d-table w-100">
-      <p class="d-table-cell" style="font-size:20px">Lowest Balance: <span style="color:white; font-weight:bold">${{ minbalance }}</span></p>
-      <div style = "display: flex; justify-content:flex-end; padding-bottom:20px;">
-          <button id="refresh-button" class="refresh-end" onclick="refreshContent();location.href='/refresh';"
-            >refresh <img id="refresh-icon"
-                          class="refresh-start"
-                          src="../static/icons/refresh-icon.png"
-                          width="20"
-                          loading="lazy"
-                    />
-          </button>
-      </div>
-  </div>
-    <div id="chart" class="chart" style="font-family:arial, sans-serif; font-weight:normal"></div>
-</h1>
+
+<!-- Page Header -->
+<div class="page-header">
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">
+        <i class="fa-regular fa-calendar"></i>
+        {{ todaydate }}
+    </p>
+</div>
+
+<!-- Metrics Grid -->
+<div class="metrics-grid">
+    <!-- Current Balance Card -->
+    <div class="metric-card highlight">
+        <div class="metric-label">
+            <i class="fa-solid fa-wallet"></i> Current Balance
+        </div>
+        <div class="metric-value">{{ balance }}</div>
+        <div class="metric-sublabel">
+            As of {{ todaydate }}
+        </div>
+        <button class="metric-action" data-bs-toggle="modal" data-bs-target="#balancemodal">
+            <i class="fa-solid fa-pen-to-square"></i>
+            Update Balance
+        </button>
+    </div>
+
+    <!-- Lowest Balance Card -->
+    <div class="metric-card warning">
+        <div class="metric-label">
+            <i class="fa-solid fa-triangle-exclamation"></i> Lowest Balance (60 days)
+        </div>
+        <div class="metric-value">${{ minbalance }}</div>
+        <div class="metric-sublabel">
+            Monitor your cash flow carefully
+        </div>
+    </div>
+
+    <!-- Refresh Card -->
+    <div class="metric-card">
+        <div class="metric-label">
+            <i class="fa-solid fa-arrows-rotate"></i> Data Status
+        </div>
+        <div class="metric-sublabel" style="margin-top: 1rem; margin-bottom: 1rem;">
+            Keep your projections up to date
+        </div>
+        <button id="refresh-button" class="metric-action" onclick="refreshContent();location.href='/refresh';">
+            <i class="fa-solid fa-arrows-rotate refresh-icon" id="refresh-icon"></i>
+            Refresh Data
+        </button>
+    </div>
+</div>
+
+<!-- Cash Flow Chart Card -->
+<div class="chart-card">
+    <div class="chart-header">
+        <h2>
+            <i class="fa-solid fa-chart-area"></i>
+            60-Day Cash Flow Projection
+        </h2>
+        <div class="chart-controls">
+            <button class="refresh-btn" id="refresh-btn-chart" onclick="refreshContent();location.href='/refresh';">
+                <i class="fa-solid fa-arrows-rotate refresh-icon" id="refresh-icon-chart"></i>
+                <span>Refresh</span>
+            </button>
+        </div>
+    </div>
+    <div class="chart-body">
+        <div id="chart" class="chart" style="width: 100%; height: 500px;"></div>
+    </div>
+</div>
+
+<!-- Quick Actions Section -->
+<div class="page-header" style="margin-top: 2rem;">
+    <h2 class="page-title" style="font-size: 1.5rem;">Quick Actions</h2>
+</div>
+
+<div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+    <a href="/schedule" style="text-decoration: none;">
+        <div class="metric-card" style="text-align: center; cursor: pointer;">
+            <i class="fa-solid fa-calendar-plus" style="font-size: 2.5rem; color: var(--accent); margin-bottom: 1rem;"></i>
+            <div class="metric-label">Add Schedule</div>
+            <div style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+                Create recurring transaction
+            </div>
+        </div>
+    </a>
+
+    <a href="/transactions" style="text-decoration: none;">
+        <div class="metric-card" style="text-align: center; cursor: pointer;">
+            <i class="fa-solid fa-list-check" style="font-size: 2.5rem; color: var(--success); margin-bottom: 1rem;"></i>
+            <div class="metric-label">View Transactions</div>
+            <div style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+                See upcoming payments
+            </div>
+        </div>
+    </a>
+
+    <a href="/export" style="text-decoration: none;">
+        <div class="metric-card" style="text-align: center; cursor: pointer;">
+            <i class="fa-solid fa-file-export" style="font-size: 2.5rem; color: var(--warning); margin-bottom: 1rem;"></i>
+            <div class="metric-label">Export Data</div>
+            <div style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+                Download CSV file
+            </div>
+        </div>
+    </a>
+
+    <a href="/holds" style="text-decoration: none;">
+        <div class="metric-card" style="text-align: center; cursor: pointer;">
+            <i class="fa-solid fa-pause-circle" style="font-size: 2.5rem; color: var(--danger); margin-bottom: 1rem;"></i>
+            <div class="metric-label">Manage Holds</div>
+            <div style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+                Skip or hold payments
+            </div>
+        </div>
+    </a>
+</div>
+
+<!-- Update Balance Modal (Bootstrap 5) -->
+<div class="modal fade modal-modern" id="balancemodal" tabindex="-1" aria-labelledby="balanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="balanceModalLabel">
+                    <i class="fa-solid fa-wallet"></i> Update Balance
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{url_for('main.balance')}}" method="POST">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-dollar-sign"></i> Current Balance
+                        </label>
+                        <input type="number" step="0.01" class="form-control-modern" name="amount" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-calendar"></i> As of Date
+                        </label>
+                        <input type="date" class="form-control-modern" name="date" required max="3000-01-01" onfocus="this.max=new Date().toISOString().split('T')[0]">
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                            <i class="fa-solid fa-check"></i>
+                            Update Balance
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i>
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Plotly Chart Scripts -->
 <head>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -27,7 +168,7 @@
         function cb(selection) {
             $.getJSON({
                 url: "/callback", data: { 'data': selection }, success: function (result) {
-                    Plotly.newPlot('chart', result, {staticPlot: true});;
+                    Plotly.newPlot('chart', result, {staticPlot: true});
                 }
             });
         }
@@ -35,46 +176,39 @@
 </head>
 
 <script>
+    // Plot the chart with improved dark theme
     d = {{ graphJSON | safe }};
     d.config={responsive: true};
+
+    // Apply dark theme to layout
+    if (d.layout) {
+        d.layout.paper_bgcolor = 'transparent';
+        d.layout.plot_bgcolor = 'transparent';
+        d.layout.font = { family: 'Inter, sans-serif', color: '#cbd5e1' };
+        if (d.layout.xaxis) {
+            d.layout.xaxis.gridcolor = '#475569';
+            d.layout.xaxis.titlefont = { color: '#94a3b8' };
+        }
+        if (d.layout.yaxis) {
+            d.layout.yaxis.gridcolor = '#475569';
+            d.layout.yaxis.titlefont = { color: '#94a3b8' };
+        }
+    }
+
     Plotly.newPlot('chart', d, {});
 
+    // Refresh button handler
+    function refreshContent() {
+        let refreshIcon = document.getElementById("refresh-icon");
+        let refreshButton = document.getElementById("refresh-button");
+        if (refreshIcon) refreshIcon.classList.add("loading");
+        if (refreshButton) refreshButton.disabled = true;
+
+        let refreshIconChart = document.getElementById("refresh-icon-chart");
+        let refreshButtonChart = document.getElementById("refresh-btn-chart");
+        if (refreshIconChart) refreshIconChart.classList.add("loading");
+        if (refreshButtonChart) refreshButtonChart.disabled = true;
+    }
 </script>
-<div id = "balancemodal" class = "modal fade" role="dialog">
-    <div class = "modal-dialog">
-        <div class="modal-content">
-            <div class = "modal-header">
-                <h4 class = "modal-title"  style="color:black">Update Balance</h4>
-            </div>
 
-            <div class = "modal-body">
-                <form action = "{{url_for('main.balance')}}" method="POST">
-                    <div class = "form-group">
-                        <label style="color:black"> Balance:</label>
-                        <input type="number" step="0.01" class="form-control" name="amount" required = "True">
-                    </div>
-                    <div class = "form-group">
-                        <label style="color:black"> Date:</label>
-                        <input type="date" class="form-control" name="date" required = "True" max="3000-01-01" onfocus="this.max=new Date().toISOString().split('T')[0]" />
-                    </div>
-                    <div class = "form-group">
-                        <button class="btn btn-primary" type = "submit" name="schedule">Update Balance</button>
-                    </div>
-
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    <script>
-        function refreshContent() {
-            let refreshIcon = document.getElementById("refresh-icon")
-            let refreshButton = document.getElementById("refresh-button")
-            refreshButton.removeAttribute("class")
-            refreshButton.disabled = true
-        }
-    </script>
-</div>
 {% endblock %}

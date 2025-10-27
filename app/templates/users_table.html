@@ -1,124 +1,135 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <div class = "container">
-    <div class = "row">
-        <div class="col md-12">
-            <div style="background:transparent !important" class = "jumbotron p-3 p-md-5 text-white rounded">
-               <h2  style="color:white; text-align: center;"><b>Users</b>  </h2>
 
-                {% with messages  = get_flashed_messages() %}
+<!-- Page Header -->
+<div class="page-header">
+    <h1 class="page-title">User Management</h1>
+    <p class="page-subtitle">
+        <i class="fa-solid fa-users"></i>
+        Manage user accounts and permissions
+    </p>
+</div>
 
-                   {% if messages %}
-                       {% for message in messages %}
-                            <div class="alert alert-success alert-dismissable" role="alert">
-                                <button type="button" class="close" data-dismiss="alert" aria-label="close">
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-dismissible fade show" role="alert" style="background-color: rgba(16, 185, 129, 0.1); border: 1px solid var(--success); color: var(--text-primary); border-radius: var(--radius-md); margin-bottom: 1.5rem;">
+        <i class="fa-solid fa-circle-check"></i>
+        <strong>Success!</strong> {{ message }}
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+{% endif %}
+{% endwith %}
 
-                                    <span aria-hidden="true">x</span>
-                                </button>
-                                {{message }}
-                            </div>
-                       {% endfor %}
-                    {% endif %}
+<!-- Users Table Card -->
+<div class="table-card">
+    <div class="table-header">
+        <h2>
+            <i class="fa-solid fa-users"></i>
+            All Users
+        </h2>
+        <div class="table-actions">
+            <button class="btn-primary-modern btn-modern" data-bs-toggle="modal" data-bs-target="#mymodal">
+                <i class="fa-solid fa-user-plus"></i>
+                Add User
+            </button>
+        </div>
+    </div>
 
-                {% endwith %}
+    <div class="table-responsive">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th style="display:none;">ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Admin</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in users %}
+                <tr>
+                    <td style="display:none;">{{row.id}}</td>
+                    <td>
+                        <div style="font-weight: 600;">{{row.name}}</div>
+                    </td>
+                    <td>
+                        <i class="fa-solid fa-envelope"></i> {{row.email}}
+                    </td>
+                    <td>
+                        {% if row.admin %}
+                        <span class="badge-modern badge-admin">
+                            <i class="fa-solid fa-shield-halved"></i> Admin
+                        </span>
+                        {% else %}
+                        <span class="badge-modern badge-user">
+                            <i class="fa-solid fa-user"></i> User
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="action-buttons" style="justify-content: flex-end;">
+                            <button class="btn-primary-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem;" data-bs-toggle="modal" data-bs-target="#modaledit{{row.id}}">
+                                <i class="fa-solid fa-pen"></i> Edit
+                            </button>
+                            <a href="/delete_user/{{row.id}}" class="btn-danger-modern btn-modern" style="font-size: 0.8rem; padding: 0.375rem 0.75rem; text-decoration: none;" onclick="return confirm('Are you sure you want to delete this user?')">
+                                <i class="fa-solid fa-trash"></i> Delete
+                            </a>
+                        </div>
+                    </td>
+                </tr>
 
-                <table style="background-color:DarkSlateGrey; max-width: 800px" class="table table-hover sortable" border="2">
-                    <tr>
-                        <th style="display:none;">ID</th>
-                        <th style="color:white">Name</th>
-                        <th style="color:white">Email</th>
-                        <th style="color:white">Admin</th>
-                        <th>
-                             <button type="button"  class="btn btn-success float-center"
-                                    data-toggle="modal" data-target="#mymodal">Add New</button>
-                        </th>
-                    </tr>
-
-                    {% for row in users %}
-                    <tr>
-                        <td style="display:none;">{{row.id}}</td>
-                        <td style="color:white">{{row.name}}</td>
-                        <td style="color:white">{{row.email}}</td>
-                        <td style="color:white">{{row.admin}}</td>
-                        <td>
-                            <a href = "/update_user/{{row.id}}" class="btn btn-warning btn-xs" data-toggle="modal" data-target="#modaledit{{row.id}}">Edit</a>
-                             <a href = "/delete_user/{{row.id}}" class="btn btn-danger btn-xs" onclick="return confirm ('Are you sure you want to Delete ?')">Delete</a>
-                        </td>
-                    </tr>
-                <!-- Edit Modal -->
-                <div id="modaledit{{row.id}}" class="modal fade" role="dialog">
-                   <div class="modal-dialog">
-                      <div class="modal-content">
-                         <div class="modal-header">
-                            <h4 class="modal-title"  style="color:black">Update User</h4>
-                         </div>
-                         <div class="modal-body">
-                            <form action="{{url_for('main.update_user')}}" method="POST">
-                               <div class="form-group">
-                                  <label style="color:black">Name:</label>
-                                   <input type="hidden"  name="id" value="{{row.id}}">
-                                  <input type="text" class="form-control" name="name" value="{{row.name}}" required = "True">
-                               </div>
-                               <div class="form-group">
-                                  <label style="color:black">Email:</label>
-                                  <input type="text" class="form-control" name="email" value="{{row.email}}" required = "True">
-                               </div>
-                                <div class = "form-group">
-                                    <label style="color:black"> Admin:</label>
-                                    <select id="admin" name="admin" class="selectpicker form-control" style="width: 150px;">
-                                                                  <option value="True">True</option>
-                                                                  <option value="False">False</option>
-                                    </select>
-                                </div>
-                               <div class="form-group">
-                                  <button class="btn btn-primary" type="submit">Update</button>
-                               </div>
-                            </form>
-                         </div>
-                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                         </div>
-                      </div>
-                   </div>
-                </div>
-                <!-- Open Modal Box (Add User)-->
-                <div id = "mymodal" class = "modal fade" role="dialog">
-                    <div class = "modal-dialog">
+                <!-- Edit Modal for each user -->
+                <div class="modal fade modal-modern" id="modaledit{{row.id}}" tabindex="-1">
+                    <div class="modal-dialog">
                         <div class="modal-content">
-                            <div class = "modal-header">
-                                <h4 class = "modal-title"  style="color:black">Add User</h4>
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="fa-solid fa-user-pen"></i> Update User
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
+                            <div class="modal-body">
+                                <form action="{{url_for('main.update_user')}}" method="POST">
+                                    <input type="hidden" name="id" value="{{row.id}}">
 
-                            <div class = "modal-body">
-                                <form action = "{{url_for('main.create_user')}}" method="POST">
-
-                                    <div class = "form-group">
-                                        <label style="color:black"> Name:</label>
-                                        <input type="text" class="form-control" name="name" required = "True">
-                                    </div>
-
-                                    <div class = "form-group">
-                                        <label style="color:black"> Email:</label>
-                                        <input type="text" class="form-control" name="email" required = "True">
-                                    </div>
-                                    <div class = "form-group">
-                                        <label style="color:black"> Admin:</label>
-                                        <select name="admin" class="selectpicker form-control" style="width: 150px;">
-                                                  <option value="True">True</option>
-                                                  <option value="False">False</option>
-                                         </select>
-                                    </div>
-                                    <div class = "form-group">
-                                        <label style="color:black"> Password:</label>
-                                        <input class="input is-large" type="password" name="password" placeholder="Password">
-                                    </div>
-                                    <div class = "form-group">
-                                        <button class="btn btn-primary" type = "submit" name="user">Add New User</button>
+                                    <div class="form-group-modern">
+                                        <label class="form-label-modern">
+                                            <i class="fa-solid fa-user"></i> Name
+                                        </label>
+                                        <input type="text" class="form-control-modern" name="name" value="{{row.name}}" required>
                                     </div>
 
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                    <div class="form-group-modern">
+                                        <label class="form-label-modern">
+                                            <i class="fa-solid fa-envelope"></i> Email
+                                        </label>
+                                        <input type="email" class="form-control-modern" name="email" value="{{row.email}}" required>
+                                    </div>
+
+                                    <div class="form-group-modern">
+                                        <label class="form-label-modern">
+                                            <i class="fa-solid fa-shield-halved"></i> Admin Privileges
+                                        </label>
+                                        <select name="admin" class="form-control-modern">
+                                            <option value="True" {% if row.admin %}selected{% endif %}>Admin</option>
+                                            <option value="False" {% if not row.admin %}selected{% endif %}>User</option>
+                                        </select>
+                                    </div>
+
+                                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                                            <i class="fa-solid fa-check"></i>
+                                            Update User
+                                        </button>
+                                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                                            <i class="fa-solid fa-xmark"></i>
+                                            Cancel
+                                        </button>
                                     </div>
                                 </form>
                             </div>
@@ -126,14 +137,104 @@
                     </div>
                 </div>
                 {% endfor %}
-                </table>
-            </div>
-        </div>
+
+                <!-- Add User Modal -->
+                <div class="modal fade modal-modern" id="mymodal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="fa-solid fa-user-plus"></i> Add New User
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form action="{{url_for('main.create_user')}}" method="POST">
+                                    <div class="form-group-modern">
+                                        <label class="form-label-modern">
+                                            <i class="fa-solid fa-user"></i> Name
+                                        </label>
+                                        <input type="text" class="form-control-modern" name="name" placeholder="Full name" required>
+                                    </div>
+
+                                    <div class="form-group-modern">
+                                        <label class="form-label-modern">
+                                            <i class="fa-solid fa-envelope"></i> Email
+                                        </label>
+                                        <input type="email" class="form-control-modern" name="email" placeholder="user@email.com" required>
+                                    </div>
+
+                                    <div class="form-group-modern">
+                                        <label class="form-label-modern">
+                                            <i class="fa-solid fa-shield-halved"></i> Admin Privileges
+                                        </label>
+                                        <select name="admin" class="form-control-modern">
+                                            <option value="False">User</option>
+                                            <option value="True">Admin</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group-modern">
+                                        <label class="form-label-modern">
+                                            <i class="fa-solid fa-lock"></i> Password
+                                        </label>
+                                        <input type="password" class="form-control-modern" name="password" placeholder="Choose a strong password" required>
+                                    </div>
+
+                                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                                            <i class="fa-solid fa-check"></i>
+                                            Add User
+                                        </button>
+                                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                                            <i class="fa-solid fa-xmark"></i>
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </tbody>
+        </table>
     </div>
 </div>
-<script> document.querySelectorAll('[data-selected]').forEach(e => {
-   e.value = e.dataset.selected
-    });
-</script>
-<script src="https://www.kryogenix.org/code/browser/sorttable/sorttable.js"></script>
+
+<!-- Badge Styles -->
+<style>
+.badge-modern {
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.badge-admin {
+    background-color: rgba(139, 92, 246, 0.15);
+    color: #8b5cf6;
+    border: 1px solid #8b5cf6;
+}
+.badge-user {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+}
+@media (max-width: 768px) {
+    .action-buttons {
+        flex-direction: column;
+    }
+}
+</style>
+
 {% endblock content %}

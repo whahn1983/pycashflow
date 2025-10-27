@@ -1,38 +1,76 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="column is-4 is-offset-4" style="align-items: center; justify-content: center;">
-    <h3 class="title" style="color:white; text-align: center">Login</h3>
-    <div class="box" style="margin: 5%">
+
+<div style="max-width: 450px; margin: 4rem auto;">
+    <!-- Logo/Header -->
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 style="color: var(--accent); font-size: 2.5rem; margin-bottom: 0.5rem;">
+            <i class="fa-solid fa-chart-line"></i> PyCashFlow
+        </h1>
+        <p style="color: var(--text-secondary);">Manage your cash flow with confidence</p>
+    </div>
+
+    <!-- Login Card -->
+    <div class="metric-card" style="padding: 2rem;">
+        <h2 style="color: var(--text-primary); margin-bottom: 1.5rem; font-size: 1.5rem;">
+            Sign In
+        </h2>
+
+        <!-- Flash messages -->
         {% with messages = get_flashed_messages() %}
         {% if messages %}
-            <div class="notification is-danger">
+            <div class="alert alert-dismissible fade show" role="alert" style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--text-primary); border-radius: var(--radius-md); margin-bottom: 1.5rem;">
+                <i class="fa-solid fa-circle-exclamation"></i>
                 {{ messages[0] }}
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         {% endif %}
         {% endwith %}
+
+        <!-- Login Form -->
         <form method="POST" action="/login">
-            <div class="field">
-                <div class="control">
-                    <input class="input is-large" type="email" name="email" placeholder="Your Email" autofocus="">
-                </div>
+            <div class="form-group-modern">
+                <label class="form-label-modern">
+                    <i class="fa-solid fa-envelope"></i> Email Address
+                </label>
+                <input type="email" class="form-control-modern" name="email" placeholder="your@email.com" required autofocus>
             </div>
 
-            <div class="field">
-                <div class="control">
-                    <input class="input is-large" type="password" name="password" placeholder="Your Password">
-                </div>
+            <div class="form-group-modern">
+                <label class="form-label-modern">
+                    <i class="fa-solid fa-lock"></i> Password
+                </label>
+                <input type="password" class="form-control-modern" name="password" placeholder="Enter your password" required>
             </div>
-            <div class="field">
-                <label class="checkbox">
-                    <input type="checkbox" name="remember">
+
+            <div class="form-group-modern">
+                <label style="color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="remember" style="width: 1rem; height: 1rem; cursor: pointer;">
                     Remember me
                 </label>
             </div>
-            <button class="button is-block is-info is-large is-fullwidth">Login</button>
-            <a href="{{url_for('auth.login_passkey')}}" class="button is-block is-info is-large is-fullwidth">Passkey</a>
-            <a style="color:black; float:right" href="{{url_for('auth.signup')}}">Sign Up</a>
+
+            <button type="submit" class="btn-primary-modern btn-modern" style="width: 100%; margin-bottom: 1rem;">
+                <i class="fa-solid fa-right-to-bracket"></i>
+                Sign In
+            </button>
+
+            <a href="{{url_for('auth.login_passkey')}}" class="btn-outline-modern btn-modern" style="width: 100%; text-decoration: none; display: flex; align-items: center; justify-content: center;">
+                <i class="fa-solid fa-key"></i>
+                Sign In with Passkey
+            </a>
         </form>
+
+        <!-- Sign up link -->
+        <div style="margin-top: 1.5rem; text-align: center; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+            <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Don't have an account?</p>
+            <a href="{{url_for('auth.signup')}}" style="color: var(--accent); text-decoration: none; font-weight: 600;">
+                <i class="fa-solid fa-user-plus"></i>
+                Create Account
+            </a>
+        </div>
     </div>
 </div>
+
 {% endblock %}
