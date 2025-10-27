@@ -139,11 +139,21 @@ body {
   flex-basis: 100%;
   flex-grow: 1;
   align-items: center;
-  display: flex;
-  justify-content: flex-end;
 }
 
-/* Mobile Navigation Styles */
+/* Desktop: Always show navigation (override Bootstrap collapse) */
+@media (min-width: 769px) {
+  .navbar-collapse {
+    display: flex !important;
+    justify-content: flex-end;
+  }
+
+  .navbar-toggler {
+    display: none !important;
+  }
+}
+
+/* Mobile and Tablet Portrait Navigation Styles */
 @media (max-width: 768px) {
   .navbar-toggler {
     display: block;
@@ -163,7 +173,7 @@ body {
   }
 
   .navbar-collapse.show {
-    display: block;
+    display: block !important;
   }
 
   .navbar-nav-container {
