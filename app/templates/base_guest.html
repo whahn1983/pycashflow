@@ -56,19 +56,27 @@
                 PyCashFlow
             </a>
 
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <a href="/" class="nav-link">
-                    <i class="fa-solid fa-home"></i>
-                    <span>Dashboard</span>
-                </a>
-                <a href="/profile" class="nav-link">
-                    <i class="fa-solid fa-user"></i>
-                    <span>Profile</span>
-                </a>
-                <a href="/logout" class="nav-link">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                    <span>Logout</span>
-                </a>
+            <!-- Hamburger Toggle (Mobile Only) -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+
+            <!-- Navigation Links -->
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <div class="navbar-nav-container">
+                    <a href="/" class="nav-link">
+                        <i class="fa-solid fa-home"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="/profile" class="nav-link">
+                        <i class="fa-solid fa-user"></i>
+                        <span>Profile</span>
+                    </a>
+                    <a href="/logout" class="nav-link">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Logout</span>
+                    </a>
+                </div>
             </div>
         </div>
     </nav>
