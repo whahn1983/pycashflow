@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyCashFlow - Modern Dashboard Demo</title>
+
+    <!-- Bootstrap 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Improved Custom CSS -->
+    <link rel="stylesheet" href="../static/css/improved.css">
+
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+    <style>
+        /* Demo-specific styles */
+        .comparison-note {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);
+            border: 2px solid var(--accent);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .comparison-note h3 {
+            color: var(--accent);
+            margin-top: 0;
+        }
+
+        .comparison-note ul {
+            margin-bottom: 0;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Improved Navigation Bar -->
+    <nav class="navbar-improved">
+        <div class="container-modern" style="display: flex; justify-content: space-between; align-items: center;">
+            <a href="/" class="brand">
+                <i class="fa-solid fa-chart-line"></i>
+                PyCashFlow
+            </a>
+
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <a href="/" class="nav-link active">
+                    <i class="fa-solid fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/schedule" class="nav-link">
+                    <i class="fa-solid fa-calendar-days"></i>
+                    <span>Schedule</span>
+                </a>
+                <a href="/transactions" class="nav-link">
+                    <i class="fa-solid fa-list"></i>
+                    <span>Transactions</span>
+                </a>
+                <a href="/settings" class="nav-link">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Settings</span>
+                </a>
+                <a href="/profile" class="nav-link">
+                    <i class="fa-solid fa-user"></i>
+                    <span>Profile</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-modern">
+
+        <!-- Demo Notice -->
+        <div class="comparison-note">
+            <h3><i class="fa-solid fa-wand-magic-sparkles"></i> UI Improvement Demo</h3>
+            <p style="margin-bottom: 0.5rem;"><strong>Key Improvements Shown:</strong></p>
+            <ul>
+                <li>Modern color scheme (Slate blues instead of dated DarkCyan)</li>
+                <li>Card-based metric layout with visual hierarchy</li>
+                <li>Better typography with Inter font</li>
+                <li>Improved navigation with icons + labels</li>
+                <li>Enhanced button styles with hover effects</li>
+                <li>Proper spacing and border radius for modern look</li>
+                <li>No inline styles - all CSS-based</li>
+                <li>Responsive grid layout</li>
+            </ul>
+        </div>
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-subtitle">
+                <i class="fa-regular fa-calendar"></i>
+                Friday, October 27, 2025
+            </p>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="metrics-grid">
+            <!-- Current Balance Card -->
+            <div class="metric-card highlight">
+                <div class="metric-label">
+                    <i class="fa-solid fa-wallet"></i> Current Balance
+                </div>
+                <div class="metric-value">$5,432.10</div>
+                <div class="metric-sublabel">
+                    As of October 27, 2025
+                </div>
+                <button class="metric-action btn-primary-modern" data-bs-toggle="modal" data-bs-target="#balanceModal">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    Update Balance
+                </button>
+            </div>
+
+            <!-- Lowest Balance Card -->
+            <div class="metric-card warning">
+                <div class="metric-label">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Lowest Balance (60 days)
+                </div>
+                <div class="metric-value">$1,234.56</div>
+                <div class="metric-sublabel">
+                    Expected on November 15, 2025
+                </div>
+            </div>
+
+            <!-- Next Update Card -->
+            <div class="metric-card">
+                <div class="metric-label">
+                    <i class="fa-solid fa-clock"></i> Next Transaction
+                </div>
+                <div class="metric-value">$850.00</div>
+                <div class="metric-sublabel">
+                    Rent payment - November 1, 2025
+                </div>
+            </div>
+        </div>
+
+        <!-- Cash Flow Chart Card -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <h2>
+                    <i class="fa-solid fa-chart-area"></i>
+                    60-Day Cash Flow Projection
+                </h2>
+                <div class="chart-controls">
+                    <button class="refresh-btn" id="refreshBtn" onclick="handleRefresh()">
+                        <i class="fa-solid fa-arrows-rotate refresh-icon" id="refreshIcon"></i>
+                        <span>Refresh</span>
+                    </button>
+                    <button class="btn-outline-modern btn-icon" title="Export Chart">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="chart-body">
+                <div id="chart" style="width: 100%; height: 500px;"></div>
+            </div>
+        </div>
+
+        <!-- Quick Actions Section -->
+        <div class="page-header" style="margin-top: 2rem;">
+            <h2 class="page-title" style="font-size: 1.5rem;">Quick Actions</h2>
+        </div>
+
+        <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+            <a href="/schedule" style="text-decoration: none;">
+                <div class="metric-card" style="text-align: center; cursor: pointer;">
+                    <i class="fa-solid fa-calendar-plus" style="font-size: 2.5rem; color: var(--accent); margin-bottom: 1rem;"></i>
+                    <div class="metric-label">Add Schedule</div>
+                    <div style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+                        Create recurring transaction
+                    </div>
+                </div>
+            </a>
+
+            <a href="/transactions" style="text-decoration: none;">
+                <div class="metric-card" style="text-align: center; cursor: pointer;">
+                    <i class="fa-solid fa-list-check" style="font-size: 2.5rem; color: var(--success); margin-bottom: 1rem;"></i>
+                    <div class="metric-label">View Transactions</div>
+                    <div style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+                        See upcoming payments
+                    </div>
+                </div>
+            </a>
+
+            <a href="/export" style="text-decoration: none;">
+                <div class="metric-card" style="text-align: center; cursor: pointer;">
+                    <i class="fa-solid fa-file-export" style="font-size: 2.5rem; color: var(--warning); margin-bottom: 1rem;"></i>
+                    <div class="metric-label">Export Data</div>
+                    <div style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+                        Download CSV file
+                    </div>
+                </div>
+            </a>
+
+            <a href="/holds" style="text-decoration: none;">
+                <div class="metric-card" style="text-align: center; cursor: pointer;">
+                    <i class="fa-solid fa-pause-circle" style="font-size: 2.5rem; color: var(--danger); margin-bottom: 1rem;"></i>
+                    <div class="metric-label">Manage Holds</div>
+                    <div style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+                        Skip or hold payments
+                    </div>
+                </div>
+            </a>
+        </div>
+
+    </div>
+
+    <!-- Update Balance Modal (Bootstrap 5) -->
+    <div class="modal fade modal-modern" id="balanceModal" tabindex="-1" aria-labelledby="balanceModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="balanceModalLabel">
+                        <i class="fa-solid fa-wallet"></i> Update Balance
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="/balance" method="POST">
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-dollar-sign"></i> Current Balance
+                            </label>
+                            <input type="number" step="0.01" class="form-control-modern" name="amount" placeholder="0.00" required>
+                        </div>
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">
+                                <i class="fa-solid fa-calendar"></i> As of Date
+                            </label>
+                            <input type="date" class="form-control-modern" name="date" required>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn-primary-modern" type="submit" style="flex: 1;">
+                                <i class="fa-solid fa-check"></i>
+                                Update Balance
+                            </button>
+                            <button type="button" class="btn-outline-modern" data-bs-dismiss="modal">
+                                <i class="fa-solid fa-xmark"></i>
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Demo Chart Data -->
+    <script>
+        // Sample chart data for demonstration
+        const dates = [];
+        const balances = [];
+        const today = new Date();
+
+        // Generate 60 days of sample data
+        let currentBalance = 5432.10;
+        for (let i = 0; i < 60; i++) {
+            const date = new Date(today);
+            date.setDate(date.getDate() + i);
+            dates.push(date.toISOString().split('T')[0]);
+
+            // Simulate some transactions
+            if (i % 14 === 0) currentBalance += 2500; // Bi-weekly income
+            if (i % 30 === 0) currentBalance -= 1200; // Monthly rent
+            if (i % 7 === 3) currentBalance -= 150; // Weekly groceries
+
+            balances.push(currentBalance);
+        }
+
+        // Create Plotly chart with improved styling
+        const chartData = [{
+            x: dates,
+            y: balances,
+            type: 'scatter',
+            mode: 'lines',
+            fill: 'tozeroy',
+            line: {
+                color: '#3b82f6',
+                width: 3,
+                shape: 'spline',
+                smoothing: 0.8
+            },
+            fillcolor: 'rgba(59, 130, 246, 0.1)',
+            name: 'Balance'
+        }];
+
+        const layout = {
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            font: {
+                family: 'Inter, sans-serif',
+                color: '#cbd5e1'
+            },
+            xaxis: {
+                gridcolor: '#475569',
+                title: 'Date',
+                titlefont: { color: '#94a3b8' }
+            },
+            yaxis: {
+                gridcolor: '#475569',
+                title: 'Balance ($)',
+                titlefont: { color: '#94a3b8' },
+                tickprefix: '$'
+            },
+            margin: { t: 20, r: 20, b: 60, l: 60 },
+            hovermode: 'x unified'
+        };
+
+        const config = {
+            responsive: true,
+            displayModeBar: true,
+            displaylogo: false,
+            modeBarButtonsToRemove: ['lasso2d', 'select2d']
+        };
+
+        Plotly.newPlot('chart', chartData, layout, config);
+
+        // Refresh button handler
+        function handleRefresh() {
+            const btn = document.getElementById('refreshBtn');
+            const icon = document.getElementById('refreshIcon');
+
+            btn.classList.add('loading');
+            btn.disabled = true;
+
+            // Simulate refresh
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        }
+    </script>
+
+</body>
+</html>
