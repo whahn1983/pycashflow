@@ -89,7 +89,7 @@ def profile():
 
 @main.route('/settings')
 @login_required
-@global_admin_required
+@admin_required
 def settings():
     # get about info
     about = version()

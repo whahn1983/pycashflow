@@ -53,6 +53,15 @@ def login_post():
         user.admin = 1
         db.session.commit()
 
+    # ensure there's at least one global admin in the system
+    global_admin_test = User.query.filter_by(is_global_admin=True).first()
+    if not global_admin_test:
+        # Set the first admin user to be a global admin
+        first_admin = User.query.filter_by(admin=True).order_by(User.id).first()
+        if first_admin:
+            first_admin.is_global_admin = True
+            db.session.commit()
+
     # if the above check passes, then we know the user has the right credentials
     login_user(user, remember=remember)
     session['name'] = user.name
@@ -199,6 +208,15 @@ def login_passkey_post():
     if not user_test:
         user.admin = 1
         db.session.commit()
+
+    # ensure there's at least one global admin in the system
+    global_admin_test = User.query.filter_by(is_global_admin=True).first()
+    if not global_admin_test:
+        # Set the first admin user to be a global admin
+        first_admin = User.query.filter_by(admin=True).order_by(User.id).first()
+        if first_admin:
+            first_admin.is_global_admin = True
+            db.session.commit()
 
     # if the above check passes, then we know the user has the right credentials
     login_user(user, remember=True)

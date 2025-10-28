@@ -14,7 +14,7 @@
 <!-- Settings Grid -->
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
 
-    <!-- Email Configuration Card -->
+    <!-- Email Configuration Card - Available to all admins -->
     <div class="metric-card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#emailmodal">
         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
             <div style="width: 3rem; height: 3rem; background: linear-gradient(135deg, var(--accent), #60a5fa); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
@@ -30,7 +30,8 @@
         </button>
     </div>
 
-    <!-- Sign-Ups Toggle Card -->
+    {% if current_user.is_global_admin %}
+    <!-- Sign-Ups Toggle Card - Global Admins Only -->
     <div class="metric-card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#settingsmodal">
         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
             <div style="width: 3rem; height: 3rem; background: linear-gradient(135deg, #f59e0b, #fbbf24); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
@@ -46,7 +47,7 @@
         </button>
     </div>
 
-    <!-- User Management Card -->
+    <!-- User Management Card - Global Admins Only -->
     <div class="metric-card">
         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
             <div style="width: 3rem; height: 3rem; background: linear-gradient(135deg, #8b5cf6, #a78bfa); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
@@ -61,8 +62,9 @@
             <i class="fa-solid fa-users"></i> Manage Users
         </a>
     </div>
+    {% endif %}
 
-    <!-- About Card -->
+    <!-- About Card - Available to all admins -->
     <div class="metric-card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#aboutmodal">
         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
             <div style="width: 3rem; height: 3rem; background: linear-gradient(135deg, var(--success), #34d399); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
@@ -80,7 +82,8 @@
 
 </div>
 
-<!-- Disable Sign-Ups Modal -->
+{% if current_user.is_global_admin %}
+<!-- Disable Sign-Ups Modal - Global Admins Only -->
 <div class="modal fade modal-modern" id="settingsmodal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -117,6 +120,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <!-- Email Configuration Modal -->
 <div class="modal fade modal-modern" id="emailmodal" tabindex="-1">
