@@ -37,16 +37,19 @@ def upgrade():
             # No users exist - use placeholder (will fail if data exists in other tables)
             first_admin_id = 1
 
-    # Add new columns to User table
+    # Add new columns to User table (without foreign key to avoid circular dependency)
     with op.batch_alter_table('user', schema=None) as batch_op:
         batch_op.add_column(sa.Column('is_global_admin', sa.Boolean(), nullable=True))
         batch_op.add_column(sa.Column('account_owner_id', sa.Integer(), nullable=True))
-        batch_op.create_foreign_key('fk_user_account_owner', 'user', ['account_owner_id'], ['id'])
 
     # Set first admin as global admin
     conn.execute(text(f"UPDATE user SET is_global_admin = 1 WHERE id = {first_admin_id}"))
     # Set default for is_global_admin to False for all other users
     conn.execute(text(f"UPDATE user SET is_global_admin = 0 WHERE id != {first_admin_id}"))
+
+    # Now add the self-referencing foreign key in a separate batch operation
+    with op.batch_alter_table('user', schema=None) as batch_op:
+        batch_op.create_foreign_key('fk_user_account_owner', 'user', ['account_owner_id'], ['id'])
 
     # Update Schedule table - add user_id and change unique constraint
     with op.batch_alter_table('schedule', schema=None) as batch_op:
