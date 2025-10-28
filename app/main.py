@@ -89,7 +89,7 @@ def profile():
 
 @main.route('/settings')
 @login_required
-@admin_required
+@global_admin_required
 def settings():
     # get about info
     about = version()
@@ -356,7 +356,7 @@ def changepw():
 
 @main.route('/signups', methods=('GET', 'POST'))
 @login_required
-@admin_required
+@global_admin_required
 def signups():
     # set the settings options, in this case disable signups, from the profile page
     if request.method == 'POST':
@@ -448,7 +448,7 @@ def email():
 
 @main.route('/users_table')
 @login_required
-@admin_required
+@global_admin_required
 def users():
     users = User.query
 
@@ -457,7 +457,7 @@ def users():
 
 @main.route('/update_user', methods=['GET', 'POST'])
 @login_required
-@admin_required
+@global_admin_required
 def update_user():
     # update an existing user
     if request.method == 'POST':
@@ -470,11 +470,19 @@ def update_user():
         my_data = User.query.get(request.form.get('id'))
         my_data.name = request.form['name']
         my_data.email = request.form['email']
-        if request.form['admin'] == "True":
-            adminvalue = True
-        else:
-            adminvalue = False
-        my_data.admin = adminvalue
+
+        # Handle role assignment
+        role = request.form.get('role', 'user')
+        if role == 'global_admin':
+            my_data.admin = True
+            my_data.is_global_admin = True
+        elif role == 'admin':
+            my_data.admin = True
+            my_data.is_global_admin = False
+        else:  # user
+            my_data.admin = False
+            my_data.is_global_admin = False
+
         db.session.commit()
         flash("Updated Successfully")
 
@@ -485,7 +493,7 @@ def update_user():
 
 @main.route('/delete_user/<id>')
 @login_required
-@admin_required
+@global_admin_required
 def delete_user(id):
     # delete a user
     user = User.query.filter_by(id=id).first()
@@ -500,18 +508,27 @@ def delete_user(id):
 
 @main.route('/create_user', methods=('GET', 'POST'))
 @login_required
-@admin_required
+@global_admin_required
 def create_user():
     # create a new user
     if request.method == 'POST':
         name = request.form['name']
         email = request.form['email']
-        if request.form['admin'] == "True":
-            adminvalue = True
-        else:
-            adminvalue = False
         password = generate_password_hash(request.form['password'], method='scrypt')
-        user = User(name=name, email=email, admin=adminvalue, password=password)
+
+        # Handle role assignment
+        role = request.form.get('role', 'user')
+        if role == 'global_admin':
+            admin = True
+            is_global_admin = True
+        elif role == 'admin':
+            admin = True
+            is_global_admin = False
+        else:  # user
+            admin = False
+            is_global_admin = False
+
+        user = User(name=name, email=email, admin=admin, is_global_admin=is_global_admin, password=password)
         existing = User.query.filter_by(email=email).first()
         if existing:
             flash("User already exists")

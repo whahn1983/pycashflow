@@ -61,7 +61,11 @@
                         <i class="fa-solid fa-envelope"></i> {{row.email}}
                     </td>
                     <td>
-                        {% if row.admin %}
+                        {% if row.is_global_admin %}
+                        <span class="badge-modern badge-global-admin">
+                            <i class="fa-solid fa-crown"></i> Global Admin
+                        </span>
+                        {% elif row.admin %}
                         <span class="badge-modern badge-admin">
                             <i class="fa-solid fa-shield-halved"></i> Admin
                         </span>
@@ -113,11 +117,12 @@
 
                                     <div class="form-group-modern">
                                         <label class="form-label-modern">
-                                            <i class="fa-solid fa-shield-halved"></i> Admin Privileges
+                                            <i class="fa-solid fa-shield-halved"></i> User Role
                                         </label>
-                                        <select name="admin" class="form-control-modern">
-                                            <option value="True" {% if row.admin %}selected{% endif %}>Admin</option>
-                                            <option value="False" {% if not row.admin %}selected{% endif %}>User</option>
+                                        <select name="role" class="form-control-modern">
+                                            <option value="global_admin" {% if row.is_global_admin %}selected{% endif %}>Global Admin</option>
+                                            <option value="admin" {% if row.admin and not row.is_global_admin %}selected{% endif %}>Admin</option>
+                                            <option value="user" {% if not row.admin and not row.is_global_admin %}selected{% endif %}>User</option>
                                         </select>
                                     </div>
 
@@ -166,11 +171,12 @@
 
                                     <div class="form-group-modern">
                                         <label class="form-label-modern">
-                                            <i class="fa-solid fa-shield-halved"></i> Admin Privileges
+                                            <i class="fa-solid fa-shield-halved"></i> User Role
                                         </label>
-                                        <select name="admin" class="form-control-modern">
-                                            <option value="False">User</option>
-                                            <option value="True">Admin</option>
+                                        <select name="role" class="form-control-modern">
+                                            <option value="user">User</option>
+                                            <option value="admin">Admin</option>
+                                            <option value="global_admin">Global Admin</option>
                                         </select>
                                     </div>
 
@@ -214,6 +220,11 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
+}
+.badge-global-admin {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid #f59e0b;
 }
 .badge-admin {
     background-color: rgba(139, 92, 246, 0.15);

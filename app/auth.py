@@ -89,23 +89,31 @@ def signup_post():
     user = User.query.filter_by(email=email).first() # if this returns a user, then the email already exists in database
 
     if user: # if a user is found, we want to redirect back to signup page so user can try again
+        flash('Email address already exists')
         return redirect(url_for('auth.signup'))
 
-    # if no admin user, make new user an admin
+    # if no admin user, make new user an admin AND global admin
     user_test = User.query.filter_by(admin=True).first()
     if not user_test:
-        admin = 1
+        admin = True
+        is_global_admin = True
     else:
-        admin = 0
+        admin = False
+        is_global_admin = False
 
     # create a new user with the form data. Hash the password so the plaintext version isn't saved.
-    new_user = User(email=email, name=name, password=generate_password_hash(password, method='scrypt'), admin=admin)
+    new_user = User(
+        email=email,
+        name=name,
+        password=generate_password_hash(password, method='scrypt'),
+        admin=admin,
+        is_global_admin=is_global_admin
+    )
 
     # add the new user to the database
     db.session.add(new_user)
     db.session.commit()
-    if user:  # if a user is found, we want to redirect back to signup page so user can try again
-        flash('Email address already exists')
+
     return redirect(url_for('auth.login'))
 
 
