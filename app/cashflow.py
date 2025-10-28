@@ -271,7 +271,15 @@ def calc_schedule(schedules, holds, skips):
 
 def calc_transactions(balance, total):
     # retrieve the total future transactions
-    df = total.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(total["date"])))
+    # Check if total DataFrame is empty
+    if total.empty:
+        # Return empty DataFrames if no transactions
+        trans = pd.DataFrame(columns=['name', 'type', 'amount', 'date'])
+        run_dict = {0: {'amount': balance, 'date': datetime.today().date()}}
+        run = pd.DataFrame.from_dict(run_dict, orient="index")
+        return trans, run
+
+    df = total.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(total["date"]))).reset_index(drop=True)
     trans_dict = {}
     # collect the next 60 days of transactions for the transactions table
     todaydate = datetime.today().date()
@@ -292,14 +300,11 @@ def calc_transactions(balance, total):
     trans = pd.DataFrame.from_dict(trans_dict, orient="index")
 
     # for schedules marked as expenses, make the value negative for the sum
-    for i in df.itertuples():
-        amount = i.amount
-        exp_type = i.type
-        if exp_type == 'Expense':
-            amount = float(amount) * -1
-            df.loc[i.Index, 'amount'] = amount
-        elif exp_type == 'Income':
-            pass
+    # Create a copy to avoid modifying during iteration
+    df = df.copy()
+    for idx in df.index:
+        if df.loc[idx, 'type'] == 'Expense':
+            df.loc[idx, 'amount'] = float(df.loc[idx, 'amount']) * -1
 
     # group total transactions by date and sum the amounts for each date
     df = df.groupby("date")['amount'].sum().reset_index()
