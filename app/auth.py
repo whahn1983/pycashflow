@@ -126,6 +126,39 @@ def admin_required(f):
     return decorated_function
 
 
+def global_admin_required(f):
+    """
+    Decorator for routes that require global admin access.
+    Only users with is_global_admin=True can access.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('auth.login'))
+        if current_user.is_global_admin:
+            return f(*args, **kwargs)
+        else:
+            flash('Global admin access required')
+            return redirect(url_for('main.index'))
+    return decorated_function
+
+
+def account_owner_required(f):
+    """
+    Decorator for routes that require account owner access.
+    Guest users (those with account_owner_id set) cannot access.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('auth.login'))
+        if current_user.account_owner_id is not None:
+            flash('Account owner access required')
+            return redirect(url_for('main.index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 @auth.route('/passkey_login')
 def login_passkey():
     project_id = os.environ['PROJECT_ID']

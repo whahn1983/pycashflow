@@ -8,35 +8,56 @@ import os
 from sqlalchemy import desc, extract, asc
 from werkzeug.security import generate_password_hash, check_password_hash
 from .cashflow import update_cash, plot_cash
-from .auth import admin_required
+from .auth import admin_required, global_admin_required, account_owner_required
 from .files import export, upload, version
 
 
 main = Blueprint('main', __name__)
 
 
+def get_effective_user_id():
+    """
+    Get the effective user ID for data filtering.
+    For guest users, returns their account owner's ID.
+    For account owners, returns their own ID.
+    """
+    if current_user.account_owner_id:
+        # Guest user - return account owner's ID
+        return current_user.account_owner_id
+    else:
+        # Account owner or standalone user - return their own ID
+        return current_user.id
+
+
 @main.route('/', methods=('GET', 'POST'))
 @login_required
 def index():
+    # Get effective user ID (account owner for guests, self for owners)
+    user_id = get_effective_user_id()
+
     # get today's date
     todaydate = datetime.today().strftime('%A, %B %d, %Y')
 
-    # query the latest balance information
-    balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
+    # query the latest balance information for this user
+    balance = Balance.query.filter_by(user_id=user_id).order_by(desc(Balance.date), desc(Balance.id)).first()
 
     try:
         float(balance.amount)
-        db.session.query(Balance).delete()
-        balance = Balance(amount=balance.amount, date=datetime.today())
+        db.session.query(Balance).filter_by(user_id=user_id).delete()
+        balance = Balance(amount=balance.amount, date=datetime.today(), user_id=user_id)
         db.session.add(balance)
         db.session.commit()
     except:
-        balance = Balance(amount='0',
-                          date=datetime.today())
+        balance = Balance(amount='0', date=datetime.today(), user_id=user_id)
         db.session.add(balance)
         db.session.commit()
 
-    trans, run = update_cash(float(balance.amount))
+    # Pre-filter data by user before passing to cashflow
+    schedules = Schedule.query.filter_by(user_id=user_id).all()
+    holds = Hold.query.filter_by(user_id=user_id).all()
+    skips = Skip.query.filter_by(user_id=user_id).all()
+
+    trans, run = update_cash(float(balance.amount), schedules, holds, skips)
 
     # plot cash flow results
     minbalance, graphJSON = plot_cash(run)
@@ -80,7 +101,8 @@ def settings():
 @login_required
 @admin_required
 def schedule():
-    schedule = Schedule.query.order_by(asc(extract('day', Schedule.startdate)))
+    user_id = get_effective_user_id()
+    schedule = Schedule.query.filter_by(user_id=user_id).order_by(asc(extract('day', Schedule.startdate)))
 
     return render_template('schedule_table.html', title='Schedule Table', schedule=schedule)
 
@@ -89,8 +111,9 @@ def schedule():
 @login_required
 @admin_required
 def holds():
-    hold = Hold.query
-    skip = Skip.query
+    user_id = get_effective_user_id()
+    hold = Hold.query.filter_by(user_id=user_id)
+    skip = Skip.query.filter_by(user_id=user_id)
 
     return render_template('holds_table.html', title='Holds Table', hold=hold, skip=skip)
 
@@ -100,6 +123,7 @@ def holds():
 @admin_required
 def create():
     # create a new schedule item
+    user_id = get_effective_user_id()
     format = '%Y-%m-%d'
     if request.method == 'POST':
         name = request.form['name']
@@ -112,8 +136,9 @@ def create():
                             amount=amount,
                             frequency=frequency,
                             startdate=datetime.strptime(startdate, format).date(),
-                            firstdate=datetime.strptime(startdate, format).date())
-        existing = Schedule.query.filter_by(name=name).first()
+                            firstdate=datetime.strptime(startdate, format).date(),
+                            user_id=user_id)
+        existing = Schedule.query.filter_by(name=name, user_id=user_id).first()
         if existing:
             flash("Schedule already exists")
             return redirect(url_for('main.schedule'))
@@ -131,16 +156,17 @@ def create():
 @admin_required
 def update():
     # update an existing schedule item
+    user_id = get_effective_user_id()
     format = '%Y-%m-%d'
 
     if request.method == 'POST':
-        current = Schedule.query.filter_by(id=request.form['id']).first()
-        existing = Schedule.query.filter_by(name=request.form['name']).first()
+        current = Schedule.query.filter_by(id=request.form['id'], user_id=user_id).first()
+        existing = Schedule.query.filter_by(name=request.form['name'], user_id=user_id).first()
         if existing:
             if current.name != request.form['name']:
                 flash("Schedule name already exists")
                 return redirect(url_for('main.schedule'))
-        my_data = Schedule.query.get(request.form.get('id'))
+        my_data = Schedule.query.filter_by(id=request.form.get('id'), user_id=user_id).first()
         my_data.name = request.form['name']
         my_data.amount = request.form['amount']
         my_data.type = request.form['type']
@@ -163,8 +189,9 @@ def update():
 @admin_required
 def addhold(id):
     # add a hold item from the schedule
-    schedule = Schedule.query.filter_by(id=id).first()
-    hold = Hold(name=schedule.name, type=schedule.type, amount=schedule.amount)
+    user_id = get_effective_user_id()
+    schedule = Schedule.query.filter_by(id=id, user_id=user_id).first()
+    hold = Hold(name=schedule.name, type=schedule.type, amount=schedule.amount, user_id=user_id)
     db.session.add(hold)
     db.session.commit()
     flash("Added Hold")
@@ -177,15 +204,22 @@ def addhold(id):
 @admin_required
 def addskip(id):
     # add a skip item from the schedule
-    balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
-    trans , run = update_cash(float(balance.amount))
+    user_id = get_effective_user_id()
+    balance = Balance.query.filter_by(user_id=user_id).order_by(desc(Balance.date), desc(Balance.id)).first()
+
+    # Pre-filter data by user
+    schedules = Schedule.query.filter_by(user_id=user_id).all()
+    holds = Hold.query.filter_by(user_id=user_id).all()
+    skips = Skip.query.filter_by(user_id=user_id).all()
+
+    trans, run = update_cash(float(balance.amount), schedules, holds, skips)
     transaction = trans.loc[int(id)]
     trans_type = ""
     if transaction[1] == "Expense":
         trans_type = "Income"
     elif transaction[1] == "Income":
         trans_type = "Expense"
-    skip = Skip(name=transaction[0] + " (SKIP)", type=trans_type, amount=transaction[2], date=transaction[3])
+    skip = Skip(name=transaction[0] + " (SKIP)", type=trans_type, amount=transaction[2], date=transaction[3], user_id=user_id)
     db.session.add(skip)
     db.session.commit()
     flash("Added Skip")
@@ -198,7 +232,8 @@ def addskip(id):
 @admin_required
 def holds_delete(id):
     # delete a hold item
-    hold = Hold.query.filter_by(id=id).first()
+    user_id = get_effective_user_id()
+    hold = Hold.query.filter_by(id=id, user_id=user_id).first()
 
     if hold:
         db.session.delete(hold)
@@ -213,7 +248,8 @@ def holds_delete(id):
 @admin_required
 def skips_delete(id):
     # delete a skip item
-    skip = Skip.query.filter_by(id=id).first()
+    user_id = get_effective_user_id()
+    skip = Skip.query.filter_by(id=id, user_id=user_id).first()
 
     if skip:
         db.session.delete(skip)
@@ -228,7 +264,8 @@ def skips_delete(id):
 @admin_required
 def clear_holds():
     # clear holds
-    db.session.query(Hold).delete()
+    user_id = get_effective_user_id()
+    db.session.query(Hold).filter_by(user_id=user_id).delete()
     db.session.commit()
 
     return redirect(url_for('main.holds'))
@@ -239,7 +276,8 @@ def clear_holds():
 @admin_required
 def clear_skips():
     # clear skips
-    db.session.query(Skip).delete()
+    user_id = get_effective_user_id()
+    db.session.query(Skip).filter_by(user_id=user_id).delete()
     db.session.commit()
 
     return redirect(url_for('main.holds'))
@@ -250,7 +288,8 @@ def clear_skips():
 @admin_required
 def schedule_delete(id):
     # delete a schedule item
-    schedule = Schedule.query.filter_by(id=id).first()
+    user_id = get_effective_user_id()
+    schedule = Schedule.query.filter_by(id=id, user_id=user_id).first()
 
     if schedule:
         db.session.delete(schedule)
@@ -277,12 +316,14 @@ def appleicon():
 @admin_required
 def balance():
     # manually update the balance from the balance button
+    user_id = get_effective_user_id()
     format = '%Y-%m-%d'
     if request.method == 'POST':
         amount = request.form['amount']
         dateentry = request.form['date']
         balance = Balance(amount=amount,
-                          date=datetime.strptime(dateentry, format).date())
+                          date=datetime.strptime(dateentry, format).date(),
+                          user_id=user_id)
         db.session.add(balance)
         db.session.commit()
 
@@ -349,8 +390,15 @@ def signups():
 @login_required
 @admin_required
 def transactions():
-    balance = Balance.query.order_by(desc(Balance.date), desc(Balance.id)).first()
-    trans, run = update_cash(float(balance.amount))
+    user_id = get_effective_user_id()
+    balance = Balance.query.filter_by(user_id=user_id).order_by(desc(Balance.date), desc(Balance.id)).first()
+
+    # Pre-filter data by user
+    schedules = Schedule.query.filter_by(user_id=user_id).all()
+    holds = Hold.query.filter_by(user_id=user_id).all()
+    skips = Skip.query.filter_by(user_id=user_id).all()
+
+    trans, run = update_cash(float(balance.amount), schedules, holds, skips)
 
     return render_template('transactions_table.html', total=trans.to_dict(orient='records'))
 
@@ -360,8 +408,10 @@ def transactions():
 @admin_required
 def email():
     # set the users email address, password, and server for the auto email balance update
+    user_id = get_effective_user_id()
+
     if request.method == 'POST':
-        emailsettings = Email.query.filter_by(id=1).first()
+        emailsettings = Email.query.filter_by(user_id=user_id).first()
 
         if emailsettings:
             email = request.form['email']
@@ -387,7 +437,7 @@ def email():
         startstr = request.form['start_str']
         endstr = request.form['end_str']
         emailentry = Email(email=email, password=password, server=server, subjectstr=subjectstr, startstr=startstr,
-                           endstr=endstr)
+                           endstr=endstr, user_id=user_id)
         db.session.add(emailentry)
         db.session.commit()
 
@@ -479,8 +529,9 @@ def create_user():
 @login_required
 @admin_required
 def export_csv():
+    user_id = get_effective_user_id()
 
-    csv_data = export()
+    csv_data = export(user_id)
 
     # Create a direct download response with the CSV data and appropriate headers
     response = Response(csv_data, content_type="text/csv")
@@ -494,13 +545,92 @@ def export_csv():
 @admin_required
 def import_csv():
     if request.method == 'POST':
+        user_id = get_effective_user_id()
         csv_file = request.files.get('file')
 
-        upload(csv_file)
+        upload(csv_file, user_id)
 
         flash("Import Successful")
 
     return redirect(url_for('main.schedule'))
+
+
+@main.route('/manage_guests')
+@login_required
+@account_owner_required
+def manage_guests():
+    """Account owners can manage their guest users"""
+    guests = User.query.filter_by(account_owner_id=current_user.id).all()
+    return render_template('manage_guests.html', guests=guests)
+
+
+@main.route('/add_guest', methods=['POST'])
+@login_required
+@account_owner_required
+def add_guest():
+    """Create a guest user linked to current account owner"""
+    email = request.form.get('email')
+    name = request.form.get('name')
+
+    # Check if user already exists
+    existing_user = User.query.filter_by(email=email).first()
+    if existing_user:
+        flash('A user with this email already exists')
+        return redirect(url_for('main.manage_guests'))
+
+    # Generate a random password for guest (they can change it later)
+    import secrets
+    temp_password = secrets.token_urlsafe(16)
+
+    new_guest = User(
+        email=email,
+        name=name,
+        password=generate_password_hash(temp_password, method='scrypt'),
+        admin=False,  # Guests are not admins
+        is_global_admin=False,
+        account_owner_id=current_user.id
+    )
+    db.session.add(new_guest)
+    db.session.commit()
+
+    flash(f'Guest user {name} added successfully. Temporary password: {temp_password}')
+    return redirect(url_for('main.manage_guests'))
+
+
+@main.route('/remove_guest/<int:guest_id>', methods=['POST'])
+@login_required
+@account_owner_required
+def remove_guest(guest_id):
+    """Remove a guest user (account owner only)"""
+    guest = User.query.filter_by(id=guest_id, account_owner_id=current_user.id).first()
+
+    if guest:
+        db.session.delete(guest)
+        db.session.commit()
+        flash('Guest user removed successfully')
+    else:
+        flash('Guest user not found or you do not have permission to remove them')
+
+    return redirect(url_for('main.manage_guests'))
+
+
+@main.route('/global_admin')
+@login_required
+@global_admin_required
+def global_admin_panel():
+    """Global admin can see all users and accounts"""
+    all_users = User.query.all()
+
+    # Organize users by account owners
+    account_owners = [u for u in all_users if u.account_owner_id is None and not u.is_global_admin]
+    global_admins = [u for u in all_users if u.is_global_admin]
+    standalone_users = [u for u in all_users if u.account_owner_id is None and not u.admin]
+
+    return render_template('global_admin.html',
+                         all_users=all_users,
+                         account_owners=account_owners,
+                         global_admins=global_admins,
+                         standalone_users=standalone_users)
 
 
 @main.route('/manifest.json')
