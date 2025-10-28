@@ -62,7 +62,8 @@ def create_app():
     from .main import main as main_blueprint
     app.register_blueprint(main_blueprint)
 
-    with app.app_context():
-        db.create_all()
+    # Don't use db.create_all() - use flask db upgrade instead
+    # with app.app_context():
+    #     db.create_all()
 
     return app
