@@ -38,79 +38,103 @@ def upgrade():
             first_admin_id = 1
 
     # Add new columns to User table
-    op.add_column('user', sa.Column('is_global_admin', sa.Boolean(), nullable=True))
-    op.add_column('user', sa.Column('account_owner_id', sa.Integer(), nullable=True))
+    with op.batch_alter_table('user', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('is_global_admin', sa.Boolean(), nullable=True))
+        batch_op.add_column(sa.Column('account_owner_id', sa.Integer(), nullable=True))
+        batch_op.create_foreign_key('fk_user_account_owner', 'user', ['account_owner_id'], ['id'])
 
     # Set first admin as global admin
     conn.execute(text(f"UPDATE user SET is_global_admin = 1 WHERE id = {first_admin_id}"))
-
     # Set default for is_global_admin to False for all other users
     conn.execute(text(f"UPDATE user SET is_global_admin = 0 WHERE id != {first_admin_id}"))
 
-    # Add foreign key for account_owner_id (self-referencing)
-    op.create_foreign_key('fk_user_account_owner', 'user', 'user', ['account_owner_id'], ['id'])
+    # Update Schedule table - add user_id and change unique constraint
+    with op.batch_alter_table('schedule', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('user_id', sa.Integer(), nullable=True))
+        batch_op.drop_constraint('schedule_name_key', type_='unique')
 
-    # Add user_id columns to data tables (nullable first for migration)
-    op.add_column('schedule', sa.Column('user_id', sa.Integer(), nullable=True))
-    op.add_column('balance', sa.Column('user_id', sa.Integer(), nullable=True))
-    op.add_column('hold', sa.Column('user_id', sa.Integer(), nullable=True))
-    op.add_column('skip', sa.Column('user_id', sa.Integer(), nullable=True))
-    op.add_column('email', sa.Column('user_id', sa.Integer(), nullable=True))
-
-    # Assign all existing data to first admin
+    # Assign existing schedule data to first admin
     conn.execute(text(f"UPDATE schedule SET user_id = {first_admin_id}"))
+
+    # Now recreate schedule table with NOT NULL constraint and new unique constraint
+    with op.batch_alter_table('schedule', schema=None) as batch_op:
+        batch_op.alter_column('user_id', existing_type=sa.Integer(), nullable=False)
+        batch_op.create_foreign_key('fk_schedule_user', 'user', ['user_id'], ['id'])
+        batch_op.create_unique_constraint('_user_schedule_uc', ['user_id', 'name'])
+
+    # Update Balance table
+    with op.batch_alter_table('balance', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('user_id', sa.Integer(), nullable=True))
+
     conn.execute(text(f"UPDATE balance SET user_id = {first_admin_id}"))
+
+    with op.batch_alter_table('balance', schema=None) as batch_op:
+        batch_op.alter_column('user_id', existing_type=sa.Integer(), nullable=False)
+        batch_op.create_foreign_key('fk_balance_user', 'user', ['user_id'], ['id'])
+
+    # Update Hold table
+    with op.batch_alter_table('hold', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('user_id', sa.Integer(), nullable=True))
+
     conn.execute(text(f"UPDATE hold SET user_id = {first_admin_id}"))
+
+    with op.batch_alter_table('hold', schema=None) as batch_op:
+        batch_op.alter_column('user_id', existing_type=sa.Integer(), nullable=False)
+        batch_op.create_foreign_key('fk_hold_user', 'user', ['user_id'], ['id'])
+
+    # Update Skip table
+    with op.batch_alter_table('skip', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('user_id', sa.Integer(), nullable=True))
+
     conn.execute(text(f"UPDATE skip SET user_id = {first_admin_id}"))
+
+    with op.batch_alter_table('skip', schema=None) as batch_op:
+        batch_op.alter_column('user_id', existing_type=sa.Integer(), nullable=False)
+        batch_op.create_foreign_key('fk_skip_user', 'user', ['user_id'], ['id'])
+
+    # Update Email table
+    with op.batch_alter_table('email', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('user_id', sa.Integer(), nullable=True))
+        batch_op.drop_constraint('email_email_key', type_='unique')
+
     conn.execute(text(f"UPDATE email SET user_id = {first_admin_id}"))
 
-    # Now make user_id NOT NULL and add foreign keys
-    op.alter_column('schedule', 'user_id', nullable=False)
-    op.alter_column('balance', 'user_id', nullable=False)
-    op.alter_column('hold', 'user_id', nullable=False)
-    op.alter_column('skip', 'user_id', nullable=False)
-    op.alter_column('email', 'user_id', nullable=False)
-
-    # Add foreign key constraints
-    op.create_foreign_key('fk_schedule_user', 'schedule', 'user', ['user_id'], ['id'])
-    op.create_foreign_key('fk_balance_user', 'balance', 'user', ['user_id'], ['id'])
-    op.create_foreign_key('fk_hold_user', 'hold', 'user', ['user_id'], ['id'])
-    op.create_foreign_key('fk_skip_user', 'skip', 'user', ['user_id'], ['id'])
-    op.create_foreign_key('fk_email_user', 'email', 'user', ['user_id'], ['id'])
-
-    # Drop old unique constraints
-    op.drop_constraint('schedule_name_key', 'schedule', type_='unique')
-    op.drop_constraint('email_email_key', 'email', type_='unique')
-
-    # Add composite unique constraint for schedule (user_id, name)
-    op.create_unique_constraint('_user_schedule_uc', 'schedule', ['user_id', 'name'])
+    with op.batch_alter_table('email', schema=None) as batch_op:
+        batch_op.alter_column('user_id', existing_type=sa.Integer(), nullable=False)
+        batch_op.create_foreign_key('fk_email_user', 'user', ['user_id'], ['id'])
 
 
 def downgrade():
-    # Remove composite unique constraint
-    op.drop_constraint('_user_schedule_uc', 'schedule', type_='unique')
+    # Remove composite unique constraint and restore schedule table
+    with op.batch_alter_table('schedule', schema=None) as batch_op:
+        batch_op.drop_constraint('_user_schedule_uc', type_='unique')
+        batch_op.drop_constraint('fk_schedule_user', type_='foreignkey')
+        batch_op.drop_column('user_id')
+        batch_op.create_unique_constraint('schedule_name_key', ['name'])
 
-    # Restore old unique constraints
-    op.create_unique_constraint('schedule_name_key', 'schedule', ['name'])
-    op.create_unique_constraint('email_email_key', 'email', ['email'])
+    # Restore email table
+    with op.batch_alter_table('email', schema=None) as batch_op:
+        batch_op.drop_constraint('fk_email_user', type_='foreignkey')
+        batch_op.drop_column('user_id')
+        batch_op.create_unique_constraint('email_email_key', ['email'])
 
-    # Drop foreign keys
-    op.drop_constraint('fk_email_user', 'email', type_='foreignkey')
-    op.drop_constraint('fk_skip_user', 'skip', type_='foreignkey')
-    op.drop_constraint('fk_hold_user', 'hold', type_='foreignkey')
-    op.drop_constraint('fk_balance_user', 'balance', type_='foreignkey')
-    op.drop_constraint('fk_schedule_user', 'schedule', type_='foreignkey')
+    # Restore skip table
+    with op.batch_alter_table('skip', schema=None) as batch_op:
+        batch_op.drop_constraint('fk_skip_user', type_='foreignkey')
+        batch_op.drop_column('user_id')
 
-    # Remove user_id columns
-    op.drop_column('email', 'user_id')
-    op.drop_column('skip', 'user_id')
-    op.drop_column('hold', 'user_id')
-    op.drop_column('balance', 'user_id')
-    op.drop_column('schedule', 'user_id')
+    # Restore hold table
+    with op.batch_alter_table('hold', schema=None) as batch_op:
+        batch_op.drop_constraint('fk_hold_user', type_='foreignkey')
+        batch_op.drop_column('user_id')
 
-    # Drop account owner foreign key
-    op.drop_constraint('fk_user_account_owner', 'user', type_='foreignkey')
+    # Restore balance table
+    with op.batch_alter_table('balance', schema=None) as batch_op:
+        batch_op.drop_constraint('fk_balance_user', type_='foreignkey')
+        batch_op.drop_column('user_id')
 
-    # Remove new columns from User table
-    op.drop_column('user', 'account_owner_id')
-    op.drop_column('user', 'is_global_admin')
+    # Restore user table
+    with op.batch_alter_table('user', schema=None) as batch_op:
+        batch_op.drop_constraint('fk_user_account_owner', type_='foreignkey')
+        batch_op.drop_column('account_owner_id')
+        batch_op.drop_column('is_global_admin')
