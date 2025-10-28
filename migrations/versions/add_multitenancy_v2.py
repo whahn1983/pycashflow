@@ -43,6 +43,10 @@ def upgrade():
 
     if dialect_name == 'sqlite':
         # SQLite: Use direct table recreation approach
+        # First, clean up any leftover temporary tables from failed migrations
+        temp_tables = ['user_new', 'schedule_new', 'balance_new', 'hold_new', 'skip_new', 'email_new']
+        for temp_table in temp_tables:
+            conn.execute(text(f"DROP TABLE IF EXISTS {temp_table}"))
 
         # 1. USER TABLE
         conn.execute(text("""
