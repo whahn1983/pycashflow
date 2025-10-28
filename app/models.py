@@ -4,7 +4,7 @@ from app import db
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)  # primary keys are required by SQLAlchemy
-    email = db.Column(db.String(100), unique=True)
+    email = db.Column(db.String(100))
     password = db.Column(db.String(100))
     name = db.Column(db.String(1000))
     admin = db.Column(db.Boolean)
@@ -13,6 +13,11 @@ class User(UserMixin, db.Model):
 
     # Relationships
     guests = db.relationship('User', backref=db.backref('account_owner', remote_side=[id]))
+
+    # Constraints
+    __table_args__ = (
+        db.UniqueConstraint('email', name='uq_user_email'),
+    )
 
 
 class Schedule(db.Model):
@@ -67,8 +72,13 @@ class Skip(db.Model):
 
 class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True)
+    name = db.Column(db.String(100))
     value = db.Column(db.Boolean)
+
+    # Constraints
+    __table_args__ = (
+        db.UniqueConstraint('name', name='uq_settings_name'),
+    )
 
 
 class Email(db.Model):
