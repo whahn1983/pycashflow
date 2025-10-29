@@ -12,9 +12,22 @@ import decimal
 import plotly.graph_objs as go
 
 
-def update_cash(balance):
+def update_cash(balance, schedules, holds, skips):
+    """
+    Calculate cash flow with pre-filtered user data
+
+    Args:
+        balance: Current balance amount (Decimal)
+        schedules: List of Schedule objects (pre-filtered for user)
+        holds: List of Hold objects (pre-filtered for user)
+        skips: List of Skip objects (pre-filtered for user)
+
+    Returns:
+        trans: DataFrame of upcoming transactions
+        run: DataFrame of running balance projections
+    """
     # calculate total events for the year amount
-    total = calc_schedule()
+    total = calc_schedule(schedules, holds, skips)
 
     # calculate sum of running transactions
     trans, run = calc_transactions(balance, total)
@@ -22,20 +35,42 @@ def update_cash(balance):
     return trans, run
 
 
-def calc_schedule():
+def calc_schedule(schedules, holds, skips):
+    """
+    Process schedules, holds, and skips into projected transactions
+
+    Args:
+        schedules: List of Schedule objects (pre-filtered for user)
+        holds: List of Hold objects (pre-filtered for user)
+        skips: List of Skip objects (pre-filtered for user)
+
+    Returns:
+        DataFrame of all projected transactions
+    """
     months = 13
     weeks = 53
     years = 1
     quarters = 4
     biweeks = 27
 
-    try:
-        engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
-    except:
-        engine = db.create_engine('sqlite:///db.sqlite').connect()
+    # Create lookup dictionaries to avoid re-querying
+    schedule_objects = {s.name: s for s in schedules}
+    skip_objects = {s.name: s for s in skips}
 
-    # pull the schedule information
-    df = pd.read_sql('SELECT * FROM schedule;', engine)
+    # Convert schedules to DataFrame
+    if schedules:
+        df = pd.DataFrame([{
+            'name': s.name,
+            'startdate': s.startdate.strftime('%Y-%m-%d') if s.startdate else None,
+            'firstdate': s.firstdate.strftime('%Y-%m-%d') if s.firstdate else None,
+            'frequency': s.frequency,
+            'amount': s.amount,
+            'type': s.type
+        } for s in schedules])
+    else:
+        # Empty DataFrame if no schedules
+        df = pd.DataFrame(columns=['name', 'startdate', 'firstdate', 'frequency', 'amount', 'type'])
+
     total_dict = {}
 
     # loop through the schedule and create transactions in a table out to the future number of years
@@ -48,7 +83,9 @@ def calc_schedule():
         frequency = i.frequency
         amount = i.amount
         type = i.type
-        existing = Schedule.query.filter_by(name=name).first()
+        existing = schedule_objects.get(name)
+        if not existing:
+            continue  # Skip if schedule object not found
         if not firstdate:
             existing.firstdate = datetime.strptime(startdate, format).date()
             firstdate = existing.firstdate.strftime(format)
@@ -192,51 +229,58 @@ def calc_schedule():
     db.session.commit()
 
     # add the hold items
-    df = pd.read_sql('SELECT * FROM hold;', engine)
-    for i in df.itertuples(index=False):
-        name = i.name
-        amount = i.amount
-        type = i.type
+    for hold in holds:
         # Create a new row
         new_row = {
-            'type': type,
-            'name': name,
-            'amount': amount,
+            'type': hold.type,
+            'name': hold.name,
+            'amount': hold.amount,
             'date': todaydate + relativedelta(days=1)
         }
         # Append the row to the DataFrame
         total_dict[len(total_dict)] = new_row
 
     # add the skip items
-    df = pd.read_sql('SELECT * FROM skip;', engine)
-    for i in df.itertuples(index=False):
+    for skip in skips:
         format = '%Y-%m-%d'
-        name = i.name
-        amount = i.amount
-        type = i.type
-        date = i.date
-        if datetime.strptime(date, format).date() < todaydate:
-            skip = Skip.query.filter_by(name=name).first()
+        skip_date = skip.date if isinstance(skip.date, date) else datetime.strptime(skip.date, format).date()
+
+        if skip_date < todaydate:
+            # Delete past skip items
             db.session.delete(skip)
         else:
             # Create a new row
             new_row = {
-                'type': type,
-                'name': name,
-                'amount': amount,
-                'date': datetime.strptime(date, format).date()
+                'type': skip.type,
+                'name': skip.name,
+                'amount': skip.amount,
+                'date': skip_date
             }
             # Append the row to the DataFrame
             total_dict[len(total_dict)] = new_row
 
-    total = pd.DataFrame.from_dict(total_dict, orient="index")
+    # Create DataFrame from total_dict
+    if total_dict:
+        total = pd.DataFrame.from_dict(total_dict, orient="index")
+    else:
+        # Return empty DataFrame with expected columns
+        total = pd.DataFrame(columns=['type', 'name', 'amount', 'date'])
 
     return total
 
 
 def calc_transactions(balance, total):
     # retrieve the total future transactions
-    df = total.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(total["date"])))
+    # Check if total DataFrame is empty
+    if total.empty:
+        # Return empty DataFrames if no transactions
+        trans = pd.DataFrame(columns=['name', 'type', 'amount', 'date'])
+        # Convert balance to float for type consistency
+        run_dict = {0: {'amount': float(balance), 'date': datetime.today().date()}}
+        run = pd.DataFrame.from_dict(run_dict, orient="index")
+        return trans, run
+
+    df = total.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(total["date"]))).reset_index(drop=True)
     trans_dict = {}
     # collect the next 60 days of transactions for the transactions table
     todaydate = datetime.today().date()
@@ -257,20 +301,20 @@ def calc_transactions(balance, total):
     trans = pd.DataFrame.from_dict(trans_dict, orient="index")
 
     # for schedules marked as expenses, make the value negative for the sum
-    for i in df.itertuples():
-        amount = i.amount
-        exp_type = i.type
-        if exp_type == 'Expense':
-            amount = float(amount) * -1
-            df.loc[i.Index, 'amount'] = amount
-        elif exp_type == 'Income':
-            pass
+    # Create a copy to avoid modifying during iteration
+    df = df.copy()
+    # Convert all amounts to float to avoid Decimal/float mixing
+    df['amount'] = df['amount'].astype(float)
+    for idx in df.index:
+        if df.loc[idx, 'type'] == 'Expense':
+            df.loc[idx, 'amount'] = df.loc[idx, 'amount'] * -1
 
     # group total transactions by date and sum the amounts for each date
     df = df.groupby("date")['amount'].sum().reset_index()
 
     # loop through the total transactions by date and add the sums to the total balance amount
-    runbalance = balance
+    # Convert balance to float to avoid Decimal/float mixing
+    runbalance = float(balance)
     run_dict = {}
     # Create a new row
     new_row = {
@@ -300,13 +344,15 @@ def calc_transactions(balance, total):
 def plot_cash(run):
     # plot the running balances by date on a line plot
     df = run.sort_values(by='date', ascending=False)
+    # Convert amounts to float to avoid Decimal/float mixing
+    df['amount'] = df['amount'].astype(float)
     minbalance = df['amount'].min()
     minbalance = decimal.Decimal(str(minbalance)).quantize(decimal.Decimal('.01'))
     if float(minbalance) >= 0:
-        minrange = 0
+        minrange = 0.0
     else:
         minrange = float(minbalance) * 1.1
-    maxbalance = 0
+    maxbalance = 0.0
     todaydate = datetime.today().date()
     todaydateplus = todaydate + relativedelta(months=2)
     for i in df.itertuples(index=False):

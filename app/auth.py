@@ -53,6 +53,25 @@ def login_post():
         user.admin = 1
         db.session.commit()
 
+    # ensure there's at least one global admin in the system
+    global_admin_test = User.query.filter_by(is_global_admin=True).first()
+    if not global_admin_test:
+        # Set the first admin user to be a global admin
+        first_admin = User.query.filter_by(admin=True).order_by(User.id).first()
+        if first_admin:
+            first_admin.is_global_admin = True
+            db.session.commit()
+
+    # IMPORTANT: Global admins are always active - auto-activate if needed
+    if user.is_global_admin and not user.is_active:
+        user.is_active = True
+        db.session.commit()
+
+    # check if the user account is active (after global admin auto-activation)
+    if not user.is_active:
+        flash('Your account is pending approval. Please contact an administrator.')
+        return redirect(url_for('auth.login'))
+
     # if the above check passes, then we know the user has the right credentials
     login_user(user, remember=remember)
     session['name'] = user.name
@@ -89,23 +108,35 @@ def signup_post():
     user = User.query.filter_by(email=email).first() # if this returns a user, then the email already exists in database
 
     if user: # if a user is found, we want to redirect back to signup page so user can try again
+        flash('Email address already exists')
         return redirect(url_for('auth.signup'))
 
-    # if no admin user, make new user an admin
+    # if no admin user, make new user an admin AND global admin AND active
     user_test = User.query.filter_by(admin=True).first()
     if not user_test:
-        admin = 1
+        admin = True
+        is_global_admin = True
+        is_active = True
     else:
-        admin = 0
+        # New signups are admins but inactive until approved by global admin
+        admin = True
+        is_global_admin = False
+        is_active = False
 
     # create a new user with the form data. Hash the password so the plaintext version isn't saved.
-    new_user = User(email=email, name=name, password=generate_password_hash(password, method='scrypt'), admin=admin)
+    new_user = User(
+        email=email,
+        name=name,
+        password=generate_password_hash(password, method='scrypt'),
+        admin=admin,
+        is_global_admin=is_global_admin,
+        is_active=is_active
+    )
 
     # add the new user to the database
     db.session.add(new_user)
     db.session.commit()
-    if user:  # if a user is found, we want to redirect back to signup page so user can try again
-        flash('Email address already exists')
+
     return redirect(url_for('auth.login'))
 
 
@@ -123,6 +154,39 @@ def admin_required(f):
             return f(*args, **kwargs)
         else:
             return redirect(url_for('main.index'))
+    return decorated_function
+
+
+def global_admin_required(f):
+    """
+    Decorator for routes that require global admin access.
+    Only users with is_global_admin=True can access.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('auth.login'))
+        if current_user.is_global_admin:
+            return f(*args, **kwargs)
+        else:
+            flash('Global admin access required')
+            return redirect(url_for('main.index'))
+    return decorated_function
+
+
+def account_owner_required(f):
+    """
+    Decorator for routes that require account owner access.
+    Guest users (those with account_owner_id set) cannot access.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('auth.login'))
+        if current_user.account_owner_id is not None:
+            flash('Account owner access required')
+            return redirect(url_for('main.index'))
+        return f(*args, **kwargs)
     return decorated_function
 
 
@@ -158,6 +222,15 @@ def login_passkey_post():
     if not user_test:
         user.admin = 1
         db.session.commit()
+
+    # ensure there's at least one global admin in the system
+    global_admin_test = User.query.filter_by(is_global_admin=True).first()
+    if not global_admin_test:
+        # Set the first admin user to be a global admin
+        first_admin = User.query.filter_by(admin=True).order_by(User.id).first()
+        if first_admin:
+            first_admin.is_global_admin = True
+            db.session.commit()
 
     # if the above check passes, then we know the user has the right credentials
     login_user(user, remember=True)

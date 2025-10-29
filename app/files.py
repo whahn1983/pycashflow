@@ -10,14 +10,20 @@ from .models import Schedule
 import platform
 
 
-def export():
+def export(user_id):
+    """
+    Export schedules for a specific user to CSV
+
+    Args:
+        user_id: The user ID to filter schedules
+    """
     try:
         engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
     except:
         engine = db.create_engine('sqlite:///db.sqlite').connect()
 
-    # pull the schedule information
-    df = pd.read_sql('SELECT * FROM schedule;', engine)
+    # pull the schedule information for this user only
+    df = pd.read_sql(f'SELECT * FROM schedule WHERE user_id = {user_id};', engine)
     df = df.sort_values(by="startdate",
                         key=lambda x: np.argsort(index_natsorted(df["startdate"]))).reset_index(drop=True)
 
@@ -30,7 +36,14 @@ def export():
     return csv_data
 
 
-def upload(csv_file):
+def upload(csv_file, user_id):
+    """
+    Upload CSV file and create/update schedules for a specific user
+
+    Args:
+        csv_file: The CSV file to upload
+        user_id: The user ID to assign schedules to
+    """
     csv_file = TextIOWrapper(csv_file, encoding='utf-8')
     csv_reader = csv.reader(csv_file, delimiter=',')
     next(csv_reader)
@@ -47,13 +60,13 @@ def upload(csv_file):
             first_date = row[5]
             first_date = datetime.strptime(first_date, format).date()
 
-            existing = Schedule.query.filter_by(name=name).first()
+            existing = Schedule.query.filter_by(name=name, user_id=user_id).first()
 
             if (not existing and (type == "Income" or type == "Expense")
                     and (frequency == "Monthly" or frequency == "Quarterly" or frequency == "Yearly" or
                          frequency == "Weekly" or frequency == "BiWeekly" or frequency == "Onetime")):
                 schedule = Schedule(name=name, amount=amount, type=type, frequency=frequency, startdate=next_date,
-                                    firstdate=first_date)
+                                    firstdate=first_date, user_id=user_id)
                 db.session.add(schedule)
                 db.session.commit()
             elif (existing and (type == "Income" or type == "Expense")

@@ -84,10 +84,18 @@
                         <i class="fa-solid fa-gear"></i>
                         <span>Settings</span>
                     </a>
-                    <a href="/profile" class="nav-link">
-                        <i class="fa-solid fa-user"></i>
-                        <span>Profile</span>
+                    {% if current_user.is_authenticated and current_user.admin and not current_user.account_owner_id %}
+                    <a href="/manage_guests" class="nav-link">
+                        <i class="fa-solid fa-user-group"></i>
+                        <span>Guests</span>
                     </a>
+                    {% endif %}
+                    {% if current_user.is_authenticated and current_user.is_global_admin %}
+                    <a href="/global_admin" class="nav-link">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span>Global Admin</span>
+                    </a>
+                    {% endif %}
                     <a href="/logout" class="nav-link">
                         <i class="fa-solid fa-right-from-bracket"></i>
                         <span>Logout</span>
@@ -96,6 +104,24 @@
             </div>
         </div>
     </nav>
+
+    <!-- User Context Indicator (for guest users) -->
+    {% if current_user.is_authenticated and current_user.account_owner_id %}
+    <div class="container-modern" style="padding-top: 1rem;">
+        <div class="alert" style="background-color: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; color: var(--text-primary); border-radius: var(--radius-md); display: flex; align-items: center; gap: 0.75rem;">
+            <i class="fa-solid fa-eye" style="color: #10b981; font-size: 1.25rem;"></i>
+            <div>
+                <strong>Guest View:</strong> You are viewing
+                {% if current_user.account_owner %}
+                    {{ current_user.account_owner.name }}'s
+                {% else %}
+                    another user's
+                {% endif %}
+                account in read-only mode.
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Main Content -->
     <div class="container-modern">
