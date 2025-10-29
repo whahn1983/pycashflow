@@ -160,13 +160,13 @@ def update():
     format = '%Y-%m-%d'
 
     if request.method == 'POST':
-        current = Schedule.query.filter_by(id=request.form['id'], user_id=user_id).first()
+        current = Schedule.query.filter_by(id=int(request.form['id']), user_id=user_id).first()
         existing = Schedule.query.filter_by(name=request.form['name'], user_id=user_id).first()
         if existing:
             if current.name != request.form['name']:
                 flash("Schedule name already exists")
                 return redirect(url_for('main.schedule'))
-        my_data = Schedule.query.filter_by(id=request.form.get('id'), user_id=user_id).first()
+        my_data = Schedule.query.filter_by(id=int(request.form.get('id')), user_id=user_id).first()
         my_data.name = request.form['name']
         my_data.amount = request.form['amount']
         my_data.type = request.form['type']
@@ -190,7 +190,7 @@ def update():
 def addhold(id):
     # add a hold item from the schedule
     user_id = get_effective_user_id()
-    schedule = Schedule.query.filter_by(id=id, user_id=user_id).first()
+    schedule = Schedule.query.filter_by(id=int(id), user_id=user_id).first()
     hold = Hold(name=schedule.name, type=schedule.type, amount=schedule.amount, user_id=user_id)
     db.session.add(hold)
     db.session.commit()
@@ -233,7 +233,7 @@ def addskip(id):
 def holds_delete(id):
     # delete a hold item
     user_id = get_effective_user_id()
-    hold = Hold.query.filter_by(id=id, user_id=user_id).first()
+    hold = Hold.query.filter_by(id=int(id), user_id=user_id).first()
 
     if hold:
         db.session.delete(hold)
@@ -249,7 +249,7 @@ def holds_delete(id):
 def skips_delete(id):
     # delete a skip item
     user_id = get_effective_user_id()
-    skip = Skip.query.filter_by(id=id, user_id=user_id).first()
+    skip = Skip.query.filter_by(id=int(id), user_id=user_id).first()
 
     if skip:
         db.session.delete(skip)
@@ -289,7 +289,7 @@ def clear_skips():
 def schedule_delete(id):
     # delete a schedule item
     user_id = get_effective_user_id()
-    schedule = Schedule.query.filter_by(id=id, user_id=user_id).first()
+    schedule = Schedule.query.filter_by(id=int(id), user_id=user_id).first()
 
     if schedule:
         db.session.delete(schedule)
@@ -461,7 +461,7 @@ def users():
 def update_user():
     # update an existing user
     if request.method == 'POST':
-        current = User.query.filter_by(id=request.form['id']).first()
+        current = User.query.filter_by(id=int(request.form['id'])).first()
         existing = User.query.filter_by(email=request.form['email']).first()
         if existing:
             if current.email != request.form['email']:
@@ -496,7 +496,7 @@ def update_user():
 @global_admin_required
 def delete_user(id):
     # delete a user
-    user = User.query.filter_by(id=id).first()
+    user = User.query.filter_by(id=int(id)).first()
 
     if user:
         db.session.delete(user)
@@ -619,7 +619,7 @@ def add_guest():
 @account_owner_required
 def remove_guest(guest_id):
     """Remove a guest user (account owner only)"""
-    guest = User.query.filter_by(id=guest_id, account_owner_id=current_user.id).first()
+    guest = User.query.filter_by(id=int(guest_id), account_owner_id=current_user.id).first()
 
     if guest:
         db.session.delete(guest)
