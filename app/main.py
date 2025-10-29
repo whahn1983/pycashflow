@@ -77,21 +77,10 @@ def refresh():
     return redirect(url_for('main.index'))
 
 
-@main.route('/profile')
-@login_required
-def profile():
-
-    if current_user.admin:
-        return render_template('profile.html')
-    else:
-        return render_template('profile_guest.html')
-
-
 @main.route('/settings')
 @login_required
-@admin_required
 def settings():
-    # get about info
+    # get about info - available to all users
     about = version()
 
     return render_template('settings.html', about=about)
