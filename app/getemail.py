@@ -17,7 +17,7 @@ if parent_dir not in sys.path:
 import imaplib
 import email
 from email.header import decode_header
-from datetime import datetime
+from datetime import datetime, timedelta
 from app import db
 from app.models import User, Email, Balance
 
@@ -49,14 +49,26 @@ def process_email_balances():
             imap.login(username, password)
 
             status, messages = imap.select("INBOX", readonly=True)
-            messages = int(messages[0])
+
+            # Filter for emails from the past day to limit inbox processing
+            # IMAP SINCE searches for messages with Date on or after the specified date
+            yesterday = (datetime.now() - timedelta(days=1)).strftime("%d-%b-%Y")
+            status, message_ids = imap.search(None, f'SINCE {yesterday}')
+
+            # Parse message IDs from the search result
+            if message_ids[0]:
+                email_ids = message_ids[0].split()
+            else:
+                email_ids = []
+
+            print(f"Found {len(email_ids)} email(s) from the past day for user {user_id}")
 
             email_content = {}
 
-            # INNER LOOP: Process all emails in THIS user's inbox
-            for i in range(1, messages + 1):
+            # INNER LOOP: Process only emails from the past day
+            for email_id in email_ids:
                 try:
-                    res, msg = imap.fetch(str(i), "(RFC822)")
+                    res, msg = imap.fetch(email_id, "(RFC822)")
                     for response in msg:
                         if isinstance(response, tuple):
                             msg = email.message_from_bytes(response[1])
