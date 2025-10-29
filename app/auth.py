@@ -47,11 +47,6 @@ def login_post():
         flash('Please check your login details and try again.')
         return redirect(url_for('auth.login')) # if the user doesn't exist or password is wrong, reload the page
 
-    # check if the user account is active
-    if not user.is_active:
-        flash('Your account is pending approval. Please contact an administrator.')
-        return redirect(url_for('auth.login'))
-
     # fix for no admin user to make current user an admin
     user_test = User.query.filter_by(admin=True).first()
     if not user_test:
@@ -66,6 +61,16 @@ def login_post():
         if first_admin:
             first_admin.is_global_admin = True
             db.session.commit()
+
+    # IMPORTANT: Global admins are always active - auto-activate if needed
+    if user.is_global_admin and not user.is_active:
+        user.is_active = True
+        db.session.commit()
+
+    # check if the user account is active (after global admin auto-activation)
+    if not user.is_active:
+        flash('Your account is pending approval. Please contact an administrator.')
+        return redirect(url_for('auth.login'))
 
     # if the above check passes, then we know the user has the right credentials
     login_user(user, remember=remember)

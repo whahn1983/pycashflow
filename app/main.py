@@ -476,6 +476,8 @@ def update_user():
         if role == 'global_admin':
             my_data.admin = True
             my_data.is_global_admin = True
+            # IMPORTANT: Global admins must always be active
+            my_data.is_active = True
         elif role == 'admin':
             my_data.admin = True
             my_data.is_global_admin = False
@@ -529,12 +531,10 @@ def deactivate_user(id):
     user = User.query.filter_by(id=int(id)).first()
 
     if user:
-        # Prevent deactivating the last global admin
+        # IMPORTANT: Global admins are always active and cannot be deactivated
         if user.is_global_admin:
-            global_admin_count = User.query.filter_by(is_global_admin=True, is_active=True).count()
-            if global_admin_count <= 1:
-                flash("Cannot deactivate the last active global admin")
-                return redirect(url_for('main.users'))
+            flash("Cannot deactivate a global admin. Global admins must always remain active.")
+            return redirect(url_for('main.users'))
 
         user.is_active = False
         db.session.commit()
