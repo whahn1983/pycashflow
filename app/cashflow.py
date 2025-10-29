@@ -343,10 +343,10 @@ def plot_cash(run):
     minbalance = df['amount'].min()
     minbalance = decimal.Decimal(str(minbalance)).quantize(decimal.Decimal('.01'))
     if float(minbalance) >= 0:
-        minrange = 0
+        minrange = 0.0
     else:
         minrange = float(minbalance) * 1.1
-    maxbalance = 0
+    maxbalance = 0.0
     todaydate = datetime.today().date()
     todaydateplus = todaydate + relativedelta(months=2)
     for i in df.itertuples(index=False):
