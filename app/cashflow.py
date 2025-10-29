@@ -302,9 +302,11 @@ def calc_transactions(balance, total):
     # for schedules marked as expenses, make the value negative for the sum
     # Create a copy to avoid modifying during iteration
     df = df.copy()
+    # Convert all amounts to float to avoid Decimal/float mixing
+    df['amount'] = df['amount'].astype(float)
     for idx in df.index:
         if df.loc[idx, 'type'] == 'Expense':
-            df.loc[idx, 'amount'] = float(df.loc[idx, 'amount']) * -1
+            df.loc[idx, 'amount'] = df.loc[idx, 'amount'] * -1
 
     # group total transactions by date and sum the amounts for each date
     df = df.groupby("date")['amount'].sum().reset_index()
