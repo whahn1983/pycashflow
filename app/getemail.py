@@ -1,4 +1,19 @@
+#!/usr/bin/env python3
+"""
+Email balance import script for pycashflow.
+Processes IMAP email inboxes to extract and import balance information.
+
+This script can be run standalone from cron or called from within the application.
+"""
 import os
+import sys
+
+# When run as standalone script, add parent directory to path for imports
+# This allows 'from app import ...' to work when called from cron
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
 import imaplib
 import email
 from email.header import decode_header
@@ -103,8 +118,13 @@ def process_email_balances():
                 )
                 db.session.add(balance)
                 db.session.commit()
-            except:
-                pass  # No balance found in emails for this user
+                print(f"Successfully imported balance ${new_balance} for user {user_id}")
+            except KeyError:
+                # No email with the specified subject found
+                pass
+            except Exception as e:
+                # No balance found in emails for this user
+                print(f"Could not extract balance for user {user_id}: {e}")
 
             # Close IMAP connection for THIS user
             imap.close()
@@ -116,9 +136,17 @@ def process_email_balances():
             continue
 
 
-# Allow script to be run standalone
+# Allow script to be run standalone from cron
 if __name__ == "__main__":
     from app import create_app
+
+    print("Starting email balance import...")
     app = create_app()
+
     with app.app_context():
-        process_email_balances()
+        try:
+            process_email_balances()
+            print("Email balance import completed successfully")
+        except Exception as e:
+            print(f"Email balance import failed: {e}")
+            sys.exit(1)
