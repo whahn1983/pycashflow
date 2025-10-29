@@ -322,7 +322,7 @@ def balance():
 @main.route('/changepw', methods=('GET', 'POST'))
 @login_required
 def changepw():
-    # change the users password from the profile page
+    # change the users password from the settings page
     if request.method == 'POST':
         curr_user = current_user.id
         my_user = User.query.filter_by(id=curr_user).first()
@@ -338,9 +338,9 @@ def changepw():
         elif not check_password_hash(my_user.password, current):
             flash('Incorrect password')
 
-        return redirect(url_for('main.profile'))
+        return redirect(url_for('main.settings'))
 
-    return redirect(url_for('main.profile'))
+    return redirect(url_for('main.settings'))
 
 
 @main.route('/signups', methods=('GET', 'POST'))
