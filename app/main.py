@@ -448,20 +448,34 @@ def email():
 
 @main.route('/users_table')
 @login_required
-@global_admin_required
+@admin_required
 def users():
-    users = User.query
+    # Global admins can see all users, regular admins can only see their guests
+    if current_user.is_global_admin:
+        users = User.query
+    else:
+        # Regular admins can only see their guest users
+        users = User.query.filter_by(account_owner_id=current_user.id)
 
-    return render_template('users_table.html', title='Users Table', users=users)
+    # Get about info for settings section
+    about = version()
+
+    return render_template('users_table.html', title='Users Table', users=users, about=about)
 
 
 @main.route('/update_user', methods=['GET', 'POST'])
 @login_required
-@global_admin_required
+@admin_required
 def update_user():
     # update an existing user
     if request.method == 'POST':
         current = User.query.filter_by(id=int(request.form['id'])).first()
+
+        # Check if the current user has permission to update this user
+        if not current_user.is_global_admin and current.account_owner_id != current_user.id:
+            flash("You don't have permission to update this user")
+            return redirect(url_for('main.users'))
+
         existing = User.query.filter_by(email=request.form['email']).first()
         if existing:
             if current.email != request.form['email']:
@@ -471,19 +485,21 @@ def update_user():
         my_data.name = request.form['name']
         my_data.email = request.form['email']
 
-        # Handle role assignment
-        role = request.form.get('role', 'user')
-        if role == 'global_admin':
-            my_data.admin = True
-            my_data.is_global_admin = True
-            # IMPORTANT: Global admins must always be active
-            my_data.is_active = True
-        elif role == 'admin':
-            my_data.admin = True
-            my_data.is_global_admin = False
-        else:  # user
-            my_data.admin = False
-            my_data.is_global_admin = False
+        # Global admins can change roles, regular admins cannot
+        if current_user.is_global_admin:
+            # Handle role assignment
+            role = request.form.get('role', 'user')
+            if role == 'global_admin':
+                my_data.admin = True
+                my_data.is_global_admin = True
+                # IMPORTANT: Global admins must always be active
+                my_data.is_active = True
+            elif role == 'admin':
+                my_data.admin = True
+                my_data.is_global_admin = False
+            else:  # user
+                my_data.admin = False
+                my_data.is_global_admin = False
 
         db.session.commit()
         flash("Updated Successfully")
@@ -495,37 +511,50 @@ def update_user():
 
 @main.route('/delete_user/<id>')
 @login_required
-@global_admin_required
+@admin_required
 def delete_user(id):
     # delete a user
     user = User.query.filter_by(id=int(id)).first()
 
     if user:
-        db.session.delete(user)
-        db.session.commit()
-        flash("Deleted Successfully")
+        # Global admins can delete any user (except themselves), regular admins can only delete their guests
+        if current_user.is_global_admin or user.account_owner_id == current_user.id:
+            # Prevent deleting yourself
+            if user.id == current_user.id:
+                flash("You cannot delete your own account")
+                return redirect(url_for('main.users'))
+
+            db.session.delete(user)
+            db.session.commit()
+            flash("Deleted Successfully")
+        else:
+            flash("You don't have permission to delete this user")
 
     return redirect(url_for('main.users'))
 
 
 @main.route('/activate_user/<id>')
 @login_required
-@global_admin_required
+@admin_required
 def activate_user(id):
     # activate a user account
     user = User.query.filter_by(id=int(id)).first()
 
     if user:
-        user.is_active = True
-        db.session.commit()
-        flash(f"User {user.name} has been activated successfully")
+        # Global admins can activate any user, regular admins can only activate their guests
+        if current_user.is_global_admin or user.account_owner_id == current_user.id:
+            user.is_active = True
+            db.session.commit()
+            flash(f"User {user.name} has been activated successfully")
+        else:
+            flash("You don't have permission to activate this user")
 
     return redirect(url_for('main.users'))
 
 
 @main.route('/deactivate_user/<id>')
 @login_required
-@global_admin_required
+@admin_required
 def deactivate_user(id):
     # deactivate a user account
     user = User.query.filter_by(id=int(id)).first()
@@ -536,16 +565,20 @@ def deactivate_user(id):
             flash("Cannot deactivate a global admin. Global admins must always remain active.")
             return redirect(url_for('main.users'))
 
-        user.is_active = False
-        db.session.commit()
-        flash(f"User {user.name} has been deactivated successfully")
+        # Global admins can deactivate any user, regular admins can only deactivate their guests
+        if current_user.is_global_admin or user.account_owner_id == current_user.id:
+            user.is_active = False
+            db.session.commit()
+            flash(f"User {user.name} has been deactivated successfully")
+        else:
+            flash("You don't have permission to deactivate this user")
 
     return redirect(url_for('main.users'))
 
 
 @main.route('/create_user', methods=('GET', 'POST'))
 @login_required
-@global_admin_required
+@admin_required
 def create_user():
     # create a new user
     if request.method == 'POST':
@@ -555,18 +588,31 @@ def create_user():
 
         # Handle role assignment
         role = request.form.get('role', 'user')
-        if role == 'global_admin':
-            admin = True
-            is_global_admin = True
-        elif role == 'admin':
-            admin = True
-            is_global_admin = False
-        else:  # user
+
+        # Global admins can create any type of user
+        if current_user.is_global_admin:
+            if role == 'global_admin':
+                admin = True
+                is_global_admin = True
+            elif role == 'admin':
+                admin = True
+                is_global_admin = False
+            else:  # user
+                admin = False
+                is_global_admin = False
+            account_owner_id = None
+            # Users created by global admin are active by default
+            is_active = True
+        else:
+            # Regular admins can only create guest users (non-admin users)
             admin = False
             is_global_admin = False
+            account_owner_id = current_user.id
+            # Guests created by regular admins are active by default
+            is_active = True
 
-        # Users created by global admin are active by default
-        user = User(name=name, email=email, admin=admin, is_global_admin=is_global_admin, is_active=True, password=password)
+        user = User(name=name, email=email, admin=admin, is_global_admin=is_global_admin,
+                    is_active=is_active, password=password, account_owner_id=account_owner_id)
         existing = User.query.filter_by(email=email).first()
         if existing:
             flash("User already exists")

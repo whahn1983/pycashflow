@@ -231,6 +231,201 @@
     </div>
 </div>
 
+{% if current_user.is_global_admin %}
+<!-- Settings Section for Global Admins -->
+<div class="page-header" style="margin-top: 3rem;">
+    <h2 class="page-title">Quick Settings</h2>
+    <p class="page-subtitle">
+        <i class="fa-solid fa-gear"></i>
+        Manage application settings without switching pages
+    </p>
+</div>
+
+<!-- Settings Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+
+    <!-- Email Configuration Card -->
+    <div class="metric-card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#emailmodal">
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <div style="width: 3rem; height: 3rem; background: linear-gradient(135deg, var(--accent), #60a5fa); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                <i class="fa-solid fa-envelope"></i>
+            </div>
+            <div>
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-primary);">Email Configuration</h3>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">Configure email server settings</p>
+            </div>
+        </div>
+        <button class="btn-primary-modern btn-modern" style="width: 100%;" onclick="event.stopPropagation();" data-bs-toggle="modal" data-bs-target="#emailmodal">
+            <i class="fa-solid fa-gear"></i> Configure Email
+        </button>
+    </div>
+
+    <!-- Sign-Ups Toggle Card -->
+    <div class="metric-card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#settingsmodal">
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <div style="width: 3rem; height: 3rem; background: linear-gradient(135deg, #f59e0b, #fbbf24); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                <i class="fa-solid fa-user-lock"></i>
+            </div>
+            <div>
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-primary);">Sign-Up Control</h3>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">Enable or disable new registrations</p>
+            </div>
+        </div>
+        <button class="btn-warning-modern btn-modern" style="width: 100%;" onclick="event.stopPropagation();" data-bs-toggle="modal" data-bs-target="#settingsmodal">
+            <i class="fa-solid fa-toggle-on"></i> Toggle Sign-Ups
+        </button>
+    </div>
+
+    <!-- About Card -->
+    <div class="metric-card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#aboutmodal">
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <div style="width: 3rem; height: 3rem; background: linear-gradient(135deg, var(--success), #34d399); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                <i class="fa-solid fa-circle-info"></i>
+            </div>
+            <div>
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-primary);">About</h3>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">Application information</p>
+            </div>
+        </div>
+        <button class="btn-outline-modern btn-modern" style="width: 100%;" onclick="event.stopPropagation();" data-bs-toggle="modal" data-bs-target="#aboutmodal">
+            <i class="fa-solid fa-info"></i> About PyCashFlow
+        </button>
+    </div>
+
+</div>
+
+<!-- Disable Sign-Ups Modal -->
+<div class="modal fade modal-modern" id="settingsmodal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-user-lock"></i> Sign-Up Control
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{url_for('main.signups')}}" method="POST">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-toggle-on"></i> Allow New Sign-Ups
+                        </label>
+                        <select name="signupvalue" class="form-control-modern">
+                            <option value="False">Enabled (Allow sign-ups)</option>
+                            <option value="True">Disabled (Block sign-ups)</option>
+                        </select>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                            <i class="fa-solid fa-check"></i>
+                            Save Settings
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i>
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Email Configuration Modal -->
+<div class="modal fade modal-modern" id="emailmodal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-envelope-open-text"></i> Email Configuration
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{url_for('main.email')}}" method="POST">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-envelope"></i> Email Address
+                        </label>
+                        <input class="form-control-modern" type="email" name="email" placeholder="your@email.com" required>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-key"></i> Password
+                        </label>
+                        <input class="form-control-modern" type="password" name="password" placeholder="Email account password" required>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-server"></i> SMTP Server
+                        </label>
+                        <input class="form-control-modern" type="text" name="server" placeholder="smtp.gmail.com" required>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-tag"></i> Email Subject String
+                        </label>
+                        <input class="form-control-modern" type="text" name="subject_str" placeholder="Balance Update">
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-align-left"></i> String Before Balance
+                        </label>
+                        <input class="form-control-modern" type="text" name="start_str" placeholder="Current balance: $">
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-align-right"></i> String After Balance
+                        </label>
+                        <input class="form-control-modern" type="text" name="end_str" placeholder=" as of">
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                            <i class="fa-solid fa-check"></i>
+                            Save Configuration
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i>
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- About Modal -->
+<div class="modal fade modal-modern" id="aboutmodal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-circle-info"></i> About PyCashFlow
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-primary); line-height: 1.6;">{{ about }}</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                    <i class="fa-solid fa-xmark"></i>
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Badge Styles -->
 <style>
 .badge-modern {
