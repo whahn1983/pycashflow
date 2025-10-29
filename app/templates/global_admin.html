@@ -49,6 +49,12 @@
             <i class="fa-solid fa-shield-halved"></i>
             Global Administrators
         </h2>
+        <div class="table-actions">
+            <button class="btn-primary-modern btn-modern" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                <i class="fa-solid fa-user-plus"></i>
+                Add User
+            </button>
+        </div>
     </div>
     <div class="table-responsive">
         <table class="modern-table">
@@ -380,6 +386,66 @@
             No account owners found.
         </div>
         {% endif %}
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade modal-modern" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-user-plus"></i> Add New User
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{url_for('main.create_user')}}" method="POST">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-user"></i> Name
+                        </label>
+                        <input type="text" class="form-control-modern" name="name" placeholder="Full name" required>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-envelope"></i> Email
+                        </label>
+                        <input type="email" class="form-control-modern" name="email" placeholder="user@email.com" required>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-shield-halved"></i> User Role
+                        </label>
+                        <select name="role" class="form-control-modern">
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                            <option value="global_admin">Global Admin</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-lock"></i> Password
+                        </label>
+                        <input type="password" class="form-control-modern" name="password" placeholder="Choose a strong password" required>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                            <i class="fa-solid fa-check"></i>
+                            Add User
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i>
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 

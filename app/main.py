@@ -446,23 +446,6 @@ def email():
     return redirect(url_for('main.settings'))
 
 
-@main.route('/users_table')
-@login_required
-@admin_required
-def users():
-    # Global admins can see all users, regular admins can only see their guests
-    if current_user.is_global_admin:
-        users = User.query
-    else:
-        # Regular admins can only see their guest users
-        users = User.query.filter_by(account_owner_id=current_user.id)
-
-    # Get about info for settings section
-    about = version()
-
-    return render_template('users_table.html', title='Users Table', users=users, about=about)
-
-
 @main.route('/update_user', methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -474,13 +457,19 @@ def update_user():
         # Check if the current user has permission to update this user
         if not current_user.is_global_admin and current.account_owner_id != current_user.id:
             flash("You don't have permission to update this user")
-            return redirect(url_for('main.users'))
+            if current_user.is_global_admin:
+                return redirect(url_for('main.global_admin_panel'))
+            else:
+                return redirect(url_for('main.manage_guests'))
 
         existing = User.query.filter_by(email=request.form['email']).first()
         if existing:
             if current.email != request.form['email']:
                 flash("Email already exists")
-                return redirect(url_for('main.users'))
+                if current_user.is_global_admin:
+                    return redirect(url_for('main.global_admin_panel'))
+                else:
+                    return redirect(url_for('main.manage_guests'))
         my_data = User.query.get(request.form.get('id'))
         my_data.name = request.form['name']
         my_data.email = request.form['email']
@@ -504,9 +493,17 @@ def update_user():
         db.session.commit()
         flash("Updated Successfully")
 
-        return redirect(url_for('main.users'))
+        # Redirect based on user role
+        if current_user.is_global_admin:
+            return redirect(url_for('main.global_admin_panel'))
+        else:
+            return redirect(url_for('main.manage_guests'))
 
-    return redirect(url_for('main.users'))
+    # Redirect based on user role
+    if current_user.is_global_admin:
+        return redirect(url_for('main.global_admin_panel'))
+    else:
+        return redirect(url_for('main.manage_guests'))
 
 
 @main.route('/delete_user/<id>')
@@ -522,7 +519,10 @@ def delete_user(id):
             # Prevent deleting yourself
             if user.id == current_user.id:
                 flash("You cannot delete your own account")
-                return redirect(url_for('main.users'))
+                if current_user.is_global_admin:
+                    return redirect(url_for('main.global_admin_panel'))
+                else:
+                    return redirect(url_for('main.manage_guests'))
 
             db.session.delete(user)
             db.session.commit()
@@ -530,7 +530,11 @@ def delete_user(id):
         else:
             flash("You don't have permission to delete this user")
 
-    return redirect(url_for('main.users'))
+    # Redirect based on user role
+    if current_user.is_global_admin:
+        return redirect(url_for('main.global_admin_panel'))
+    else:
+        return redirect(url_for('main.manage_guests'))
 
 
 @main.route('/activate_user/<id>')
@@ -549,7 +553,11 @@ def activate_user(id):
         else:
             flash("You don't have permission to activate this user")
 
-    return redirect(url_for('main.users'))
+    # Redirect based on user role
+    if current_user.is_global_admin:
+        return redirect(url_for('main.global_admin_panel'))
+    else:
+        return redirect(url_for('main.manage_guests'))
 
 
 @main.route('/deactivate_user/<id>')
@@ -563,7 +571,10 @@ def deactivate_user(id):
         # IMPORTANT: Global admins are always active and cannot be deactivated
         if user.is_global_admin:
             flash("Cannot deactivate a global admin. Global admins must always remain active.")
-            return redirect(url_for('main.users'))
+            if current_user.is_global_admin:
+                return redirect(url_for('main.global_admin_panel'))
+            else:
+                return redirect(url_for('main.manage_guests'))
 
         # Global admins can deactivate any user, regular admins can only deactivate their guests
         if current_user.is_global_admin or user.account_owner_id == current_user.id:
@@ -573,7 +584,11 @@ def deactivate_user(id):
         else:
             flash("You don't have permission to deactivate this user")
 
-    return redirect(url_for('main.users'))
+    # Redirect based on user role
+    if current_user.is_global_admin:
+        return redirect(url_for('main.global_admin_panel'))
+    else:
+        return redirect(url_for('main.manage_guests'))
 
 
 @main.route('/create_user', methods=('GET', 'POST'))
@@ -616,14 +631,25 @@ def create_user():
         existing = User.query.filter_by(email=email).first()
         if existing:
             flash("User already exists")
-            return redirect(url_for('main.users'))
+            if current_user.is_global_admin:
+                return redirect(url_for('main.global_admin_panel'))
+            else:
+                return redirect(url_for('main.manage_guests'))
         db.session.add(user)
         db.session.commit()
         flash("Added Successfully")
 
-        return redirect(url_for('main.users'))
+        # Redirect based on user role
+        if current_user.is_global_admin:
+            return redirect(url_for('main.global_admin_panel'))
+        else:
+            return redirect(url_for('main.manage_guests'))
 
-    return redirect(url_for('main.users'))
+    # Redirect based on user role
+    if current_user.is_global_admin:
+        return redirect(url_for('main.global_admin_panel'))
+    else:
+        return redirect(url_for('main.manage_guests'))
 
 
 @main.route('/export', methods=('GET', 'POST'))
