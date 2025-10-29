@@ -47,6 +47,11 @@ def login_post():
         flash('Please check your login details and try again.')
         return redirect(url_for('auth.login')) # if the user doesn't exist or password is wrong, reload the page
 
+    # check if the user account is active
+    if not user.is_active:
+        flash('Your account is pending approval. Please contact an administrator.')
+        return redirect(url_for('auth.login'))
+
     # fix for no admin user to make current user an admin
     user_test = User.query.filter_by(admin=True).first()
     if not user_test:
@@ -101,14 +106,17 @@ def signup_post():
         flash('Email address already exists')
         return redirect(url_for('auth.signup'))
 
-    # if no admin user, make new user an admin AND global admin
+    # if no admin user, make new user an admin AND global admin AND active
     user_test = User.query.filter_by(admin=True).first()
     if not user_test:
         admin = True
         is_global_admin = True
+        is_active = True
     else:
-        admin = False
+        # New signups are admins but inactive until approved by global admin
+        admin = True
         is_global_admin = False
+        is_active = False
 
     # create a new user with the form data. Hash the password so the plaintext version isn't saved.
     new_user = User(
@@ -116,7 +124,8 @@ def signup_post():
         name=name,
         password=generate_password_hash(password, method='scrypt'),
         admin=admin,
-        is_global_admin=is_global_admin
+        is_global_admin=is_global_admin,
+        is_active=is_active
     )
 
     # add the new user to the database

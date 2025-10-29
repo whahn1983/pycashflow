@@ -9,6 +9,7 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String(1000))
     admin = db.Column(db.Boolean)
     is_global_admin = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=False)
     account_owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
     # Relationships

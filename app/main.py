@@ -506,6 +506,43 @@ def delete_user(id):
     return redirect(url_for('main.users'))
 
 
+@main.route('/activate_user/<id>')
+@login_required
+@global_admin_required
+def activate_user(id):
+    # activate a user account
+    user = User.query.filter_by(id=int(id)).first()
+
+    if user:
+        user.is_active = True
+        db.session.commit()
+        flash(f"User {user.name} has been activated successfully")
+
+    return redirect(url_for('main.users'))
+
+
+@main.route('/deactivate_user/<id>')
+@login_required
+@global_admin_required
+def deactivate_user(id):
+    # deactivate a user account
+    user = User.query.filter_by(id=int(id)).first()
+
+    if user:
+        # Prevent deactivating the last global admin
+        if user.is_global_admin:
+            global_admin_count = User.query.filter_by(is_global_admin=True, is_active=True).count()
+            if global_admin_count <= 1:
+                flash("Cannot deactivate the last active global admin")
+                return redirect(url_for('main.users'))
+
+        user.is_active = False
+        db.session.commit()
+        flash(f"User {user.name} has been deactivated successfully")
+
+    return redirect(url_for('main.users'))
+
+
 @main.route('/create_user', methods=('GET', 'POST'))
 @login_required
 @global_admin_required
@@ -528,7 +565,8 @@ def create_user():
             admin = False
             is_global_admin = False
 
-        user = User(name=name, email=email, admin=admin, is_global_admin=is_global_admin, password=password)
+        # Users created by global admin are active by default
+        user = User(name=name, email=email, admin=admin, is_global_admin=is_global_admin, is_active=True, password=password)
         existing = User.query.filter_by(email=email).first()
         if existing:
             flash("User already exists")
