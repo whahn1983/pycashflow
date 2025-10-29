@@ -275,7 +275,8 @@ def calc_transactions(balance, total):
     if total.empty:
         # Return empty DataFrames if no transactions
         trans = pd.DataFrame(columns=['name', 'type', 'amount', 'date'])
-        run_dict = {0: {'amount': balance, 'date': datetime.today().date()}}
+        # Convert balance to float for type consistency
+        run_dict = {0: {'amount': float(balance), 'date': datetime.today().date()}}
         run = pd.DataFrame.from_dict(run_dict, orient="index")
         return trans, run
 
@@ -312,7 +313,8 @@ def calc_transactions(balance, total):
     df = df.groupby("date")['amount'].sum().reset_index()
 
     # loop through the total transactions by date and add the sums to the total balance amount
-    runbalance = balance
+    # Convert balance to float to avoid Decimal/float mixing
+    runbalance = float(balance)
     run_dict = {}
     # Create a new row
     new_row = {
@@ -342,6 +344,8 @@ def calc_transactions(balance, total):
 def plot_cash(run):
     # plot the running balances by date on a line plot
     df = run.sort_values(by='date', ascending=False)
+    # Convert amounts to float to avoid Decimal/float mixing
+    df['amount'] = df['amount'].astype(float)
     minbalance = df['amount'].min()
     minbalance = decimal.Decimal(str(minbalance)).quantize(decimal.Decimal('.01'))
     if float(minbalance) >= 0:
