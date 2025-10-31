@@ -105,203 +105,204 @@
                         </div>
                     </td>
                 </tr>
-
-                <!-- Edit Modal for each row -->
-                <div class="modal fade modal-modern" id="modaledit{{row.id}}" tabindex="-1">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">
-                                    <i class="fa-solid fa-pen-to-square"></i> Update Schedule
-                                </h5>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <form action="{{url_for('main.update')}}" method="POST">
-                                    <input type="hidden" name="id" value="{{row.id}}">
-
-                                    <div class="form-group-modern">
-                                        <label class="form-label-modern">
-                                            <i class="fa-solid fa-tag"></i> Name
-                                        </label>
-                                        <input type="text" class="form-control-modern" name="name" value="{{row.name}}" required>
-                                    </div>
-
-                                    <div class="form-group-modern">
-                                        <label class="form-label-modern">
-                                            <i class="fa-solid fa-dollar-sign"></i> Amount
-                                        </label>
-                                        <input type="number" min="0.00" step="0.01" class="form-control-modern" name="amount" value="{{row.amount}}" required>
-                                    </div>
-
-                                    <div class="form-group-modern">
-                                        <label class="form-label-modern">
-                                            <i class="fa-solid fa-arrow-right-arrow-left"></i> Type
-                                        </label>
-                                        <select name="type" class="form-control-modern" data-selected="{{row.type}}" required>
-                                            <option value="">-- Select Type --</option>
-                                            <option value="Income">Income</option>
-                                            <option value="Expense">Expense</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="form-group-modern">
-                                        <label class="form-label-modern">
-                                            <i class="fa-solid fa-repeat"></i> Frequency
-                                        </label>
-                                        <select name="frequency" class="form-control-modern" data-selected="{{row.frequency}}" required>
-                                            <option value="Weekly">Weekly</option>
-                                            <option value="BiWeekly">Bi-Weekly</option>
-                                            <option value="Monthly">Monthly</option>
-                                            <option value="Quarterly">Quarterly</option>
-                                            <option value="Yearly">Yearly</option>
-                                            <option value="Onetime">One-time</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="form-group-modern">
-                                        <label class="form-label-modern">
-                                            <i class="fa-solid fa-calendar-day"></i> Start Date
-                                        </label>
-                                        <input type="date" class="form-control-modern" name="startdate" value="{{row.startdate}}" required>
-                                    </div>
-
-                                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
-                                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
-                                            <i class="fa-solid fa-check"></i>
-                                            Update Schedule
-                                        </button>
-                                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
-                                            <i class="fa-solid fa-xmark"></i>
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 {% endfor %}
-
-                <!-- Add Schedule Modal -->
-                <div class="modal fade modal-modern" id="mymodal" tabindex="-1">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">
-                                    <i class="fa-solid fa-calendar-plus"></i> Add New Schedule
-                                </h5>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <form action="{{url_for('main.create')}}" method="POST">
-                                    <div class="form-group-modern">
-                                        <label class="form-label-modern">
-                                            <i class="fa-solid fa-tag"></i> Name
-                                        </label>
-                                        <input type="text" class="form-control-modern" name="name" placeholder="e.g., Monthly Salary" required>
-                                    </div>
-
-                                    <div class="form-group-modern">
-                                        <label class="form-label-modern">
-                                            <i class="fa-solid fa-dollar-sign"></i> Amount
-                                        </label>
-                                        <input type="number" min="0.00" step="0.01" class="form-control-modern" name="amount" placeholder="0.00" required>
-                                    </div>
-
-                                    <div class="form-group-modern">
-                                        <label class="form-label-modern">
-                                            <i class="fa-solid fa-arrow-right-arrow-left"></i> Type
-                                        </label>
-                                        <select name="type" class="form-control-modern" required>
-                                            <option value="">-- Select Type --</option>
-                                            <option value="Income">Income</option>
-                                            <option value="Expense">Expense</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="form-group-modern">
-                                        <label class="form-label-modern">
-                                            <i class="fa-solid fa-repeat"></i> Frequency
-                                        </label>
-                                        <select name="frequency" class="form-control-modern" required>
-                                            <option value="">-- Select Frequency --</option>
-                                            <option value="Weekly">Weekly</option>
-                                            <option value="BiWeekly">Bi-Weekly</option>
-                                            <option value="Monthly">Monthly</option>
-                                            <option value="Quarterly">Quarterly</option>
-                                            <option value="Yearly">Yearly</option>
-                                            <option value="Onetime">One-time</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="form-group-modern">
-                                        <label class="form-label-modern">
-                                            <i class="fa-solid fa-calendar-day"></i> Start Date
-                                        </label>
-                                        <input type="date" class="form-control-modern" name="startdate" required>
-                                    </div>
-
-                                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
-                                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
-                                            <i class="fa-solid fa-check"></i>
-                                            Add Schedule
-                                        </button>
-                                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
-                                            <i class="fa-solid fa-xmark"></i>
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Upload Modal -->
-                <div class="modal fade modal-modern" id="uploadmodal" tabindex="-1">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">
-                                    <i class="fa-solid fa-upload"></i> Import Schedule Data
-                                </h5>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div style="background-color: rgba(59, 130, 246, 0.1); border: 1px solid var(--accent); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;">
-                                    <p style="margin: 0; color: var(--text-secondary); font-size: 0.875rem;">
-                                        <i class="fa-solid fa-circle-info"></i>
-                                        Format must match the export template. Download an export first to see the required format.
-                                    </p>
-                                </div>
-
-                                <form method="post" action="{{url_for('main.import_csv')}}" enctype="multipart/form-data">
-                                    <div class="form-group-modern">
-                                        <label class="form-label-modern">
-                                            <i class="fa-solid fa-file-csv"></i> CSV File
-                                        </label>
-                                        <input type="file" name="file" accept=".csv" class="form-control-modern" required>
-                                    </div>
-
-                                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
-                                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
-                                            <i class="fa-solid fa-upload"></i>
-                                            Upload File
-                                        </button>
-                                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
-                                            <i class="fa-solid fa-xmark"></i>
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- Edit Modals for each schedule item -->
+{% for row in schedule %}
+<div class="modal fade modal-modern" id="modaledit{{row.id}}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-pen-to-square"></i> Update Schedule
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{url_for('main.update')}}" method="POST">
+                    <input type="hidden" name="id" value="{{row.id}}">
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-tag"></i> Name
+                        </label>
+                        <input type="text" class="form-control-modern" name="name" value="{{row.name}}" required>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-dollar-sign"></i> Amount
+                        </label>
+                        <input type="number" min="0.00" step="0.01" class="form-control-modern" name="amount" value="{{row.amount}}" required>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-arrow-right-arrow-left"></i> Type
+                        </label>
+                        <select name="type" class="form-control-modern" data-selected="{{row.type}}" required>
+                            <option value="">-- Select Type --</option>
+                            <option value="Income">Income</option>
+                            <option value="Expense">Expense</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-repeat"></i> Frequency
+                        </label>
+                        <select name="frequency" class="form-control-modern" data-selected="{{row.frequency}}" required>
+                            <option value="Weekly">Weekly</option>
+                            <option value="BiWeekly">Bi-Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="Yearly">Yearly</option>
+                            <option value="Onetime">One-time</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-calendar-day"></i> Start Date
+                        </label>
+                        <input type="date" class="form-control-modern" name="startdate" value="{{row.startdate}}" required>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                            <i class="fa-solid fa-check"></i>
+                            Update Schedule
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i>
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Add Schedule Modal -->
+<div class="modal fade modal-modern" id="mymodal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-calendar-plus"></i> Add New Schedule
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{url_for('main.create')}}" method="POST">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-tag"></i> Name
+                        </label>
+                        <input type="text" class="form-control-modern" name="name" placeholder="e.g., Monthly Salary" required>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-dollar-sign"></i> Amount
+                        </label>
+                        <input type="number" min="0.00" step="0.01" class="form-control-modern" name="amount" placeholder="0.00" required>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-arrow-right-arrow-left"></i> Type
+                        </label>
+                        <select name="type" class="form-control-modern" required>
+                            <option value="">-- Select Type --</option>
+                            <option value="Income">Income</option>
+                            <option value="Expense">Expense</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-repeat"></i> Frequency
+                        </label>
+                        <select name="frequency" class="form-control-modern" required>
+                            <option value="">-- Select Frequency --</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="BiWeekly">Bi-Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="Yearly">Yearly</option>
+                            <option value="Onetime">One-time</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-calendar-day"></i> Start Date
+                        </label>
+                        <input type="date" class="form-control-modern" name="startdate" required>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                            <i class="fa-solid fa-check"></i>
+                            Add Schedule
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i>
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade modal-modern" id="uploadmodal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-upload"></i> Import Schedule Data
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div style="background-color: rgba(59, 130, 246, 0.1); border: 1px solid var(--accent); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;">
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 0.875rem;">
+                        <i class="fa-solid fa-circle-info"></i>
+                        Format must match the export template. Download an export first to see the required format.
+                    </p>
+                </div>
+
+                <form method="post" action="{{url_for('main.import_csv')}}" enctype="multipart/form-data">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-file-csv"></i> CSV File
+                        </label>
+                        <input type="file" name="file" accept=".csv" class="form-control-modern" required>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                            <i class="fa-solid fa-upload"></i>
+                            Upload File
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i>
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
