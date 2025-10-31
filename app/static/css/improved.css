@@ -569,6 +569,58 @@ table.modern-table td {
   padding: var(--spacing-lg);
 }
 
+/* iOS Safari Modal Fixes */
+/* Fix for iOS Safari modal scroll-locking and freezing issues */
+.modal {
+  /* Prevent touch events from passing through on iOS */
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-backdrop {
+  /* Ensure backdrop captures touch events on iOS */
+  touch-action: none;
+}
+
+.modal-dialog {
+  /* Enable smooth scrolling for modal content on iOS */
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-body {
+  /* Enable smooth scrolling within modal body on iOS */
+  -webkit-overflow-scrolling: touch;
+  /* Ensure proper touch handling */
+  touch-action: pan-y;
+}
+
+/* Prevent body scroll on iOS when modal is open */
+body.modal-open {
+  /* Fix iOS body scroll issue */
+  position: fixed;
+  width: 100%;
+  overflow: hidden;
+  /* Prevent rubber-band scrolling on iOS */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
+}
+
+/* Prevent iOS Safari from scrolling body behind modal */
+@supports (-webkit-touch-callout: none) {
+  /* iOS-specific: prevent background scroll */
+  body.modal-open {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* Ensure modal content is still scrollable */
+  .modal-open .modal {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+}
+
 /* Form Improvements */
 .form-group-modern {
   margin-bottom: var(--spacing-lg);
