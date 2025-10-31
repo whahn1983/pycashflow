@@ -83,7 +83,10 @@ def settings():
     # get about info - available to all users
     about = version()
 
-    return render_template('settings.html', about=about)
+    if current_user.admin:
+        return render_template('settings.html', about=about)
+    else:
+        return render_template('settings_guest.html', about=about)
 
 
 @main.route('/schedule')
