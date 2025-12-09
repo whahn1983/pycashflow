@@ -154,7 +154,7 @@
         function cb(selection) {
             $.getJSON({
                 url: "/callback", data: { 'data': selection }, success: function (result) {
-                    Plotly.newPlot('chart', result, {staticPlot: true, displayModeBar: false});
+                    Plotly.newPlot('chart', result.data, result.layout, {staticPlot: true, displayModeBar: false});
                 }
             });
         }
@@ -181,7 +181,7 @@
         }
     }
 
-    Plotly.newPlot('chart', d, {displayModeBar: false});
+    Plotly.newPlot('chart', d.data, d.layout, {displayModeBar: false});
 
     // Refresh button handler
     function refreshContent() {
