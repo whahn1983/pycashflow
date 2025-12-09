@@ -67,7 +67,7 @@
         function cb(selection) {
             $.getJSON({
                 url: "/callback", data: { 'data': selection }, success: function (result) {
-                    Plotly.newPlot('chart', result, {staticPlot: true});
+                    Plotly.newPlot('chart', result, {staticPlot: true, displayModeBar: false});
                 }
             });
         }
