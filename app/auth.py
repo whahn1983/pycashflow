@@ -3,6 +3,7 @@ from flask_login import login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from .models import User
 from app import db
+from .getemail import send_new_user_notification
 import pandas as pd
 import os
 from functools import wraps
@@ -146,6 +147,15 @@ def signup_post():
     # add the new user to the database
     db.session.add(new_user)
     db.session.commit()
+
+    # Send notification to global admin if this is not the first user
+    # (first user becomes global admin, so no need to notify themselves)
+    if not is_global_admin:
+        try:
+            send_new_user_notification(name, email)
+        except Exception as e:
+            # Don't fail registration if email notification fails
+            print(f"Failed to send new user notification: {e}")
 
     return redirect(url_for('auth.login'))
 
