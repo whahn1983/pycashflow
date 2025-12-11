@@ -38,20 +38,6 @@
             Monitor your cash flow carefully
         </div>
     </div>
-
-    <!-- Refresh Card -->
-    <div class="metric-card">
-        <div class="metric-label">
-            <i class="fa-solid fa-arrows-rotate"></i> Data Status
-        </div>
-        <div class="metric-sublabel" style="margin-top: 1rem; margin-bottom: 1rem;">
-            Keep your projections up to date
-        </div>
-        <button id="refresh-button" class="metric-action" onclick="refreshContent();location.href='/refresh';">
-            <i class="fa-solid fa-arrows-rotate refresh-icon" id="refresh-icon"></i>
-            Refresh Data
-        </button>
-    </div>
 </div>
 
 <!-- Cash Flow Chart Card -->
@@ -168,7 +154,7 @@
         function cb(selection) {
             $.getJSON({
                 url: "/callback", data: { 'data': selection }, success: function (result) {
-                    Plotly.newPlot('chart', result, {staticPlot: true});
+                    Plotly.newPlot('chart', result.data, result.layout, {staticPlot: true, displayModeBar: false});
                 }
             });
         }
@@ -195,15 +181,10 @@
         }
     }
 
-    Plotly.newPlot('chart', d, {});
+    Plotly.newPlot('chart', d.data, d.layout, {displayModeBar: false});
 
     // Refresh button handler
     function refreshContent() {
-        let refreshIcon = document.getElementById("refresh-icon");
-        let refreshButton = document.getElementById("refresh-button");
-        if (refreshIcon) refreshIcon.classList.add("loading");
-        if (refreshButton) refreshButton.disabled = true;
-
         let refreshIconChart = document.getElementById("refresh-icon-chart");
         let refreshButtonChart = document.getElementById("refresh-btn-chart");
         if (refreshIconChart) refreshIconChart.classList.add("loading");
