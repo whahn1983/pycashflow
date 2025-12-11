@@ -14,17 +14,27 @@ auth = Blueprint('auth', __name__)
 
 
 short_session_cookie_name = "cbo_short_session"
-# Config has a default values for 'short_session_cookie_name' and 'BACKEND_API'
-config: Config = Config(
-    api_secret=os.environ['API_SECRET'],
-    project_id=os.environ['PROJECT_ID'],
-    frontend_api=os.environ['FRONTEND_URI'],
-    backend_api="https://backendapi.cloud.corbado.io",
-)
-config.frontend_api = os.environ['FRONTEND_URI']
 
-# Initialize SDK
-sdk: CorbadoSDK = CorbadoSDK(config=config)
+# Read environment variables safely (returns None if missing)
+API_SECRET = os.getenv("API_SECRET")
+PROJECT_ID = os.getenv("PROJECT_ID")
+FRONTEND_URI = os.getenv("FRONTEND_URI")
+
+corbado_config = None
+corbado_enabled = all([API_SECRET, PROJECT_ID, FRONTEND_URI])
+
+# Config has a default values for 'short_session_cookie_name' and 'BACKEND_API'
+if corbado_enabled:
+    config: Config = Config(
+        api_secret=os.environ['API_SECRET'],
+        project_id=os.environ['PROJECT_ID'],
+        frontend_api=os.environ['FRONTEND_URI'],
+        backend_api="https://backendapi.cloud.corbado.io",
+    )
+    config.frontend_api = os.environ['FRONTEND_URI']
+
+    # Initialize SDK
+    sdk: CorbadoSDK = CorbadoSDK(config=config)
 
 
 @auth.route('/login')
@@ -192,10 +202,15 @@ def account_owner_required(f):
 
 @auth.route('/passkey_login')
 def login_passkey():
-    project_id = os.environ['PROJECT_ID']
-    frontend_uri = os.environ['FRONTEND_URI']
 
-    return render_template('passkey_login.html', project_id=project_id, frontend_uri=frontend_uri)
+    if corbado_enabled:
+        project_id = os.environ['PROJECT_ID']
+        frontend_uri = os.environ['FRONTEND_URI']
+
+        return render_template('passkey_login.html', project_id=project_id, frontend_uri=frontend_uri)
+    else:
+        flash('Passkey authentication is not enabled.')
+        return redirect(url_for('auth.login'))
 
 
 @auth.route('/passkey_login_post')
