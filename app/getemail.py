@@ -22,7 +22,7 @@ from email.mime.multipart import MIMEMultipart
 import smtplib
 from datetime import datetime, timedelta
 from app import db
-from app.models import User, Email, Balance
+from app.models import User, Email, Balance, GlobalEmailSettings
 
 
 def process_email_balances():
@@ -170,26 +170,22 @@ def send_new_user_notification(new_user_name, new_user_email):
             print("No global admin found, skipping notification")
             return False
 
-        # Get email settings for the global admin
-        email_config = Email.query.filter_by(user_id=global_admin.id).first()
+        # Get global email settings
+        email_settings = GlobalEmailSettings.query.first()
 
-        if not email_config:
-            print(f"No email settings configured for global admin {global_admin.id}, skipping notification")
+        if not email_settings:
+            print("No global email settings configured, skipping notification")
             return False
 
-        # Extract email credentials
-        from_email = email_config.email
-        password = email_config.password
-        imap_server = email_config.server
-
-        # Convert IMAP server to SMTP server
-        # Common patterns: imap.gmail.com -> smtp.gmail.com, imap.mail.yahoo.com -> smtp.mail.yahoo.com
-        smtp_server = imap_server.replace('imap', 'smtp')
+        # Extract email credentials from global settings
+        from_email = email_settings.email
+        password = email_settings.password
+        smtp_server = email_settings.smtp_server
 
         # Create the email message
         msg = MIMEMultipart('alternative')
         msg['From'] = from_email
-        msg['To'] = from_email  # Send to the global admin's own email
+        msg['To'] = global_admin.email  # Send to the global admin's email
         msg['Subject'] = 'New User Registration - PyCashFlow'
 
         # Create plain text version
@@ -244,9 +240,9 @@ Please log in to your PyCashFlow account to activate this user.
             server = smtplib.SMTP(smtp_server, 587, timeout=10)
             server.starttls()
             server.login(from_email, password)
-            server.sendmail(from_email, from_email, msg.as_string())
+            server.sendmail(from_email, global_admin.email, msg.as_string())
             server.quit()
-            print(f"Successfully sent new user notification email to {from_email}")
+            print(f"Successfully sent new user notification email to {global_admin.email}")
             return True
         except Exception as e:
             # If port 587 fails, try port 465 with SSL
@@ -254,9 +250,9 @@ Please log in to your PyCashFlow account to activate this user.
             try:
                 server = smtplib.SMTP_SSL(smtp_server, 465, timeout=10)
                 server.login(from_email, password)
-                server.sendmail(from_email, from_email, msg.as_string())
+                server.sendmail(from_email, global_admin.email, msg.as_string())
                 server.quit()
-                print(f"Successfully sent new user notification email to {from_email} via SSL")
+                print(f"Successfully sent new user notification email to {global_admin.email} via SSL")
                 return True
             except Exception as e2:
                 print(f"Failed to send email via both ports: {e2}")
@@ -264,6 +260,120 @@ Please log in to your PyCashFlow account to activate this user.
 
     except Exception as e:
         print(f"Error sending new user notification: {e}")
+        return False
+
+
+def send_account_activation_notification(user_name, user_email):
+    """
+    Send an email notification to a user when their account is activated.
+
+    Args:
+        user_name: Name of the user whose account was activated
+        user_email: Email of the user whose account was activated
+
+    Returns:
+        bool: True if email was sent successfully, False otherwise
+    """
+    try:
+        # Get global email settings
+        email_settings = GlobalEmailSettings.query.first()
+
+        if not email_settings:
+            print("No global email settings configured, skipping activation notification")
+            return False
+
+        # Extract email credentials from global settings
+        from_email = email_settings.email
+        password = email_settings.password
+        smtp_server = email_settings.smtp_server
+
+        # Create the email message
+        msg = MIMEMultipart('alternative')
+        msg['From'] = from_email
+        msg['To'] = user_email
+        msg['Subject'] = 'Your PyCashFlow Account Has Been Activated'
+
+        # Create plain text version
+        text_content = f"""
+Hello {user_name},
+
+Great news! Your PyCashFlow account has been activated and you can now log in.
+
+You can access your account at any time by visiting the login page.
+
+If you have any questions or need assistance, please contact your administrator.
+
+Best regards,
+The PyCashFlow Team
+"""
+
+        # Create HTML version
+        html_content = f"""
+<html>
+  <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h2 style="color: #10b981; border-bottom: 3px solid #10b981; padding-bottom: 10px;">
+        Account Activated!
+      </h2>
+      <p>Hello <strong>{user_name}</strong>,</p>
+      <p>Great news! Your PyCashFlow account has been activated and you can now log in.</p>
+
+      <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
+        <p style="margin: 0;">
+          <strong>What's next?</strong><br>
+          You can now access all features of PyCashFlow including:
+        </p>
+        <ul style="margin: 10px 0;">
+          <li>Cash flow forecasting</li>
+          <li>Schedule management</li>
+          <li>Balance tracking</li>
+          <li>And more!</li>
+        </ul>
+      </div>
+
+      <p>If you have any questions or need assistance, please contact your administrator.</p>
+
+      <p style="margin-top: 30px;">
+        Best regards,<br>
+        <strong>The PyCashFlow Team</strong>
+      </p>
+    </div>
+  </body>
+</html>
+"""
+
+        # Attach both versions
+        part1 = MIMEText(text_content, 'plain')
+        part2 = MIMEText(html_content, 'html')
+        msg.attach(part1)
+        msg.attach(part2)
+
+        # Send the email using SMTP
+        # Try port 587 with STARTTLS first (most common)
+        try:
+            server = smtplib.SMTP(smtp_server, 587, timeout=10)
+            server.starttls()
+            server.login(from_email, password)
+            server.sendmail(from_email, user_email, msg.as_string())
+            server.quit()
+            print(f"Successfully sent account activation email to {user_email}")
+            return True
+        except Exception as e:
+            # If port 587 fails, try port 465 with SSL
+            print(f"Failed to send via port 587, trying SSL on port 465: {e}")
+            try:
+                server = smtplib.SMTP_SSL(smtp_server, 465, timeout=10)
+                server.login(from_email, password)
+                server.sendmail(from_email, user_email, msg.as_string())
+                server.quit()
+                print(f"Successfully sent account activation email to {user_email} via SSL")
+                return True
+            except Exception as e2:
+                print(f"Failed to send email via both ports: {e2}")
+                return False
+
+    except Exception as e:
+        print(f"Error sending account activation notification: {e}")
         return False
 
 
