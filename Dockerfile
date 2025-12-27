@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM python:3.14.0-alpine
+FROM python:3.14.2-alpine
 
 ARG DOCKER_TAG
 ENV APP_VERSION=$DOCKER_TAG
