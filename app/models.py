@@ -95,3 +95,15 @@ class Email(db.Model):
     # Relationships
     user = db.relationship('User', backref='email_configs')
 
+
+class GlobalEmailSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), nullable=False)
+    password = db.Column(db.String(100), nullable=False)
+    smtp_server = db.Column(db.String(100), nullable=False)
+
+    # Constraints - only one global email settings record allowed
+    __table_args__ = (
+        db.CheckConstraint('id = 1', name='single_row_check'),
+    )
+

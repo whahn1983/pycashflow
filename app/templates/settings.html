@@ -46,6 +46,22 @@
     {% endif %}
 
     {% if current_user.is_global_admin %}
+    <!-- Global Email Notifications Card - Global Admins Only -->
+    <div class="metric-card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#globalemailmodal">
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <div style="width: 3rem; height: 3rem; background: linear-gradient(135deg, #10b981, #34d399); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                <i class="fa-solid fa-bell"></i>
+            </div>
+            <div>
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-primary);">Global Email Notifications</h3>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">Configure SMTP for all notifications</p>
+            </div>
+        </div>
+        <button class="btn-success-modern btn-modern" style="width: 100%;" onclick="event.stopPropagation();" data-bs-toggle="modal" data-bs-target="#globalemailmodal">
+            <i class="fa-solid fa-gear"></i> Configure Notifications
+        </button>
+    </div>
+
     <!-- Sign-Ups Toggle Card - Global Admins Only -->
     <div class="metric-card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#settingsmodal">
         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
@@ -147,6 +163,64 @@
 </div>
 
 {% if current_user.is_global_admin %}
+<!-- Global Email Notifications Modal - Global Admins Only -->
+<div class="modal fade modal-modern" id="globalemailmodal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-bell"></i> Global Email Notifications
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div style="background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--accent); padding: 1rem; margin-bottom: 1.5rem; border-radius: var(--radius-md);">
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 0.875rem;">
+                        <i class="fa-solid fa-info-circle"></i>
+                        <strong>Global Email Settings:</strong> Configure the SMTP server credentials used for all system email notifications (new user registrations, account activations, etc.). This is separate from the balance update email settings.
+                    </p>
+                </div>
+                <form action="{{url_for('main.global_email_settings')}}" method="POST">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-envelope"></i> Email Address
+                        </label>
+                        <input class="form-control-modern" type="email" name="email" placeholder="notifications@yourdomain.com" required>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-key"></i> Password
+                        </label>
+                        <input class="form-control-modern" type="password" name="password" placeholder="Email account password or app password" required>
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-server"></i> SMTP Server
+                        </label>
+                        <input class="form-control-modern" type="text" name="smtp_server" placeholder="smtp.gmail.com" required>
+                        <small style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                            Common servers: smtp.gmail.com, smtp.office365.com, smtp.mail.yahoo.com
+                        </small>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                            <i class="fa-solid fa-check"></i>
+                            Save Configuration
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i>
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Disable Sign-Ups Modal - Global Admins Only -->
 <div class="modal fade modal-modern" id="settingsmodal" tabindex="-1">
     <div class="modal-dialog">

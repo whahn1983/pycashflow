@@ -1,7 +1,7 @@
 from flask import request, redirect, url_for, send_from_directory, flash, send_file, Response
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Balance, User, Settings, Email, Hold, Skip
+from .models import Schedule, Balance, User, Settings, Email, Hold, Skip, GlobalEmailSettings
 from app import db
 from datetime import datetime
 import os
@@ -10,6 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from .cashflow import update_cash, plot_cash
 from .auth import admin_required, global_admin_required, account_owner_required
 from .files import export, upload, version
+from .getemail import send_account_activation_notification
 
 
 main = Blueprint('main', __name__)
@@ -542,6 +543,13 @@ def activate_user(id):
             user.is_active = True
             db.session.commit()
             flash(f"User {user.name} has been activated successfully")
+
+            # Send activation notification email to the user
+            try:
+                send_account_activation_notification(user.name, user.email)
+            except Exception as e:
+                # Don't fail activation if email notification fails
+                print(f"Failed to send activation notification to {user.email}: {e}")
         else:
             flash("You don't have permission to activate this user")
 
@@ -750,6 +758,41 @@ def global_admin_panel():
                          account_owners=account_owners,
                          global_admins=global_admins,
                          standalone_users=standalone_users)
+
+
+@main.route('/global_email_settings', methods=['GET', 'POST'])
+@login_required
+@global_admin_required
+def global_email_settings():
+    """Configure global email settings for all email notifications"""
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        smtp_server = request.form.get('smtp_server')
+
+        # Check if global settings already exist
+        settings = GlobalEmailSettings.query.first()
+
+        if settings:
+            # Update existing settings
+            settings.email = email
+            settings.password = password
+            settings.smtp_server = smtp_server
+        else:
+            # Create new settings
+            settings = GlobalEmailSettings(
+                id=1,  # Enforce single row
+                email=email,
+                password=password,
+                smtp_server=smtp_server
+            )
+            db.session.add(settings)
+
+        db.session.commit()
+        flash('Global email settings saved successfully')
+        return redirect(url_for('main.settings'))
+
+    return redirect(url_for('main.settings'))
 
 
 @main.route('/manifest.json')
