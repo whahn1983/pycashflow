@@ -517,6 +517,28 @@ def delete_user(id):
                 else:
                     return redirect(url_for('main.manage_guests'))
 
+            # Manually delete all related data before deleting the user
+            user_id = user.id
+
+            # Delete all guest users for this admin user
+            db.session.query(User).filter_by(account_owner_id=user_id).delete()
+
+            # Delete all schedules for this user
+            db.session.query(Schedule).filter_by(user_id=user_id).delete()
+
+            # Delete all balances for this user
+            db.session.query(Balance).filter_by(user_id=user_id).delete()
+
+            # Delete all holds for this user
+            db.session.query(Hold).filter_by(user_id=user_id).delete()
+
+            # Delete all skips for this user
+            db.session.query(Skip).filter_by(user_id=user_id).delete()
+
+            # Delete all email configs for this user
+            db.session.query(Email).filter_by(user_id=user_id).delete()
+
+            # Now delete the user
             db.session.delete(user)
             db.session.commit()
             flash("Deleted Successfully")

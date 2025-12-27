@@ -10,10 +10,10 @@ class User(UserMixin, db.Model):
     admin = db.Column(db.Boolean)
     is_global_admin = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=False)
-    account_owner_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=True)
+    account_owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
     # Relationships
-    guests = db.relationship('User', backref=db.backref('account_owner', remote_side=[id]), cascade='all, delete-orphan')
+    guests = db.relationship('User', backref=db.backref('account_owner', remote_side=[id]))
 
     # Constraints
     __table_args__ = (
@@ -23,7 +23,7 @@ class User(UserMixin, db.Model):
 
 class Schedule(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     amount = db.Column(db.Numeric(10, 2))
     frequency = db.Column(db.String(100))
@@ -40,7 +40,7 @@ class Schedule(db.Model):
 
 class Balance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     amount = db.Column(db.Numeric(10, 2))
     date = db.Column(db.Date)
 
@@ -50,7 +50,7 @@ class Balance(db.Model):
 
 class Hold(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     amount = db.Column(db.Numeric(10, 2))
     name = db.Column(db.String(100))
     type = db.Column(db.String(100))
@@ -61,7 +61,7 @@ class Hold(db.Model):
 
 class Skip(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     name = db.Column(db.String(100))
     date = db.Column(db.Date)
     amount = db.Column(db.Numeric(10, 2))
@@ -84,7 +84,7 @@ class Settings(db.Model):
 
 class Email(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     email = db.Column(db.String(100), nullable=False)
     password = db.Column(db.String(100))
     server = db.Column(db.String(100))
