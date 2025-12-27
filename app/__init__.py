@@ -5,11 +5,21 @@ import secrets
 import os
 from flask_migrate import Migrate
 from dotenv import load_dotenv
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 
 # init SQLAlchemy so we can use it later in our models
 db = SQLAlchemy()
 migrate = Migrate()
+
+
+# Enable foreign key constraints for SQLite
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 def create_app():
