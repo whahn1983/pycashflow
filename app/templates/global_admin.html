@@ -110,12 +110,12 @@
                                 <i class="fa-solid fa-user-group"></i> Guest Users ({{ admin_guests|length }})
                             </div>
                             {% for guest in admin_guests %}
-                            <div style="padding: 0.75rem; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
-                                <div>
+                            <div style="padding: 0.75rem; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; overflow-x: auto;">
+                                <div style="min-width: 0; flex-shrink: 1;">
                                     <div style="font-weight: 500;">{{ guest.name }}</div>
                                     <div style="color: var(--text-secondary); font-size: 0.8rem;">{{ guest.email }}</div>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
                                     <span class="badge-modern badge-guest">
                                         <i class="fa-solid fa-eye"></i> Guest
                                     </span>
@@ -182,8 +182,7 @@
                                                     </label>
                                                     <select name="role" class="form-control-modern">
                                                         <option value="global_admin" {% if guest.is_global_admin %}selected{% endif %}>Global Admin</option>
-                                                        <option value="admin" {% if guest.admin and not guest.is_global_admin %}selected{% endif %}>Admin</option>
-                                                        <option value="user" {% if not guest.admin and not guest.is_global_admin %}selected{% endif %}>User</option>
+                                                        <option value="admin" {% if not guest.is_global_admin %}selected{% endif %}>Account Owner</option>
                                                     </select>
                                                 </div>
 
@@ -242,8 +241,7 @@
                                         </label>
                                         <select name="role" class="form-control-modern">
                                             <option value="global_admin" {% if user.is_global_admin %}selected{% endif %}>Global Admin</option>
-                                            <option value="admin" {% if user.admin and not user.is_global_admin %}selected{% endif %}>Admin</option>
-                                            <option value="user" {% if not user.admin and not user.is_global_admin %}selected{% endif %}>User</option>
+                                            <option value="admin" {% if not user.is_global_admin %}selected{% endif %}>Account Owner</option>
                                         </select>
                                     </div>
 
@@ -358,8 +356,7 @@
                                     </label>
                                     <select name="role" class="form-control-modern">
                                         <option value="global_admin" {% if owner.is_global_admin %}selected{% endif %}>Global Admin</option>
-                                        <option value="admin" {% if owner.admin and not owner.is_global_admin %}selected{% endif %}>Admin</option>
-                                        <option value="user" {% if not owner.admin and not owner.is_global_admin %}selected{% endif %}>User</option>
+                                        <option value="admin" {% if not owner.is_global_admin %}selected{% endif %}>Account Owner</option>
                                     </select>
                                 </div>
 
@@ -386,12 +383,12 @@
                     <i class="fa-solid fa-user-group"></i> Guest Users ({{ guests|length }})
                 </div>
                 {% for guest in guests %}
-                <div style="padding: 0.75rem; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
-                    <div>
+                <div style="padding: 0.75rem; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; overflow-x: auto;">
+                    <div style="min-width: 0; flex-shrink: 1;">
                         <div style="font-weight: 500;">{{ guest.name }}</div>
                         <div style="color: var(--text-secondary); font-size: 0.8rem;">{{ guest.email }}</div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
                         <span class="badge-modern badge-guest">
                             <i class="fa-solid fa-eye"></i> Guest
                         </span>
@@ -458,8 +455,7 @@
                                         </label>
                                         <select name="role" class="form-control-modern">
                                             <option value="global_admin" {% if guest.is_global_admin %}selected{% endif %}>Global Admin</option>
-                                            <option value="admin" {% if guest.admin and not guest.is_global_admin %}selected{% endif %}>Admin</option>
-                                            <option value="user" {% if not guest.admin and not guest.is_global_admin %}selected{% endif %}>User</option>
+                                            <option value="admin" {% if not guest.is_global_admin %}selected{% endif %}>Account Owner</option>
                                         </select>
                                     </div>
 
@@ -528,8 +524,7 @@
                             <i class="fa-solid fa-shield-halved"></i> User Role
                         </label>
                         <select name="role" class="form-control-modern">
-                            <option value="user">User</option>
-                            <option value="admin">Admin</option>
+                            <option value="admin">Account Owner</option>
                             <option value="global_admin">Global Admin</option>
                         </select>
                     </div>
