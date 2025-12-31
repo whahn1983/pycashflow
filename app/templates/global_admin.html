@@ -624,7 +624,11 @@
     display: flex;
     gap: 0.5rem;
     flex-wrap: nowrap;
-    flex-shrink: 0;
+}
+@media (max-width: 768px) {
+    .action-buttons {
+        flex-direction: column;
+    }
 }
 </style>
 
