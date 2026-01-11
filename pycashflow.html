@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="PyCashFlow - Professional cash flow forecasting, transaction management, and financial planning for individuals, families, and small-medium businesses.">
+    <meta name="keywords" content="cash flow, forecasting, financial planning, transaction management, Python, Flask">
+    <title>PyCashFlow - Professional Cash Flow Forecasting & Financial Management</title>
+
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* Modern Dark Theme for PyCashFlow Website */
+        :root {
+            /* Color Palette - Matching App Theme */
+            --primary-dark: #1e293b;
+            --secondary-dark: #0f172a;
+            --surface: #334155;
+            --surface-light: #475569;
+
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --accent-light: #60a5fa;
+
+            --success: #10b981;
+            --success-hover: #059669;
+
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+
+            --warning: #f59e0b;
+            --warning-hover: #d97706;
+
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+
+            --border: #475569;
+            --border-light: #64748b;
+
+            /* Spacing */
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+            --spacing-xl: 2rem;
+            --spacing-2xl: 3rem;
+            --spacing-3xl: 4rem;
+
+            /* Border Radius */
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            line-height: 1.6;
+            font-size: 16px;
+            background: linear-gradient(135deg, var(--secondary-dark) 0%, var(--primary-dark) 100%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Navigation */
+        .navbar {
+            background-color: var(--secondary-dark);
+            box-shadow: var(--shadow-md);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 var(--spacing-lg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .brand i {
+            color: var(--accent);
+            font-size: 2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: var(--spacing-md);
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-md);
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            background-color: var(--surface);
+            color: var(--text-primary);
+        }
+
+        .btn-primary {
+            background-color: var(--accent);
+            color: white;
+            padding: 0.625rem 1.25rem;
+            border-radius: var(--radius-md);
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--text-secondary);
+            padding: 0.625rem 1.25rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-outline:hover {
+            background-color: var(--surface);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 var(--spacing-lg);
+        }
+
+        .section {
+            padding: var(--spacing-3xl) 0;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 5rem 0 4rem;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: var(--spacing-lg);
+            background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.2;
+        }
+
+        .hero .subtitle {
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-xl);
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: var(--spacing-md);
+            justify-content: center;
+            margin-bottom: var(--spacing-3xl);
+            flex-wrap: wrap;
+        }
+
+        .hero-buttons .btn-primary,
+        .hero-buttons .btn-outline {
+            padding: 0.875rem 1.75rem;
+            font-size: 1.125rem;
+        }
+
+        /* Dashboard Preview */
+        .dashboard-preview {
+            max-width: 1200px;
+            margin: 0 auto;
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border);
+        }
+
+        .dashboard-preview img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            background: linear-gradient(135deg, var(--surface) 0%, var(--primary-dark) 100%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-xl);
+            margin-top: var(--spacing-3xl);
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--accent);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+
+        /* Section Headers */
+        .section-header {
+            text-align: center;
+            margin-bottom: var(--spacing-3xl);
+        }
+
+        .section-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-md);
+            color: var(--text-primary);
+        }
+
+        .section-subtitle {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Feature Grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--spacing-xl);
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, var(--surface) 0%, var(--primary-dark) 100%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--accent);
+        }
+
+        .feature-icon {
+            width: 3.5rem;
+            height: 3.5rem;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            color: white;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .feature-card.success .feature-icon {
+            background: linear-gradient(135deg, var(--success) 0%, var(--success-hover) 100%);
+        }
+
+        .feature-card.warning .feature-icon {
+            background: linear-gradient(135deg, var(--warning) 0%, var(--warning-hover) 100%);
+        }
+
+        .feature-card.danger .feature-icon {
+            background: linear-gradient(135deg, var(--danger) 0%, var(--danger-hover) 100%);
+        }
+
+        .feature-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-sm);
+            color: var(--text-primary);
+        }
+
+        .feature-description {
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .feature-list {
+            list-style: none;
+            margin-top: var(--spacing-md);
+        }
+
+        .feature-list li {
+            padding-left: 1.5rem;
+            position: relative;
+            margin-bottom: var(--spacing-sm);
+            color: var(--text-secondary);
+        }
+
+        .feature-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: 700;
+        }
+
+        /* Tech Stack */
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--spacing-lg);
+        }
+
+        .tech-card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-lg);
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .tech-card:hover {
+            border-color: var(--accent);
+            box-shadow: var(--shadow-md);
+        }
+
+        .tech-card h4 {
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-sm);
+            font-size: 1.125rem;
+        }
+
+        .tech-card p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* Installation Section */
+        .installation-tabs {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-xl);
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .tab-button {
+            padding: 0.75rem 1.5rem;
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 600;
+        }
+
+        .tab-button:hover {
+            background-color: var(--surface-light);
+            border-color: var(--accent);
+        }
+
+        .tab-button.active {
+            background-color: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .code-block {
+            background-color: var(--secondary-dark);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-lg);
+            overflow-x: auto;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .code-block pre {
+            margin: 0;
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+
+        .code-block code {
+            color: var(--accent-light);
+        }
+
+        /* Use Cases */
+        .use-case-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--spacing-lg);
+        }
+
+        .use-case-card {
+            background-color: var(--primary-dark);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .use-case-card:hover {
+            border-color: var(--accent);
+            transform: scale(1.02);
+        }
+
+        .use-case-icon {
+            font-size: 3rem;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .use-case-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-sm);
+            color: var(--text-primary);
+        }
+
+        .use-case-description {
+            color: var(--text-secondary);
+        }
+
+        /* Support Section */
+        .support-card {
+            background: linear-gradient(135deg, var(--surface) 0%, var(--primary-dark) 100%);
+            border: 2px solid var(--accent);
+            border-radius: var(--radius-xl);
+            padding: var(--spacing-3xl);
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .support-logo {
+            max-width: 400px;
+            margin: 0 auto var(--spacing-xl);
+        }
+
+        .support-logo img {
+            width: 100%;
+            height: auto;
+        }
+
+        .support-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-lg);
+            color: var(--text-primary);
+        }
+
+        .support-description {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .support-services {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-xl);
+            text-align: left;
+        }
+
+        .support-service {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .support-service i {
+            color: var(--success);
+        }
+
+        .support-contact {
+            display: flex;
+            gap: var(--spacing-lg);
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--accent-light);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.125rem;
+        }
+
+        .contact-item:hover {
+            color: var(--accent);
+        }
+
+        /* Footer */
+        .footer {
+            background-color: var(--secondary-dark);
+            border-top: 1px solid var(--border);
+            padding: var(--spacing-3xl) 0 var(--spacing-xl);
+            margin-top: var(--spacing-3xl);
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--spacing-2xl);
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .footer-section h3 {
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-md);
+            font-size: 1.125rem;
+        }
+
+        .footer-links {
+            list-style: none;
+        }
+
+        .footer-links li {
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--accent);
+        }
+
+        .footer-bottom {
+            text-align: center;
+            padding-top: var(--spacing-xl);
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        .social-links {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-md);
+        }
+
+        .social-link {
+            width: 2.5rem;
+            height: 2.5rem;
+            background-color: var(--surface);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .social-link:hover {
+            background-color: var(--accent);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero .subtitle {
+                font-size: 1.125rem;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .stats-bar {
+                grid-template-columns: 1fr;
+                gap: var(--spacing-lg);
+            }
+
+            .feature-grid,
+            .tech-grid,
+            .use-case-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .support-card {
+                padding: var(--spacing-xl);
+            }
+
+            .support-logo {
+                max-width: 250px;
+            }
+        }
+
+        /* Accessibility */
+        *:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* Smooth animations */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="#" class="brand">
+                <i class="fa-solid fa-chart-line"></i>
+                PyCashFlow
+            </a>
+            <div class="nav-links">
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#installation" class="nav-link">Installation</a>
+                <a href="#tech-stack" class="nav-link">Technology</a>
+                <a href="#support" class="nav-link">Support</a>
+                <a href="https://github.com/whahn1983/pycashflow" class="btn-primary">
+                    <i class="fa-brands fa-github"></i>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Professional Cash Flow Forecasting</h1>
+            <p class="subtitle">
+                A comprehensive Python Flask application for cash flow forecasting, transaction management,
+                and financial planning for individuals, families, and small-medium businesses.
+            </p>
+            <div class="hero-buttons">
+                <a href="https://hub.docker.com/r/whahn1983/pycashflow" class="btn-primary">
+                    <i class="fa-brands fa-docker"></i>
+                    Get Started with Docker
+                </a>
+                <a href="https://github.com/whahn1983/pycashflow" class="btn-outline">
+                    <i class="fa-brands fa-github"></i>
+                    View on GitHub
+                </a>
+            </div>
+
+            <!-- Dashboard Preview -->
+            <div class="dashboard-preview">
+                <img src="https://github.com/user-attachments/assets/72acb38c-1e60-474e-8d86-b25854d83e59"
+                     alt="PyCashFlow Dashboard"
+                     loading="lazy">
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="stat">
+                    <div class="stat-value">12 Months</div>
+                    <div class="stat-label">Cash Flow Projections</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">Multi-User</div>
+                    <div class="stat-label">3-Tier Access Control</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">Automated</div>
+                    <div class="stat-label">Email Balance Updates</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">PWA</div>
+                    <div class="stat-label">Progressive Web App</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Key Features Section -->
+    <section id="features" class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Powerful Features</h2>
+                <p class="section-subtitle">
+                    Everything you need to manage and forecast your cash flow with precision and confidence
+                </p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fa-solid fa-chart-area"></i>
+                    </div>
+                    <h3 class="feature-title">Cash Flow Forecasting</h3>
+                    <p class="feature-description">
+                        Visualize your financial future with intelligent forecasting
+                    </p>
+                    <ul class="feature-list">
+                        <li>12-month projections</li>
+                        <li>Interactive Plotly charts</li>
+                        <li>Minimum balance warnings</li>
+                        <li>60-day transaction preview</li>
+                        <li>Running balance calculations</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card success">
+                    <div class="feature-icon">
+                        <i class="fa-solid fa-calendar-days"></i>
+                    </div>
+                    <h3 class="feature-title">Transaction Management</h3>
+                    <p class="feature-description">
+                        Flexible scheduling for all your recurring transactions
+                    </p>
+                    <ul class="feature-list">
+                        <li>Multiple frequencies (Monthly, Weekly, etc.)</li>
+                        <li>Smart business day adjustments</li>
+                        <li>Transaction holds & skip functionality</li>
+                        <li>Manual balance updates</li>
+                        <li>Auto-cleanup of past transactions</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card warning">
+                    <div class="feature-icon">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <h3 class="feature-title">Multi-User Support</h3>
+                    <p class="feature-description">
+                        Secure access control for teams and families
+                    </p>
+                    <ul class="feature-list">
+                        <li>Global Administrator role</li>
+                        <li>Account Owner with full access</li>
+                        <li>Guest users (view-only)</li>
+                        <li>User activation workflow</li>
+                        <li>Complete data isolation</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card danger">
+                    <div class="feature-icon">
+                        <i class="fa-solid fa-envelope"></i>
+                    </div>
+                    <h3 class="feature-title">Automated Balance Updates</h3>
+                    <p class="feature-description">
+                        Stay current with automatic email integration
+                    </p>
+                    <ul class="feature-list">
+                        <li>IMAP email integration</li>
+                        <li>Configurable search patterns</li>
+                        <li>Scheduled processing (cron)</li>
+                        <li>Multi-user support</li>
+                        <li>Custom delimiter patterns</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <h3 class="feature-title">Modern Authentication</h3>
+                    <p class="feature-description">
+                        Secure and convenient login options
+                    </p>
+                    <ul class="feature-list">
+                        <li>Email/password with Scrypt hashing</li>
+                        <li>Passkey support (Corbado)</li>
+                        <li>Secure session management</li>
+                        <li>"Remember me" functionality</li>
+                        <li>Passwordless authentication</li>
+                    </ul>
+                </div>
+
+                <div class="feature-card success">
+                    <div class="feature-icon">
+                        <i class="fa-solid fa-mobile-screen"></i>
+                    </div>
+                    <h3 class="feature-title">Progressive Web App</h3>
+                    <p class="feature-description">
+                        Native app experience on any device
+                    </p>
+                    <ul class="feature-list">
+                        <li>Installable on mobile & desktop</li>
+                        <li>Service worker enabled</li>
+                        <li>Offline capabilities</li>
+                        <li>Responsive design</li>
+                        <li>Optimized for all screen sizes</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases Section -->
+    <section class="section" style="background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.5) 100%);">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Perfect For</h2>
+                <p class="section-subtitle">
+                    PyCashFlow adapts to your needs, whether you're an individual, family, or business
+                </p>
+            </div>
+
+            <div class="use-case-grid">
+                <div class="use-case-card">
+                    <div class="use-case-icon">👤</div>
+                    <h3 class="use-case-title">Individuals</h3>
+                    <p class="use-case-description">
+                        Track personal income, expenses, and plan for the future with confidence
+                    </p>
+                </div>
+
+                <div class="use-case-card">
+                    <div class="use-case-icon">👨‍👩‍👧‍👦</div>
+                    <h3 class="use-case-title">Families</h3>
+                    <p class="use-case-description">
+                        Share financial visibility with family members while maintaining control
+                    </p>
+                </div>
+
+                <div class="use-case-card">
+                    <div class="use-case-icon">🏢</div>
+                    <h3 class="use-case-title">Small Businesses</h3>
+                    <p class="use-case-description">
+                        Manage business cash flow, forecast revenue, and plan for growth
+                    </p>
+                </div>
+
+                <div class="use-case-card">
+                    <div class="use-case-icon">💼</div>
+                    <h3 class="use-case-title">Freelancers</h3>
+                    <p class="use-case-description">
+                        Handle irregular income patterns and predict cash flow gaps
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Technology Stack Section -->
+    <section id="tech-stack" class="section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Built with Modern Technology</h2>
+                <p class="section-subtitle">
+                    Powered by industry-leading frameworks and libraries
+                </p>
+            </div>
+
+            <div class="tech-grid">
+                <div class="tech-card">
+                    <h4><i class="fa-brands fa-python"></i> Python & Flask</h4>
+                    <p>Lightweight web framework with SQLAlchemy ORM</p>
+                </div>
+
+                <div class="tech-card">
+                    <h4><i class="fa-solid fa-chart-line"></i> Pandas & NumPy</h4>
+                    <p>Advanced data processing and calculations</p>
+                </div>
+
+                <div class="tech-card">
+                    <h4><i class="fa-solid fa-chart-area"></i> Plotly</h4>
+                    <p>Interactive, responsive visualizations</p>
+                </div>
+
+                <div class="tech-card">
+                    <h4><i class="fa-brands fa-bootstrap"></i> Bootstrap 5</h4>
+                    <p>Modern, responsive UI framework</p>
+                </div>
+
+                <div class="tech-card">
+                    <h4><i class="fa-brands fa-docker"></i> Docker</h4>
+                    <p>Easy deployment and containerization</p>
+                </div>
+
+                <div class="tech-card">
+                    <h4><i class="fa-solid fa-database"></i> SQLite/PostgreSQL</h4>
+                    <p>Flexible database options</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation Section -->
+    <section id="installation" class="section" style="background: linear-gradient(180deg, rgba(15, 23, 42, 0.5) 0%, transparent 100%);">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Quick Installation</h2>
+                <p class="section-subtitle">
+                    Get started in minutes with Docker or manual installation
+                </p>
+            </div>
+
+            <div class="installation-tabs">
+                <button class="tab-button active" onclick="switchTab('docker')">
+                    <i class="fa-brands fa-docker"></i> Docker (Recommended)
+                </button>
+                <button class="tab-button" onclick="switchTab('manual')">
+                    <i class="fa-solid fa-terminal"></i> Manual Installation
+                </button>
+            </div>
+
+            <div id="docker" class="tab-content active">
+                <div class="code-block">
+                    <pre><code># Pull the latest image
+docker pull whahn1983/pycashflow:latest
+
+# Run the container
+docker run -d \
+  -p 127.0.0.1:5000:5000 \
+  -v /mnt/data:/app/app/data \
+  -v /mnt/migrations:/app/migrations \
+  -v /etc/localtime:/etc/localtime:ro \
+  -v /mnt/.env:/app/app/.env \
+  --restart always \
+  --name pycashflow \
+  whahn1983/pycashflow:latest
+
+# Access at http://localhost:5000</code></pre>
+                </div>
+                <p style="text-align: center; color: var(--text-secondary); margin-top: var(--spacing-lg);">
+                    <i class="fa-solid fa-circle-info"></i>
+                    Docker provides the simplest and most reliable deployment method
+                </p>
+            </div>
+
+            <div id="manual" class="tab-content">
+                <div class="code-block">
+                    <pre><code># Clone the repository
+git clone https://github.com/whahn1983/pycashflow.git
+cd pycashflow
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Initialize database
+flask db init
+flask db migrate -m "Initial migration"
+flask db upgrade
+
+# Run the application
+python app.py
+
+# Access at http://localhost:5000</code></pre>
+                </div>
+                <p style="text-align: center; color: var(--text-secondary); margin-top: var(--spacing-lg);">
+                    <i class="fa-solid fa-circle-info"></i>
+                    Requires Python 3.9+ and optional reverse proxy for production
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Professional Support Section -->
+    <section id="support" class="section">
+        <div class="container">
+            <div class="support-card">
+                <div class="support-logo">
+                    <img src="https://h3consultingpartners.com/h3_full_logo.png"
+                         alt="H3 Consulting Partners Logo"
+                         loading="lazy">
+                </div>
+
+                <h2 class="support-title">Professional Support & Custom Development</h2>
+                <p class="support-description">
+                    H3 Consulting Partners LLC offers professional installation, configuration,
+                    ongoing support, and accelerated development for PyCashFlow.
+                </p>
+
+                <div class="support-services">
+                    <div class="support-service">
+                        <i class="fa-solid fa-check-circle"></i>
+                        <span>Professional Installation</span>
+                    </div>
+                    <div class="support-service">
+                        <i class="fa-solid fa-check-circle"></i>
+                        <span>Custom Configuration</span>
+                    </div>
+                    <div class="support-service">
+                        <i class="fa-solid fa-check-circle"></i>
+                        <span>System Integration</span>
+                    </div>
+                    <div class="support-service">
+                        <i class="fa-solid fa-check-circle"></i>
+                        <span>Feature Development</span>
+                    </div>
+                    <div class="support-service">
+                        <i class="fa-solid fa-check-circle"></i>
+                        <span>Ongoing Maintenance</span>
+                    </div>
+                    <div class="support-service">
+                        <i class="fa-solid fa-check-circle"></i>
+                        <span>Training & Documentation</span>
+                    </div>
+                </div>
+
+                <div class="support-contact">
+                    <a href="mailto:bill@h3consultingpartners.com" class="contact-item">
+                        <i class="fa-solid fa-envelope"></i>
+                        bill@h3consultingpartners.com
+                    </a>
+                    <a href="https://h3consultingpartners.com" target="_blank" class="contact-item">
+                        <i class="fa-solid fa-globe"></i>
+                        h3consultingpartners.com
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>
+                        <i class="fa-solid fa-chart-line"></i>
+                        PyCashFlow
+                    </h3>
+                    <p style="color: var(--text-secondary); margin-bottom: var(--spacing-md);">
+                        Professional cash flow management and forecasting for individuals, families, and businesses.
+                    </p>
+                    <div class="social-links">
+                        <a href="https://github.com/whahn1983/pycashflow" class="social-link" title="GitHub">
+                            <i class="fa-brands fa-github"></i>
+                        </a>
+                        <a href="https://hub.docker.com/r/whahn1983/pycashflow" class="social-link" title="Docker Hub">
+                            <i class="fa-brands fa-docker"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="footer-section">
+                    <h3>Resources</h3>
+                    <ul class="footer-links">
+                        <li><a href="https://github.com/whahn1983/pycashflow">GitHub Repository</a></li>
+                        <li><a href="https://hub.docker.com/r/whahn1983/pycashflow">Docker Hub</a></li>
+                        <li><a href="https://github.com/whahn1983/pycashflow#readme">Documentation</a></li>
+                        <li><a href="https://github.com/whahn1983/pycashflow/issues">Issue Tracker</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h3>Features</h3>
+                    <ul class="footer-links">
+                        <li><a href="#features">Cash Flow Forecasting</a></li>
+                        <li><a href="#features">Transaction Management</a></li>
+                        <li><a href="#features">Multi-User Support</a></li>
+                        <li><a href="#features">Email Integration</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h3>Support</h3>
+                    <ul class="footer-links">
+                        <li><a href="https://h3consultingpartners.com">H3 Consulting Partners</a></li>
+                        <li><a href="mailto:bill@h3consultingpartners.com">Contact Support</a></li>
+                        <li><a href="#installation">Installation Guide</a></li>
+                        <li><a href="https://github.com/whahn1983/pycashflow/blob/master/LICENSE">License</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>
+                    <strong>PyCashFlow v3.2.3</strong> &mdash;
+                    Professional cash flow management and forecasting
+                </p>
+                <p style="margin-top: var(--spacing-sm);">
+                    <i class="fa-solid fa-code"></i>
+                    Built with Python, Flask, and modern web technologies
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript for Tab Switching -->
+    <script>
+        function switchTab(tabName) {
+            // Hide all tab contents
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Remove active class from all buttons
+            const tabButtons = document.querySelectorAll('.tab-button');
+            tabButtons.forEach(button => {
+                button.classList.remove('active');
+            });
+
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>
