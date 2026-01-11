@@ -409,7 +409,7 @@ PyCashFlow uses Flask-Migrate for database schema management:
 ## Professional Support
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/8b0e8c6e-c5f4-4a1f-bb8c-8e2e3f3e0f4a" alt="H3 Consulting Partners Logo" width="500">
+  <img src="https://h3consultingpartners.com/h3_full_logo.png" alt="H3 Consulting Partners Logo" width="500">
 </p>
 
 ### H3 Consulting Partners LLC
