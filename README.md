@@ -8,7 +8,7 @@
 
 **A comprehensive Python Flask application for cash flow forecasting, transaction management, and financial planning.**
 
-PyCashFlow is a powerful, multi-user web application designed to help individuals and families manage their finances through intelligent cash flow forecasting, recurring transaction scheduling, and automated balance tracking. With support for up to one year of cash flow projections, interactive visualizations, and automatic email-based balance updates, PyCashFlow provides a complete solution for financial planning and management.
+PyCashFlow is a powerful, multi-user web application designed to help individuals, families, and small-medium businesses manage their finances through intelligent cash flow forecasting, recurring transaction scheduling, and automated balance tracking. With support for up to one year of cash flow projections, interactive visualizations, and automatic email-based balance updates, PyCashFlow provides a complete solution for financial planning and management.
 
 <img width="912" height="880" alt="PyCashFlow Dashboard" src="https://github.com/user-attachments/assets/72acb38c-1e60-474e-8d86-b25854d83e59" />
 
@@ -28,7 +28,6 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - [Data Management](#data-management)
 - [Updates & Maintenance](#updates--maintenance)
 - [Professional Support](#professional-support)
-- [Built With](#built-with)
 - [License](#license)
 
 ---
@@ -54,7 +53,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - **Three-Tier Access Control**:
   - **Global Administrator**: System-wide management and user approval
   - **Account Owner**: Full cash flow management plus guest user administration
-  - **Guest User**: View-only dashboard access for family members or advisors
+  - **Guest User**: View-only dashboard access for family members, business partners, or advisors
 - **User Activation Workflow**: Global admin approval required for new registrations
 - **Multi-Account Isolation**: Complete data separation between account owners
 
@@ -409,6 +408,10 @@ PyCashFlow uses Flask-Migrate for database schema management:
 
 ## Professional Support
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/8b0e8c6e-c5f4-4a1f-bb8c-8e2e3f3e0f4a" alt="H3 Consulting Partners Logo" width="500">
+</p>
+
 ### H3 Consulting Partners LLC
 
 For professional installation, configuration, ongoing support, and accelerated development of PyCashFlow, contact **H3 Consulting Partners LLC**.
@@ -426,12 +429,6 @@ For professional installation, configuration, ongoing support, and accelerated d
 - **Website**: [https://h3consultingpartners.com](https://h3consultingpartners.com)
 
 H3 Consulting Partners specializes in enterprise deployments, custom feature development, and ongoing support to ensure PyCashFlow meets your organization's specific needs.
-
----
-
-## Built With
-
-[<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/PyCharm.png" alt="PyCharm logo." width="300">](https://jb.gg/OpenSourceSupport)
 
 ---
 
@@ -455,4 +452,4 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 
 ---
 
-*PyCashFlow - Professional cash flow management and forecasting for individuals and families.*
+*PyCashFlow - Professional cash flow management and forecasting for individuals, families, and small-medium businesses.*
