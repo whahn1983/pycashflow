@@ -258,7 +258,8 @@ def calc_schedule(schedules, holds, skips):
             }
             # Append the row to the DataFrame
             total_dict[len(total_dict)] = new_row
-
+    db.session.commit()
+    
     # Create DataFrame from total_dict
     if total_dict:
         total = pd.DataFrame.from_dict(total_dict, orient="index")
