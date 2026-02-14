@@ -208,11 +208,11 @@ def addskip(id):
     trans, run = update_cash(float(balance.amount), schedules, holds, skips)
     transaction = trans.loc[int(id)]
     trans_type = ""
-    if transaction[1] == "Expense":
+    if transaction['type'] == "Expense":
         trans_type = "Income"
-    elif transaction[1] == "Income":
+    elif transaction['type'] == "Income":
         trans_type = "Expense"
-    skip = Skip(name=transaction[0] + " (SKIP)", type=trans_type, amount=transaction[2], date=transaction[3], user_id=user_id)
+    skip = Skip(name=transaction['name'] + " (SKIP)", type=trans_type, amount=transaction['amount'], date=transaction['date'], user_id=user_id)
     db.session.add(skip)
     db.session.commit()
     flash("Added Skip")
