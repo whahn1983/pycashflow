@@ -344,21 +344,22 @@ def update_scenario():
 
     if request.method == 'POST':
         current = Scenario.query.filter_by(id=int(request.form['id']), user_id=user_id).first()
+        if not current:
+            flash("Scenario not found")
+            return redirect(url_for('main.scenarios'))
         existing = Scenario.query.filter_by(name=request.form['name'], user_id=user_id).first()
-        if existing:
-            if current.name != request.form['name']:
-                flash("Scenario name already exists")
-                return redirect(url_for('main.scenarios'))
-        my_data = Scenario.query.filter_by(id=int(request.form.get('id')), user_id=user_id).first()
-        my_data.name = request.form['name']
-        my_data.amount = request.form['amount']
-        my_data.type = request.form['type']
-        my_data.frequency = request.form['frequency']
+        if existing and current.name != request.form['name']:
+            flash("Scenario name already exists")
+            return redirect(url_for('main.scenarios'))
+        current.name = request.form['name']
+        current.amount = request.form['amount']
+        current.type = request.form['type']
+        current.frequency = request.form['frequency']
         startdate = request.form['startdate']
-        if (datetime.strptime(startdate, format).date() != my_data.startdate and my_data.startdate.day !=
+        if (datetime.strptime(startdate, format).date() != current.startdate and current.startdate.day !=
                 datetime.strptime(startdate, format).day):
-            my_data.firstdate = datetime.strptime(startdate, format).date()
-        my_data.startdate = datetime.strptime(startdate, format).date()
+            current.firstdate = datetime.strptime(startdate, format).date()
+        current.startdate = datetime.strptime(startdate, format).date()
         db.session.commit()
         flash("Updated Successfully")
 
