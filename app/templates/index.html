@@ -33,9 +33,17 @@
         <div class="metric-label">
             <i class="fa-solid fa-triangle-exclamation"></i> Lowest Balance (60 days)
         </div>
-        <div class="metric-value">${{ minbalance }}</div>
+        <div class="metric-value">
+            ${{ minbalance }}
+            {% if min_scenario is not none %}
+            <span style="color: #f59e0b; font-size: 0.75em; font-weight: 600;">(${{ min_scenario }})</span>
+            {% endif %}
+        </div>
         <div class="metric-sublabel">
             Monitor your cash flow carefully
+            {% if min_scenario is not none %}
+            &nbsp;&mdash;&nbsp;<span style="color: #f59e0b;">amber = with scenarios</span>
+            {% endif %}
         </div>
     </div>
 </div>

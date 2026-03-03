@@ -1,7 +1,7 @@
 from flask import request, redirect, url_for, send_from_directory, flash, send_file, Response
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Balance, User, Settings, Email, Hold, Skip, GlobalEmailSettings
+from .models import Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip, GlobalEmailSettings
 from app import db
 from datetime import datetime
 import os
@@ -57,18 +57,19 @@ def index():
     schedules = Schedule.query.filter_by(user_id=user_id).all()
     holds = Hold.query.filter_by(user_id=user_id).all()
     skips = Skip.query.filter_by(user_id=user_id).all()
+    scenarios = Scenario.query.filter_by(user_id=user_id).all()
 
-    trans, run = update_cash(float(balance.amount), schedules, holds, skips)
+    trans, run, run_scenario = update_cash(float(balance.amount), schedules, holds, skips, scenarios)
 
     # plot cash flow results
-    minbalance, graphJSON = plot_cash(run)
+    minbalance, min_scenario, graphJSON = plot_cash(run, run_scenario)
 
     if current_user.admin:
         return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
-                           minbalance=minbalance, graphJSON=graphJSON)
+                           minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON)
     else:
         return render_template('index_guest.html', title='Index', todaydate=todaydate, balance=balance.amount,
-                           minbalance=minbalance, graphJSON=graphJSON)
+                           minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON)
 
 
 @main.route('/refresh')
@@ -205,7 +206,7 @@ def addskip(id):
     holds = Hold.query.filter_by(user_id=user_id).all()
     skips = Skip.query.filter_by(user_id=user_id).all()
 
-    trans, run = update_cash(float(balance.amount), schedules, holds, skips)
+    trans, run, _ = update_cash(float(balance.amount), schedules, holds, skips)
     transaction = trans.loc[int(id)]
     trans_type = ""
     if transaction['type'] == "Expense":
@@ -290,6 +291,95 @@ def schedule_delete(id):
         flash("Deleted Successfully")
 
     return redirect(url_for('main.schedule'))
+
+
+@main.route('/scenarios')
+@login_required
+@admin_required
+def scenarios():
+    user_id = get_effective_user_id()
+    scenario = Scenario.query.filter_by(user_id=user_id).order_by(asc(extract('day', Scenario.startdate)))
+
+    return render_template('scenario_table.html', title='Scenario Table', scenario=scenario)
+
+
+@main.route('/create_scenario', methods=('GET', 'POST'))
+@login_required
+@admin_required
+def create_scenario():
+    user_id = get_effective_user_id()
+    format = '%Y-%m-%d'
+    if request.method == 'POST':
+        name = request.form['name']
+        amount = request.form['amount']
+        frequency = request.form['frequency']
+        startdate = request.form['startdate']
+        type = request.form['type']
+        scenario = Scenario(name=name,
+                            type=type,
+                            amount=amount,
+                            frequency=frequency,
+                            startdate=datetime.strptime(startdate, format).date(),
+                            firstdate=datetime.strptime(startdate, format).date(),
+                            user_id=user_id)
+        existing = Scenario.query.filter_by(name=name, user_id=user_id).first()
+        if existing:
+            flash("Scenario already exists")
+            return redirect(url_for('main.scenarios'))
+        db.session.add(scenario)
+        db.session.commit()
+        flash("Added Successfully")
+
+        return redirect(url_for('main.scenarios'))
+
+    return redirect(url_for('main.scenarios'))
+
+
+@main.route('/update_scenario', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def update_scenario():
+    user_id = get_effective_user_id()
+    format = '%Y-%m-%d'
+
+    if request.method == 'POST':
+        current = Scenario.query.filter_by(id=int(request.form['id']), user_id=user_id).first()
+        existing = Scenario.query.filter_by(name=request.form['name'], user_id=user_id).first()
+        if existing:
+            if current.name != request.form['name']:
+                flash("Scenario name already exists")
+                return redirect(url_for('main.scenarios'))
+        my_data = Scenario.query.filter_by(id=int(request.form.get('id')), user_id=user_id).first()
+        my_data.name = request.form['name']
+        my_data.amount = request.form['amount']
+        my_data.type = request.form['type']
+        my_data.frequency = request.form['frequency']
+        startdate = request.form['startdate']
+        if (datetime.strptime(startdate, format).date() != my_data.startdate and my_data.startdate.day !=
+                datetime.strptime(startdate, format).day):
+            my_data.firstdate = datetime.strptime(startdate, format).date()
+        my_data.startdate = datetime.strptime(startdate, format).date()
+        db.session.commit()
+        flash("Updated Successfully")
+
+        return redirect(url_for('main.scenarios'))
+
+    return redirect(url_for('main.scenarios'))
+
+
+@main.route('/delete_scenario/<id>')
+@login_required
+@admin_required
+def scenario_delete(id):
+    user_id = get_effective_user_id()
+    scenario = Scenario.query.filter_by(id=int(id), user_id=user_id).first()
+
+    if scenario:
+        db.session.delete(scenario)
+        db.session.commit()
+        flash("Deleted Successfully")
+
+    return redirect(url_for('main.scenarios'))
 
 
 @main.route('/favicon')
@@ -391,7 +481,7 @@ def transactions():
     holds = Hold.query.filter_by(user_id=user_id).all()
     skips = Skip.query.filter_by(user_id=user_id).all()
 
-    trans, run = update_cash(float(balance.amount), schedules, holds, skips)
+    trans, run, _ = update_cash(float(balance.amount), schedules, holds, skips)
 
     return render_template('transactions_table.html', total=trans.to_dict(orient='records'))
 
@@ -525,6 +615,9 @@ def delete_user(id):
 
             # Delete all schedules for this user
             db.session.query(Schedule).filter_by(user_id=user_id).delete()
+
+            # Delete all scenarios for this user
+            db.session.query(Scenario).filter_by(user_id=user_id).delete()
 
             # Delete all balances for this user
             db.session.query(Balance).filter_by(user_id=user_id).delete()
