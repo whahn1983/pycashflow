@@ -457,11 +457,6 @@ This project is licensed under the terms specified in the [LICENSE](LICENSE) fil
 
 **Docker Hub**: [https://hub.docker.com/r/whahn1983/pycashflow](https://hub.docker.com/r/whahn1983/pycashflow)
 
----
-
-## Version
-
-**Current Version**: 3.2.3
 
 ---
 
