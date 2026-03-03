@@ -39,6 +39,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - **Interactive Charts**: Plotly-powered interactive visualizations with zoom, pan, and hover details
 - **Minimum Balance Warnings**: Automatically identifies potential low balance periods
 - **60-Day Transaction Preview**: Detailed view of upcoming transactions with running balance calculations
+- **Scenario Modeling**: Create what-if income and expense scenarios alongside your real schedule; the dashboard chart displays a second dashed line showing the projected impact, and the lowest balance card shows the scenario minimum in amber parentheses
 
 ### Transaction Management
 - **Recurring Schedules**: Support for multiple frequencies:
@@ -268,6 +269,7 @@ PyCashFlow implements a three-tier access control system:
 
 ### Account Owner
 - **Full Cash Flow Management**: Create, edit, and delete schedules
+- **Scenario Modeling**: Build and manage what-if scenarios for financial planning
 - **Balance Management**: Manual and automated balance updates
 - **Guest User Management**: Create and manage view-only users
 - **Data Management**: Import/export transaction schedules
@@ -303,6 +305,17 @@ Create and manage recurring financial events:
 - **Income vs Expense**: Categorize transactions for accurate projections
 - **Hold Until Date**: Temporarily suspend transactions
 - **Skip Future Instances**: One-time skips without schedule deletion
+
+### Scenario Modeling
+
+Model hypothetical "what-if" financial situations without affecting your live schedule:
+
+- **Separate Scenario Table**: Create and manage scenarios independently from your real schedules
+- **Same Frequency Support**: All six frequencies (Monthly, Weekly, BiWeekly, Quarterly, Yearly, One-Time) work identically to regular schedules, including business day adjustments
+- **Dual-Line Chart**: The dashboard chart renders a solid blue line for your current schedule and a dashed amber line for schedules + scenarios, so both projections are visible simultaneously
+- **Scenario Minimum Balance**: The Lowest Balance (60 days) card displays the schedule-only minimum alongside the scenario minimum in amber e.g. `$1,200 ($850)`
+- **No Auto-Delete**: One-time scenarios that have passed are skipped in projection but never auto-deleted — remove them manually when no longer needed
+- **Full CRUD**: Edit and delete scenarios via the Scenarios page; no holds or skips needed since scenarios are purely hypothetical
 
 ### Balance Tracking
 
