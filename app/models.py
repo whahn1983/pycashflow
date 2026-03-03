@@ -38,6 +38,23 @@ class Schedule(db.Model):
     __table_args__ = (db.UniqueConstraint('user_id', 'name', name='_user_schedule_uc'),)
 
 
+class Scenario(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    amount = db.Column(db.Numeric(10, 2))
+    frequency = db.Column(db.String(100))
+    startdate = db.Column(db.Date)
+    type = db.Column(db.String(100))
+    firstdate = db.Column(db.Date)
+
+    # Relationships
+    user = db.relationship('User', backref='scenarios')
+
+    # Unique constraint per user
+    __table_args__ = (db.UniqueConstraint('user_id', 'name', name='_user_scenario_uc'),)
+
+
 class Balance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
