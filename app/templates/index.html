@@ -67,6 +67,69 @@
     </div>
 </div>
 
+<!-- AI Insights Card -->
+<div class="chart-card" style="margin-top: 1.5rem;">
+    <div class="chart-header">
+        <h2>
+            <i class="fa-solid fa-robot"></i>
+            AI Cash Flow Insights
+        </h2>
+        <div class="chart-controls" style="display: flex; align-items: center; gap: 1rem;">
+            {% if ai_last_updated %}
+            <span style="font-size: 0.8rem; color: var(--text-muted);">
+                <i class="fa-solid fa-clock"></i> Last updated: {{ ai_last_updated.strftime('%b %d, %Y %I:%M %p') }} UTC
+            </span>
+            {% endif %}
+            {% if not current_user.account_owner_id %}
+            <button class="refresh-btn" id="ai-refresh-btn" onclick="refreshAIInsights();">
+                <i class="fa-solid fa-arrows-rotate refresh-icon" id="ai-refresh-icon"></i>
+                <span>Refresh</span>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    <div class="chart-body" id="ai-insights-body">
+        {% if not has_ai_key %}
+        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+            <i class="fa-solid fa-robot" style="font-size: 2rem; margin-bottom: 0.75rem; display: block; color: #6366f1;"></i>
+            <p style="margin: 0 0 0.5rem;">AI insights are not configured yet.</p>
+            <a href="/settings" style="color: #6366f1; font-size: 0.875rem;">
+                <i class="fa-solid fa-gear"></i> Configure your OpenAI API key in Settings
+            </a>
+        </div>
+        {% elif not ai_insights_data %}
+        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+            <i class="fa-solid fa-robot" style="font-size: 2rem; margin-bottom: 0.75rem; display: block; color: #6366f1;"></i>
+            <p style="margin: 0;">No insights yet. Click <strong>Refresh</strong> to generate your first analysis.</p>
+        </div>
+        {% else %}
+        <div id="ai-insights-list">
+            {% for insight in ai_insights_data.insights %}
+            <div style="padding: 1rem; border-radius: var(--radius-md); margin-bottom: 0.75rem;
+                {% if insight.type == 'risk' %}background-color: rgba(239, 68, 68, 0.1); border-left: 4px solid var(--danger);
+                {% elif insight.type == 'pattern' %}background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--accent);
+                {% else %}background-color: rgba(16, 185, 129, 0.1); border-left: 4px solid var(--success);{% endif %}">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;">
+                    {% if insight.type == 'risk' %}
+                    <i class="fa-solid fa-triangle-exclamation" style="color: var(--danger);"></i>
+                    <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--danger);">Risk</span>
+                    {% elif insight.type == 'pattern' %}
+                    <i class="fa-solid fa-chart-line" style="color: var(--accent);"></i>
+                    <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--accent);">Pattern</span>
+                    {% else %}
+                    <i class="fa-solid fa-lightbulb" style="color: var(--success);"></i>
+                    <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--success);">Observation</span>
+                    {% endif %}
+                </div>
+                <p style="margin: 0 0 0.25rem; font-weight: 600; color: var(--text-primary);">{{ insight.title }}</p>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">{{ insight.description }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Quick Actions Section -->
 <div class="page-header" style="margin-top: 2rem;">
     <h2 class="page-title" style="font-size: 1.5rem;">Quick Actions</h2>
@@ -197,6 +260,71 @@
         let refreshButtonChart = document.getElementById("refresh-btn-chart");
         if (refreshIconChart) refreshIconChart.classList.add("loading");
         if (refreshButtonChart) refreshButtonChart.disabled = true;
+    }
+
+    // AI Insights refresh handler
+    function refreshAIInsights() {
+        const btn = document.getElementById('ai-refresh-btn');
+        const icon = document.getElementById('ai-refresh-icon');
+        const body = document.getElementById('ai-insights-body');
+
+        if (btn) btn.disabled = true;
+        if (icon) icon.classList.add('loading');
+
+        fetch('/ai_insights', {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'}})
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    body.innerHTML = '<div style="padding: 1rem; border-radius: var(--radius-md); background-color: rgba(239,68,68,0.1); border-left: 4px solid var(--danger);">' +
+                        '<i class="fa-solid fa-circle-exclamation" style="color:var(--danger);"></i> ' +
+                        '<strong style="color:var(--danger);">Error:</strong> <span style="color:var(--text-secondary);">' + data.error + '</span></div>';
+                } else if (data.insights && data.insights.length > 0) {
+                    const typeStyles = {
+                        risk: {bg: 'rgba(239,68,68,0.1)', border: 'var(--danger)', icon: 'fa-triangle-exclamation', color: 'var(--danger)', label: 'Risk'},
+                        pattern: {bg: 'rgba(59,130,246,0.1)', border: 'var(--accent)', icon: 'fa-chart-line', color: 'var(--accent)', label: 'Pattern'},
+                        observation: {bg: 'rgba(16,185,129,0.1)', border: 'var(--success)', icon: 'fa-lightbulb', color: 'var(--success)', label: 'Observation'}
+                    };
+                    let html = '<div id="ai-insights-list">';
+                    data.insights.forEach(insight => {
+                        const s = typeStyles[insight.type] || typeStyles.observation;
+                        html += '<div style="padding:1rem;border-radius:var(--radius-md);margin-bottom:0.75rem;background-color:' + s.bg + ';border-left:4px solid ' + s.border + ';">' +
+                            '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">' +
+                            '<i class="fa-solid ' + s.icon + '" style="color:' + s.color + ';"></i>' +
+                            '<span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:' + s.color + ';">' + s.label + '</span></div>' +
+                            '<p style="margin:0 0 0.25rem;font-weight:600;color:var(--text-primary);">' + insight.title + '</p>' +
+                            '<p style="margin:0;font-size:0.875rem;color:var(--text-secondary);">' + insight.description + '</p></div>';
+                    });
+                    html += '</div>';
+                    body.innerHTML = html;
+
+                    // Update the last-updated timestamp display
+                    const now = new Date();
+                    const timeStr = now.toUTCString().replace(' GMT', ' UTC');
+                    const ctrl = document.querySelector('.chart-controls span');
+                    if (ctrl) {
+                        ctrl.innerHTML = '<i class="fa-solid fa-clock"></i> Last updated: ' + timeStr;
+                    } else {
+                        const ctrlDiv = document.querySelector('.chart-controls');
+                        if (ctrlDiv) {
+                            const span = document.createElement('span');
+                            span.style = 'font-size:0.8rem;color:var(--text-muted);';
+                            span.innerHTML = '<i class="fa-solid fa-clock"></i> Last updated: ' + timeStr;
+                            ctrlDiv.insertBefore(span, ctrlDiv.firstChild);
+                        }
+                    }
+                } else {
+                    body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);">No insights were returned. Try again later.</div>';
+                }
+            })
+            .catch(err => {
+                body.innerHTML = '<div style="padding:1rem;border-radius:var(--radius-md);background-color:rgba(239,68,68,0.1);border-left:4px solid var(--danger);">' +
+                    '<i class="fa-solid fa-circle-exclamation" style="color:var(--danger);"></i> ' +
+                    '<strong style="color:var(--danger);">Error:</strong> <span style="color:var(--text-secondary);">Network error. Please try again.</span></div>';
+            })
+            .finally(() => {
+                if (btn) btn.disabled = false;
+                if (icon) icon.classList.remove('loading');
+            });
     }
 </script>
 

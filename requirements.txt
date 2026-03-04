@@ -13,3 +13,4 @@ werkzeug
 passkeys
 python-dotenv
 cryptography
+openai

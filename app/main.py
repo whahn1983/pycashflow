@@ -1,17 +1,19 @@
 from flask import request, redirect, url_for, send_from_directory, flash, send_file, Response
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip, GlobalEmailSettings
+from .models import Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip, GlobalEmailSettings, AISettings
 from app import db
 from datetime import datetime
 import os
+import json
 from sqlalchemy import desc, extract, asc
 from werkzeug.security import generate_password_hash, check_password_hash
 from .cashflow import update_cash, plot_cash
 from .auth import admin_required, global_admin_required, account_owner_required
 from .files import export, upload, version
 from .getemail import send_account_activation_notification
-from .crypto_utils import encrypt_password
+from .crypto_utils import encrypt_password, decrypt_password
+from .ai_insights import fetch_insights
 
 
 main = Blueprint('main', __name__)
@@ -65,12 +67,29 @@ def index():
     # plot cash flow results
     minbalance, min_scenario, graphJSON = plot_cash(run, run_scenario)
 
+    # Load AI insights for dashboard card (uses effective user_id so guests see owner's insights)
+    ai_config = AISettings.query.filter_by(user_id=user_id).first()
+    ai_insights_data = None
+    ai_last_updated = None
+    has_ai_key = False
+    if ai_config:
+        has_ai_key = bool(ai_config.api_key)
+        ai_last_updated = ai_config.last_updated
+        if ai_config.last_insights:
+            try:
+                ai_insights_data = json.loads(ai_config.last_insights)
+            except Exception:
+                pass
+
     if current_user.admin:
         return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
-                           minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON)
+                           minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON,
+                           ai_insights_data=ai_insights_data, ai_last_updated=ai_last_updated,
+                           has_ai_key=has_ai_key)
     else:
         return render_template('index_guest.html', title='Index', todaydate=todaydate, balance=balance.amount,
-                           minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON)
+                           minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON,
+                           ai_insights_data=ai_insights_data, ai_last_updated=ai_last_updated)
 
 
 @main.route('/refresh')
@@ -87,7 +106,9 @@ def settings():
     about = version()
 
     if current_user.admin:
-        return render_template('settings.html', about=about)
+        ai_config = AISettings.query.filter_by(user_id=current_user.id).first()
+        ai_configured = ai_config is not None and bool(ai_config.api_key)
+        return render_template('settings.html', about=about, ai_configured=ai_configured)
     else:
         return render_template('settings_guest.html', about=about)
 
@@ -910,6 +931,62 @@ def global_email_settings():
         return redirect(url_for('main.settings'))
 
     return redirect(url_for('main.settings'))
+
+
+@main.route('/ai_settings', methods=['POST'])
+@login_required
+@admin_required
+def ai_settings():
+    """Save the user's OpenAI API key (encrypted)."""
+    api_key_input = request.form.get('api_key', '').strip()
+
+    if not api_key_input:
+        flash('API key cannot be empty')
+        return redirect(url_for('main.settings'))
+
+    encrypted_key = encrypt_password(api_key_input)
+    ai_config = AISettings.query.filter_by(user_id=current_user.id).first()
+
+    if ai_config:
+        ai_config.api_key = encrypted_key
+    else:
+        ai_config = AISettings(user_id=current_user.id, api_key=encrypted_key)
+        db.session.add(ai_config)
+
+    db.session.commit()
+    flash('AI settings saved successfully')
+    return redirect(url_for('main.settings'))
+
+
+@main.route('/ai_insights', methods=['POST'])
+@login_required
+@admin_required
+def ai_insights():
+    """Query OpenAI for cash flow insights on demand and cache the result."""
+    user_id = current_user.id
+
+    ai_config = AISettings.query.filter_by(user_id=user_id).first()
+    if not ai_config or not ai_config.api_key:
+        return Response(json.dumps({'error': 'No OpenAI API key configured. Please add one in Settings.'}),
+                        status=400, mimetype='application/json')
+
+    balance_record = Balance.query.filter_by(user_id=user_id).order_by(desc(Balance.date), desc(Balance.id)).first()
+    current_balance = float(balance_record.amount) if balance_record else 0.0
+
+    schedules = Schedule.query.filter_by(user_id=user_id).all()
+    holds = Hold.query.filter_by(user_id=user_id).all()
+    skips = Skip.query.filter_by(user_id=user_id).all()
+
+    try:
+        insights_json = fetch_insights(ai_config.api_key, current_balance, schedules, holds, skips)
+    except Exception as e:
+        return Response(json.dumps({'error': str(e)}), status=500, mimetype='application/json')
+
+    ai_config.last_insights = insights_json
+    ai_config.last_updated = datetime.utcnow()
+    db.session.commit()
+
+    return Response(insights_json, status=200, mimetype='application/json')
 
 
 @main.route('/manifest.json')

@@ -124,3 +124,19 @@ class GlobalEmailSettings(db.Model):
         db.CheckConstraint('id = 1', name='single_row_check'),
     )
 
+
+class AISettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    api_key = db.Column(db.String(500), nullable=True)  # Fernet-encrypted OpenAI API key
+    last_updated = db.Column(db.DateTime, nullable=True)
+    last_insights = db.Column(db.Text, nullable=True)  # JSON string of cached insights
+
+    # Relationships
+    user = db.relationship('User', backref='ai_settings')
+
+    # One settings record per user
+    __table_args__ = (
+        db.UniqueConstraint('user_id', name='_ai_settings_user_uc'),
+    )
+
