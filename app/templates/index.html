@@ -275,27 +275,40 @@
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    body.innerHTML = '<div style="padding: 1rem; border-radius: var(--radius-md); background-color: rgba(239,68,68,0.1); border-left: 4px solid var(--danger);">' +
-                        '<i class="fa-solid fa-circle-exclamation" style="color:var(--danger);"></i> ' +
-                        '<strong style="color:var(--danger);">Error:</strong> <span style="color:var(--text-secondary);">' + data.error + '</span></div>';
+                    const errDiv = document.createElement('div');
+                    errDiv.style.cssText = 'padding:1rem;border-radius:var(--radius-md);background-color:rgba(239,68,68,0.1);border-left:4px solid var(--danger);';
+                    errDiv.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color:var(--danger);"></i> <strong style="color:var(--danger);">Error:</strong> ';
+                    const errText = document.createElement('span');
+                    errText.style.color = 'var(--text-secondary)';
+                    errText.textContent = data.error;
+                    errDiv.appendChild(errText);
+                    body.replaceChildren(errDiv);
                 } else if (data.insights && data.insights.length > 0) {
                     const typeStyles = {
                         risk: {bg: 'rgba(239,68,68,0.1)', border: 'var(--danger)', icon: 'fa-triangle-exclamation', color: 'var(--danger)', label: 'Risk'},
                         pattern: {bg: 'rgba(59,130,246,0.1)', border: 'var(--accent)', icon: 'fa-chart-line', color: 'var(--accent)', label: 'Pattern'},
                         observation: {bg: 'rgba(16,185,129,0.1)', border: 'var(--success)', icon: 'fa-lightbulb', color: 'var(--success)', label: 'Observation'}
                     };
-                    let html = '<div id="ai-insights-list">';
+                    const list = document.createElement('div');
+                    list.id = 'ai-insights-list';
                     data.insights.forEach(insight => {
                         const s = typeStyles[insight.type] || typeStyles.observation;
-                        html += '<div style="padding:1rem;border-radius:var(--radius-md);margin-bottom:0.75rem;background-color:' + s.bg + ';border-left:4px solid ' + s.border + ';">' +
-                            '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">' +
+                        const card = document.createElement('div');
+                        card.style.cssText = 'padding:1rem;border-radius:var(--radius-md);margin-bottom:0.75rem;background-color:' + s.bg + ';border-left:4px solid ' + s.border + ';';
+                        card.innerHTML = '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">' +
                             '<i class="fa-solid ' + s.icon + '" style="color:' + s.color + ';"></i>' +
-                            '<span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:' + s.color + ';">' + s.label + '</span></div>' +
-                            '<p style="margin:0 0 0.25rem;font-weight:600;color:var(--text-primary);">' + insight.title + '</p>' +
-                            '<p style="margin:0;font-size:0.875rem;color:var(--text-secondary);">' + insight.description + '</p></div>';
+                            '<span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:' + s.color + ';">' + s.label + '</span></div>';
+                        const titleP = document.createElement('p');
+                        titleP.style.cssText = 'margin:0 0 0.25rem;font-weight:600;color:var(--text-primary);';
+                        titleP.textContent = insight.title;
+                        const descP = document.createElement('p');
+                        descP.style.cssText = 'margin:0;font-size:0.875rem;color:var(--text-secondary);';
+                        descP.textContent = insight.description;
+                        card.appendChild(titleP);
+                        card.appendChild(descP);
+                        list.appendChild(card);
                     });
-                    html += '</div>';
-                    body.innerHTML = html;
+                    body.replaceChildren(list);
 
                     // Update the last-updated timestamp display
                     const now = new Date();
