@@ -6,9 +6,9 @@
 ![Docker Pulls](https://img.shields.io/docker/pulls/whahn1983/pycashflow)
 ![GitHub License](https://img.shields.io/github/license/whahn1983/pycashflow)
 
-**A comprehensive Python Flask application for cash flow forecasting, transaction management, and financial planning.**
+**A comprehensive Python Flask application for cash flow forecasting, transaction management, AI-powered insights, and financial planning.**
 
-PyCashFlow is a powerful, multi-user web application designed to help individuals, families, and small-medium businesses manage their finances through intelligent cash flow forecasting, recurring transaction scheduling, and automated balance tracking. With support for up to one year of cash flow projections, interactive visualizations, and automatic email-based balance updates, PyCashFlow provides a complete solution for financial planning and management.
+PyCashFlow is a powerful, multi-user web application designed to help individuals, families, and small-medium businesses manage their finances through intelligent cash flow forecasting, recurring transaction scheduling, and automated balance tracking. With support for up to one year of cash flow projections, interactive visualizations, AI-generated insights via OpenAI, and automatic email-based balance updates, PyCashFlow provides a complete solution for financial planning and management.
 
 <img width="912" height="880" alt="PyCashFlow Dashboard" src="https://github.com/user-attachments/assets/72acb38c-1e60-474e-8d86-b25854d83e59" />
 
@@ -24,6 +24,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - [Configuration](#configuration)
 - [User Roles & Access Control](#user-roles--access-control)
 - [Core Capabilities](#core-capabilities)
+- [AI Insights](#ai-insights)
 - [Email Integration](#email-integration)
 - [Data Management](#data-management)
 - [Updates & Maintenance](#updates--maintenance)
@@ -57,6 +58,14 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
   - **Guest User**: View-only dashboard access for family members, business partners, or advisors
 - **User Activation Workflow**: Global admin approval required for new registrations
 - **Multi-Account Isolation**: Complete data separation between account owners
+
+### AI-Powered Cash Flow Insights
+- **OpenAI Integration**: On-demand analysis of your 90-day cash flow projection via GPT-4o-mini
+- **Typed Insights**: Categorized as **Risk**, **Pattern**, or **Observation** with color-coded badges
+- **On-Demand Refresh**: Insights are only generated when you click Refresh, keeping API costs minimal
+- **Staleness Indicator**: Last-updated timestamp shown so you always know how current the analysis is
+- **Secure Key Storage**: Your OpenAI API key is encrypted at rest using the same Fernet/APP_SECRET pattern as email passwords
+- **Guest Visibility**: Cached insights are visible to guest users (view-only); only account owners can trigger a refresh
 
 ### Automated Balance Updates
 - **IMAP Email Integration**: Automatically extract balance information from bank emails
@@ -99,6 +108,10 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - **Werkzeug**: Scrypt password hashing
 - **Corbado SDK**: Passkey authentication (optional)
 - **python-dotenv**: Secure environment variable management
+
+### AI
+- **OpenAI Python SDK**: GPT-4o-mini integration for cash flow insights
+- **cryptography (Fernet)**: Encrypted API key storage
 
 ### Email & Notifications
 - **IMAPLIB**: Email retrieval from mail servers
@@ -273,6 +286,7 @@ PyCashFlow implements a three-tier access control system:
 - **Balance Management**: Manual and automated balance updates
 - **Guest User Management**: Create and manage view-only users
 - **Data Management**: Import/export transaction schedules
+- **AI Insights**: Configure OpenAI API key and refresh cash flow analysis on demand
 
 ### Guest User
 - **Dashboard Access Only**: View cash flow chart and current balance
@@ -324,6 +338,41 @@ Multiple methods for keeping your balance current:
 - **Manual Entry**: Set balance for any specific date
 - **Email Import**: Automatic extraction from bank notification emails
 - **Historical Tracking**: View balance history over time
+
+---
+
+## AI Insights
+
+PyCashFlow integrates with the OpenAI API to provide on-demand cash flow analysis directly on your dashboard.
+
+### How It Works
+
+1. The account owner adds their OpenAI API key in **Settings → AI Insights**
+2. The key is encrypted using Fernet symmetric encryption (same `APP_SECRET` used for email passwords) before being stored in the database
+3. On the dashboard, click **Refresh** to trigger a live query to `gpt-4o-mini`
+4. The AI analyzes a 90-day projection of your schedule (not scenarios) including:
+   - Current balance
+   - Schedule of recurring transactions (name, amount, frequency, type)
+   - Lowest projected balance within 90 days
+5. Results are cached in the database and displayed as color-coded insight cards
+6. Guest users can view cached insights but cannot trigger a refresh
+
+### Insight Types
+
+| Type | Color | Meaning |
+|------|-------|---------|
+| **Risk** | Red | Potential cash flow shortfalls or timing problems |
+| **Pattern** | Blue | Recurring patterns in your transaction schedule |
+| **Observation** | Green | General financial observations about your projection |
+
+### Configuration
+
+1. Obtain an API key from [platform.openai.com](https://platform.openai.com)
+2. Navigate to **Settings → AI Insights → Configure API Key**
+3. Enter your `sk-...` key and save
+4. Return to the dashboard and click **Refresh** to generate your first analysis
+
+> **Note**: AI queries are only made when you click Refresh, keeping costs minimal. The last-updated timestamp on the card shows how stale the cached results are.
 
 ---
 
