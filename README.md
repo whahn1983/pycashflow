@@ -10,7 +10,7 @@
 
 PyCashFlow is a powerful, multi-user web application designed to help individuals, families, and small-medium businesses manage their finances through intelligent cash flow forecasting, recurring transaction scheduling, and automated balance tracking. With support for up to one year of cash flow projections, interactive visualizations, AI-generated insights via OpenAI, and automatic email-based balance updates, PyCashFlow provides a complete solution for financial planning and management.
 
-<img width="912" height="880" alt="PyCashFlow Dashboard" src="https://github.com/user-attachments/assets/72acb38c-1e60-474e-8d86-b25854d83e59" />
+<img width="1447" height="1179" alt="pycashflow_screenshot" src="https://github.com/user-attachments/assets/caf9082f-8650-4964-a1e2-b833940dc16d" />
 
 ---
 
