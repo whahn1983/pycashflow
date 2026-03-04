@@ -67,6 +67,48 @@
     </div>
 </div>
 
+{% if ai_insights_data %}
+<!-- AI Insights Card (view-only for guests) -->
+<div class="chart-card" style="margin-top: 1.5rem;">
+    <div class="chart-header">
+        <h2>
+            <i class="fa-solid fa-robot"></i>
+            AI Cash Flow Insights
+        </h2>
+        {% if ai_last_updated %}
+        <div class="chart-controls">
+            <span style="font-size: 0.8rem; color: var(--text-muted);">
+                <i class="fa-solid fa-clock"></i> Last updated: {{ ai_last_updated.strftime('%b %d, %Y %I:%M %p') }} UTC
+            </span>
+        </div>
+        {% endif %}
+    </div>
+    <div class="chart-body">
+        {% for insight in ai_insights_data.insights %}
+        <div style="padding: 1rem; border-radius: var(--radius-md); margin-bottom: 0.75rem;
+            {% if insight.type == 'risk' %}background-color: rgba(239, 68, 68, 0.1); border-left: 4px solid var(--danger);
+            {% elif insight.type == 'pattern' %}background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--accent);
+            {% else %}background-color: rgba(16, 185, 129, 0.1); border-left: 4px solid var(--success);{% endif %}">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;">
+                {% if insight.type == 'risk' %}
+                <i class="fa-solid fa-triangle-exclamation" style="color: var(--danger);"></i>
+                <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--danger);">Risk</span>
+                {% elif insight.type == 'pattern' %}
+                <i class="fa-solid fa-chart-line" style="color: var(--accent);"></i>
+                <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--accent);">Pattern</span>
+                {% else %}
+                <i class="fa-solid fa-lightbulb" style="color: var(--success);"></i>
+                <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--success);">Observation</span>
+                {% endif %}
+            </div>
+            <p style="margin: 0 0 0.25rem; font-weight: 600; color: var(--text-primary);">{{ insight.title }}</p>
+            <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">{{ insight.description }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Plotly Chart Scripts -->
 <head>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>

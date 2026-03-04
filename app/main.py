@@ -1,17 +1,19 @@
 from flask import request, redirect, url_for, send_from_directory, flash, send_file, Response
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip, GlobalEmailSettings
+from .models import Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip, GlobalEmailSettings, AISettings
 from app import db
 from datetime import datetime
 import os
+import json
+from dateutil.relativedelta import relativedelta
 from sqlalchemy import desc, extract, asc
 from werkzeug.security import generate_password_hash, check_password_hash
 from .cashflow import update_cash, plot_cash
 from .auth import admin_required, global_admin_required, account_owner_required
 from .files import export, upload, version
 from .getemail import send_account_activation_notification
-from .crypto_utils import encrypt_password
+from .crypto_utils import encrypt_password, decrypt_password
 
 
 main = Blueprint('main', __name__)
@@ -65,12 +67,29 @@ def index():
     # plot cash flow results
     minbalance, min_scenario, graphJSON = plot_cash(run, run_scenario)
 
+    # Load AI insights for dashboard card (uses effective user_id so guests see owner's insights)
+    ai_config = AISettings.query.filter_by(user_id=user_id).first()
+    ai_insights_data = None
+    ai_last_updated = None
+    has_ai_key = False
+    if ai_config:
+        has_ai_key = bool(ai_config.api_key)
+        ai_last_updated = ai_config.last_updated
+        if ai_config.last_insights:
+            try:
+                ai_insights_data = json.loads(ai_config.last_insights)
+            except Exception:
+                pass
+
     if current_user.admin:
         return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
-                           minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON)
+                           minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON,
+                           ai_insights_data=ai_insights_data, ai_last_updated=ai_last_updated,
+                           has_ai_key=has_ai_key)
     else:
         return render_template('index_guest.html', title='Index', todaydate=todaydate, balance=balance.amount,
-                           minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON)
+                           minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON,
+                           ai_insights_data=ai_insights_data, ai_last_updated=ai_last_updated)
 
 
 @main.route('/refresh')
@@ -87,7 +106,9 @@ def settings():
     about = version()
 
     if current_user.admin:
-        return render_template('settings.html', about=about)
+        ai_config = AISettings.query.filter_by(user_id=current_user.id).first()
+        ai_configured = ai_config is not None and bool(ai_config.api_key)
+        return render_template('settings.html', about=about, ai_configured=ai_configured)
     else:
         return render_template('settings_guest.html', about=about)
 
@@ -910,6 +931,150 @@ def global_email_settings():
         return redirect(url_for('main.settings'))
 
     return redirect(url_for('main.settings'))
+
+
+@main.route('/ai_settings', methods=['POST'])
+@login_required
+@account_owner_required
+def ai_settings():
+    """Save the user's OpenAI API key (encrypted)."""
+    api_key_input = request.form.get('api_key', '').strip()
+
+    if not api_key_input:
+        flash('API key cannot be empty')
+        return redirect(url_for('main.settings'))
+
+    encrypted_key = encrypt_password(api_key_input)
+    ai_config = AISettings.query.filter_by(user_id=current_user.id).first()
+
+    if ai_config:
+        ai_config.api_key = encrypted_key
+    else:
+        ai_config = AISettings(user_id=current_user.id, api_key=encrypted_key)
+        db.session.add(ai_config)
+
+    db.session.commit()
+    flash('AI settings saved successfully')
+    return redirect(url_for('main.settings'))
+
+
+@main.route('/ai_insights', methods=['POST'])
+@login_required
+@account_owner_required
+def ai_insights():
+    """Query OpenAI for cash flow insights on demand and cache the result."""
+    from openai import OpenAI
+
+    user_id = current_user.id
+
+    ai_config = AISettings.query.filter_by(user_id=user_id).first()
+    if not ai_config or not ai_config.api_key:
+        return Response(json.dumps({'error': 'No OpenAI API key configured. Please add one in Settings.'}),
+                        status=400, mimetype='application/json')
+
+    try:
+        api_key = decrypt_password(ai_config.api_key)
+    except Exception:
+        return Response(json.dumps({'error': 'Failed to decrypt API key. Please re-save your key in Settings.'}),
+                        status=500, mimetype='application/json')
+
+    # Gather cash flow data
+    balance_record = Balance.query.filter_by(user_id=user_id).order_by(desc(Balance.date), desc(Balance.id)).first()
+    current_balance = float(balance_record.amount) if balance_record else 0.0
+
+    schedules = Schedule.query.filter_by(user_id=user_id).all()
+    holds = Hold.query.filter_by(user_id=user_id).all()
+    skips = Skip.query.filter_by(user_id=user_id).all()
+
+    # Calculate 90-day projection using schedule only (no scenarios)
+    _, run, _ = update_cash(current_balance, schedules, holds, skips, [])
+
+    # Find lowest projected balance within 90 days
+    todaydate = datetime.today().date()
+    horizon = todaydate + relativedelta(days=90)
+
+    min_amount = current_balance
+    min_date = str(todaydate)
+    if not run.empty:
+        run_copy = run.copy()
+        run_copy['date_val'] = run_copy['date'].apply(
+            lambda d: d if hasattr(d, 'year') else datetime.strptime(str(d), '%Y-%m-%d').date()
+        )
+        run_90 = run_copy[run_copy['date_val'] <= horizon]
+        if not run_90.empty:
+            run_90 = run_90.copy()
+            run_90['amount'] = run_90['amount'].astype(float)
+            min_idx = run_90['amount'].idxmin()
+            min_amount = float(run_90.loc[min_idx, 'amount'])
+            min_date = str(run_90.loc[min_idx, 'date_val'])
+
+    # Build schedule table for the prompt payload
+    schedule_table = []
+    for s in schedules:
+        schedule_table.append({
+            'name': s.name,
+            'amount': float(s.amount),
+            'frequency': s.frequency.lower() if s.frequency else 'onetime',
+            'next_date': str(s.startdate) if s.startdate else str(todaydate),
+            'type': 'income' if s.type == 'Income' else 'expense'
+        })
+
+    payload = {
+        'analysis_horizon_days': 90,
+        'current_balance': current_balance,
+        'lowest_projected_balance': {
+            'amount': min_amount,
+            'date': min_date
+        },
+        'schedule_table': schedule_table
+    }
+
+    system_prompt = (
+        "You are a financial projection assistant analyzing a projected cash balance and a schedule of future transactions.\n\n"
+        "The data represents projected cash flow, not actual bank transactions.\n\n"
+        "Your task is to identify potential cash flow risks, patterns in the schedule, and helpful financial insights.\n\n"
+        "Rules:\n"
+        "- Only use the data provided.\n"
+        "- Do not assume any additional income, expenses, or account information.\n"
+        "- Focus on timing risks, recurring expense patterns, and large transactions.\n"
+        "- Keep explanations concise and practical.\n"
+        "- Do not provide tax, legal, or investment advice.\n"
+        "- Reference specific transactions if they appear relevant.\n"
+        "- If the provided data does not support a clear insight, return fewer insights rather than guessing.\n\n"
+        "Return results as JSON with this structure:\n\n"
+        "{\n"
+        '  "insights": [\n'
+        "    {\n"
+        '      "type": "risk | pattern | observation",\n'
+        '      "title": "Short descriptive title",\n'
+        '      "description": "1-2 sentence explanation referencing the projection data"\n'
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        "Return 2\u20134 insights maximum."
+    )
+
+    try:
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model='gpt-4o-mini',
+            messages=[
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': json.dumps(payload)}
+            ],
+            response_format={'type': 'json_object'}
+        )
+        insights_json = response.choices[0].message.content
+
+        # Cache results
+        ai_config.last_insights = insights_json
+        ai_config.last_updated = datetime.utcnow()
+        db.session.commit()
+
+        return Response(insights_json, status=200, mimetype='application/json')
+
+    except Exception as e:
+        return Response(json.dumps({'error': str(e)}), status=500, mimetype='application/json')
 
 
 @main.route('/manifest.json')
