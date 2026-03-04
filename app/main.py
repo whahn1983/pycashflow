@@ -935,7 +935,7 @@ def global_email_settings():
 
 @main.route('/ai_settings', methods=['POST'])
 @login_required
-@account_owner_required
+@admin_required
 def ai_settings():
     """Save the user's OpenAI API key (encrypted)."""
     api_key_input = request.form.get('api_key', '').strip()
@@ -960,7 +960,7 @@ def ai_settings():
 
 @main.route('/ai_insights', methods=['POST'])
 @login_required
-@account_owner_required
+@admin_required
 def ai_insights():
     """Query OpenAI for cash flow insights on demand and cache the result."""
     user_id = current_user.id
