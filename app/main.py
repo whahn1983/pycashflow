@@ -11,6 +11,7 @@ from .cashflow import update_cash, plot_cash
 from .auth import admin_required, global_admin_required, account_owner_required
 from .files import export, upload, version
 from .getemail import send_account_activation_notification
+from .crypto_utils import encrypt_password
 
 
 main = Blueprint('main', __name__)
@@ -499,7 +500,7 @@ def email():
 
         if emailsettings:
             email = request.form['email']
-            password = request.form['password']
+            password = encrypt_password(request.form['password'])
             server = request.form['server']
             subjectstr = request.form['subject_str']
             startstr = request.form['start_str']
@@ -515,7 +516,7 @@ def email():
             return redirect(url_for('main.settings'))
 
         email = request.form['email']
-        password = request.form['password']
+        password = encrypt_password(request.form['password'])
         server = request.form['server']
         subjectstr = request.form['subject_str']
         startstr = request.form['start_str']
@@ -892,14 +893,14 @@ def global_email_settings():
         if settings:
             # Update existing settings
             settings.email = email
-            settings.password = password
+            settings.password = encrypt_password(password)
             settings.smtp_server = smtp_server
         else:
             # Create new settings
             settings = GlobalEmailSettings(
                 id=1,  # Enforce single row
                 email=email,
-                password=password,
+                password=encrypt_password(password),
                 smtp_server=smtp_server
             )
             db.session.add(settings)

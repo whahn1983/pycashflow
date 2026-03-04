@@ -23,6 +23,7 @@ import smtplib
 from datetime import datetime, timedelta
 from app import db
 from app.models import User, Email, Balance, GlobalEmailSettings
+from app.crypto_utils import decrypt_password
 
 
 def process_email_balances():
@@ -40,7 +41,7 @@ def process_email_balances():
     for user, email_config in users_with_email:
         user_id = user.id
         username = email_config.email
-        password = email_config.password
+        password = decrypt_password(email_config.password)
         imap_server = email_config.server
         subjectstr = email_config.subjectstr
         startstr = email_config.startstr
@@ -179,7 +180,7 @@ def send_new_user_notification(new_user_name, new_user_email):
 
         # Extract email credentials from global settings
         from_email = email_settings.email
-        password = email_settings.password
+        password = decrypt_password(email_settings.password)
         smtp_server = email_settings.smtp_server
 
         # Create the email message
@@ -284,7 +285,7 @@ def send_account_activation_notification(user_name, user_email):
 
         # Extract email credentials from global settings
         from_email = email_settings.email
-        password = email_settings.password
+        password = decrypt_password(email_settings.password)
         smtp_server = email_settings.smtp_server
 
         # Create the email message
