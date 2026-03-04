@@ -103,7 +103,7 @@ class Email(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     email = db.Column(db.String(100), nullable=False)
-    password = db.Column(db.String(100))
+    password = db.Column(db.String(500))
     server = db.Column(db.String(100))
     subjectstr = db.Column(db.String(100))
     startstr = db.Column(db.String(100))
@@ -116,7 +116,7 @@ class Email(db.Model):
 class GlobalEmailSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(100), nullable=False)
-    password = db.Column(db.String(100), nullable=False)
+    password = db.Column(db.String(500), nullable=False)
     smtp_server = db.Column(db.String(100), nullable=False)
 
     # Constraints - only one global email settings record allowed
