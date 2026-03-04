@@ -538,15 +538,7 @@ def plot_cash(run, run_scenario=None):
         )
     )
 
-    traces = [
-        go.Scatter(
-            name='Schedule',
-            x=df['date'].values.tolist(),
-            y=df['amount'].values.tolist(),
-            mode='lines',
-            line=dict(shape='spline', smoothing=0.8, color='#3b82f6')
-        )
-    ]
+    traces = []
 
     if df_s is not None:
         traces.append(
@@ -558,6 +550,16 @@ def plot_cash(run, run_scenario=None):
                 line=dict(shape='spline', smoothing=0.8, color='#f59e0b', dash='dash')
             )
         )
+
+    traces.append(
+        go.Scatter(
+            name='Schedule',
+            x=df['date'].values.tolist(),
+            y=df['amount'].values.tolist(),
+            mode='lines',
+            line=dict(shape='spline', smoothing=0.8, color='#3b82f6')
+        )
+    )
 
     fig = go.Figure(data=traces)
     fig.update_layout(layout)
