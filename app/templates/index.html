@@ -74,7 +74,7 @@
             <i class="fa-solid fa-robot"></i>
             AI Cash Flow Insights
         </h2>
-        <div class="chart-controls" style="display: flex; align-items: center; gap: 1rem;">
+        <div id="ai-chart-controls" class="chart-controls" style="display: flex; align-items: center; gap: 1rem;">
             {% if ai_last_updated %}
             <span id="ai-last-updated-ts" data-utc="{{ ai_last_updated.strftime('%Y-%m-%dT%H:%M:%S') }}Z"
                   style="font-size: 0.8rem; color: var(--text-muted);">
@@ -344,7 +344,7 @@
                     if (tsEl) {
                         tsEl.innerHTML = '<i class="fa-solid fa-clock"></i> Last updated: ' + timeStr;
                     } else {
-                        const ctrlDiv = document.querySelector('.chart-controls');
+                        const ctrlDiv = document.getElementById('ai-chart-controls');
                         if (ctrlDiv) {
                             tsEl = document.createElement('span');
                             tsEl.id = 'ai-last-updated-ts';
