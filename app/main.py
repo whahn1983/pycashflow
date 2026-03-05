@@ -104,14 +104,23 @@ def refresh():
 def settings():
     # get about info - available to all users
     about = version()
+    user_id = get_effective_user_id()
 
     if current_user.admin:
         ai_config = AISettings.query.filter_by(user_id=current_user.id).first()
         ai_configured = ai_config is not None and bool(ai_config.api_key)
         ai_model = ai_config.model_version if ai_config else ''
-        return render_template('settings.html', about=about, ai_configured=ai_configured, ai_model=ai_model)
+        email_config = Email.query.filter_by(user_id=user_id).first()
+        global_email_config = GlobalEmailSettings.query.first()
+        signup_setting = Settings.query.filter_by(name='signup').first()
+        return render_template('settings.html', about=about, ai_configured=ai_configured, ai_model=ai_model,
+                             email_config=email_config, global_email_config=global_email_config,
+                             signup_setting=signup_setting)
     else:
-        return render_template('settings_guest.html', about=about)
+        email_config = Email.query.filter_by(user_id=user_id).first()
+        signup_setting = Settings.query.filter_by(name='signup').first()
+        return render_template('settings_guest.html', about=about, email_config=email_config,
+                             signup_setting=signup_setting)
 
 
 @main.route('/schedule')
@@ -522,13 +531,14 @@ def email():
 
         if emailsettings:
             email = request.form['email']
-            password = encrypt_password(request.form['password'])
+            password_input = request.form.get('password', '').strip()
             server = request.form['server']
             subjectstr = request.form['subject_str']
             startstr = request.form['start_str']
             endstr = request.form['end_str']
             emailsettings.email = email
-            emailsettings.password = password
+            if password_input:
+                emailsettings.password = encrypt_password(password_input)
             emailsettings.server = server
             emailsettings.subjectstr = subjectstr
             emailsettings.startstr = startstr
@@ -915,7 +925,8 @@ def global_email_settings():
         if settings:
             # Update existing settings
             settings.email = email
-            settings.password = encrypt_password(password)
+            if password:
+                settings.password = encrypt_password(password)
             settings.smtp_server = smtp_server
         else:
             # Create new settings
