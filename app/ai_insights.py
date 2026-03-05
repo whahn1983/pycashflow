@@ -191,7 +191,7 @@ def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips):
 
     client = OpenAI(api_key=api_key)
     response = client.chat.completions.create(
-        model='gpt-4o-mini',
+        model='gpt-5.4',
         messages=[
             {'role': 'system', 'content': SYSTEM_PROMPT},
             {'role': 'user', 'content': json.dumps(payload)},
