@@ -28,7 +28,10 @@ SYSTEM_PROMPT = (
     "- minimum_safe_balance (number): the net expense exposure in the 14 days leading up to the lowest balance point — total scheduled "
     "expenses in that window minus any income arriving in the same window (floored at zero). A low balance observation is warranted when "
     "the lowest_projected_balance falls below this threshold. This represents less than two weeks of scheduled expenses and indicates "
-    "meaningful financial stress regardless of whether the balance goes negative.\n\n"
+    "meaningful financial stress regardless of whether the balance goes negative.\n"
+    "- low_balance_observation_warranted (boolean): pre-calculated server-side flag. True only when lowest_projected_balance.amount is "
+    "strictly less than minimum_safe_balance. Do not generate any low balance observation unless this field is explicitly true. Do not "
+    "re-evaluate or override this flag using your own comparison.\n\n"
     "Your task is to identify potential cash flow risks, patterns in the schedule, and helpful financial insights.\n\n"
     "Rules:\n"
     "- Only use the data provided.\n"
@@ -44,14 +47,8 @@ SYSTEM_PROMPT = (
     " not obvious from the balance curve alone.\n"
     "- A shortfall only exists when the projected balance goes negative. A balance that drops from the starting level but remains positive"
     " at all times is never a risk, regardless of how much it drops or how close it gets to zero.\n"
-    "- A low balance observation is warranted when the lowest_projected_balance falls below the minimum_safe_balance threshold."
-    " This signals meaningful financial stress even without a negative balance — it means the buffer is smaller than the net expense"
-    " pressure in the two weeks before the trough. If minimum_safe_balance is near zero (because income in the window offsets expenses),"
-    " do not surface a low balance observation even if the balance dips.\n"
-    "- Before surfacing any low balance observation, explicitly verify the comparison numerically: lowest_projected_balance.amount"
-    " must be strictly less than minimum_safe_balance. For example, if lowest_projected_balance.amount is 2850.94 and"
-    " minimum_safe_balance is 486.38, then 2850.94 > 486.38 and no low balance observation should be surfaced. Do not"
-    " surface a low balance observation if lowest_projected_balance.amount is greater than or equal to minimum_safe_balance.\n"
+    "- A low balance observation is warranted only when low_balance_observation_warranted is true. Do not generate one otherwise,"
+    " regardless of how the balance looks or how close it gets to the minimum_safe_balance threshold.\n"
     "- When referencing dates, use a friendly format (e.g. March 12th) rather than ISO format. Omit the year unless the projection"
     " spans multiple calendar years.\n"
     "- Do not surface patterns unless the combined value of the transactions involved exceeds 10% of the current_balance. Small recurring"
@@ -62,6 +59,8 @@ SYSTEM_PROMPT = (
     " by more than 14 days are not a cluster. Do not group transactions from different months into the same cluster.\n"
     "- When describing timing relationships between transactions, always verify chronological order before writing. An event on an"
     " earlier date cannot be described as occurring 'shortly after' an event on a later date.\n"
+    "- Only use relative phrases like 'shortly after', 'soon after', or 'right after' when two events are within 7 days of each other."
+    " For events separated by 8 or more days, use specific dates or neutral phrasing instead (e.g. 'later in the month', 'three weeks later').\n"
     "- It is acceptable to return an empty insights array if the data does not support any meaningful findings.\n"
     "- Use projected_daily_balances as ground truth for all balance values. Use schedule_table only to identify which transactions"
     " explain balance movements; never recalculate balances independently from the schedule.\n"
@@ -90,10 +89,15 @@ SYSTEM_PROMPT = (
     "    }\n"
     "  ]\n"
     "}\n\n"
-    "The severity field is required for every insight but do not allow severity to drive whether an insight exists, use only the defined rules above. "
-    "Use 'high' for risks driven by a specific identifiable transaction or timing conflict that could be acted on (e.g. a large expense "
-    "landing before an income deposit). Use 'medium' for patterns that create stress but are harder to act on directly (e.g. recurring expenses "
-    "clustering in the same window). Use 'low' for observations that are noteworthy but unlikely to require action.\n\n"
+    "The severity field is required for every insight but do not allow severity to drive whether an insight exists — use only the defined rules above.\n"
+    "Severity reflects financial urgency and actionability. It is independent of insight type: a pattern can be 'high', an observation can be 'medium'.\n"
+    "Do not assign severity mechanically based on type. Instead:\n"
+    "- Use 'high' when there is a specific, near-term event or timing conflict where the user could take a concrete action right now to avoid a problem "
+    "(e.g. a large expense landing the day before an income deposit, a balance that will go negative on a specific date).\n"
+    "- Use 'medium' when the insight reflects real financial pressure or structural stress that is harder to resolve in a single step "
+    "(e.g. multiple large expenses clustering in the same week, sustained drawdown across several pay cycles). The issue is real but not a single actionable event.\n"
+    "- Use 'low' when the insight is worth noting but unlikely to require any user action — either because the situation is already planned for, "
+    "already visible in the balance curve, or there is nothing practical to do about it.\n\n"
     "Return up to 4 insights maximum but 0 is acceptable if the data does not support any meaningful findings."
 )
 
@@ -174,12 +178,15 @@ def build_payload(current_balance, schedules, holds, skips):
         for s in schedules
     ]
 
+    low_balance_observation_warranted = min_amount < minimum_safe_balance
+
     return {
         'today': str(todaydate),
         'analysis_horizon_days': 90,
         'current_balance': current_balance,
         'lowest_projected_balance': {'amount': min_amount, 'date': min_date},
         'minimum_safe_balance': minimum_safe_balance,
+        'low_balance_observation_warranted': low_balance_observation_warranted,
         'schedule_table': schedule_table,
         'projected_daily_balances': projected_daily_balances,
     }
