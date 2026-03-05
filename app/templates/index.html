@@ -76,8 +76,9 @@
         </h2>
         <div class="chart-controls" style="display: flex; align-items: center; gap: 1rem;">
             {% if ai_last_updated %}
-            <span style="font-size: 0.8rem; color: var(--text-muted);">
-                <i class="fa-solid fa-clock"></i> Last updated: {{ ai_last_updated.strftime('%b %d, %Y %I:%M %p') }} UTC
+            <span id="ai-last-updated-ts" data-utc="{{ ai_last_updated.strftime('%Y-%m-%dT%H:%M:%S') }}Z"
+                  style="font-size: 0.8rem; color: var(--text-muted);">
+                <i class="fa-solid fa-clock"></i> Last updated: {{ ai_last_updated.strftime('%b %d, %Y %I:%M %p') }}
             </span>
             {% endif %}
             {% if not current_user.account_owner_id %}
@@ -338,7 +339,7 @@
 
                     // Update the last-updated timestamp display
                     const now = new Date();
-                    const timeStr = now.toUTCString().replace(' GMT', ' UTC');
+                    const timeStr = now.toLocaleString([], {year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
                     const ctrl = document.querySelector('.chart-controls span');
                     if (ctrl) {
                         ctrl.innerHTML = '<i class="fa-solid fa-clock"></i> Last updated: ' + timeStr;
@@ -365,6 +366,16 @@
                 if (icon) icon.classList.remove('loading');
             });
     }
+
+    // Convert the server-rendered UTC timestamp to browser local time on page load
+    (function () {
+        const el = document.getElementById('ai-last-updated-ts');
+        if (!el) return;
+        const utc = el.getAttribute('data-utc');
+        if (!utc) return;
+        const localStr = new Date(utc).toLocaleString([], {year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+        el.innerHTML = '<i class="fa-solid fa-clock"></i> Last updated: ' + localStr;
+    })();
 </script>
 
 {% endblock %}
