@@ -942,19 +942,22 @@ def ai_settings():
     api_key_input = request.form.get('api_key', '').strip()
     model_input = request.form.get('model_version', '').strip()
 
-    if not api_key_input:
-        flash('API key cannot be empty')
-        return redirect(url_for('main.settings'))
-
-    encrypted_key = encrypt_password(api_key_input)
     ai_config = AISettings.query.filter_by(user_id=current_user.id).first()
 
-    if ai_config:
-        ai_config.api_key = encrypted_key
+    if not api_key_input:
+        if not ai_config or not ai_config.api_key:
+            flash('API key cannot be empty')
+            return redirect(url_for('main.settings'))
+        # No new key provided but one is already stored — update model only
         ai_config.model_version = model_input or None
     else:
-        ai_config = AISettings(user_id=current_user.id, api_key=encrypted_key, model_version=model_input or None)
-        db.session.add(ai_config)
+        encrypted_key = encrypt_password(api_key_input)
+        if ai_config:
+            ai_config.api_key = encrypted_key
+            ai_config.model_version = model_input or None
+        else:
+            ai_config = AISettings(user_id=current_user.id, api_key=encrypted_key, model_version=model_input or None)
+            db.session.add(ai_config)
 
     db.session.commit()
     flash('AI settings saved successfully')
