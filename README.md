@@ -60,7 +60,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - **Multi-Account Isolation**: Complete data separation between account owners
 
 ### AI-Powered Cash Flow Insights
-- **OpenAI Integration**: On-demand analysis of your 90-day cash flow projection via GPT-4o-mini
+- **OpenAI Integration**: On-demand analysis of your 90-day cash flow projection via OpenAI
 - **Typed Insights**: Categorized as **Risk**, **Pattern**, or **Observation** with color-coded badges
 - **On-Demand Refresh**: Insights are only generated when you click Refresh, keeping API costs minimal
 - **Staleness Indicator**: Last-updated timestamp shown so you always know how current the analysis is
@@ -110,7 +110,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - **python-dotenv**: Secure environment variable management
 
 ### AI
-- **OpenAI Python SDK**: GPT-4o-mini integration for cash flow insights
+- **OpenAI Python SDK**: OpenAI integration for cash flow insights
 - **cryptography (Fernet)**: Encrypted API key storage
 
 ### Email & Notifications
@@ -349,7 +349,7 @@ PyCashFlow integrates with the OpenAI API to provide on-demand cash flow analysi
 
 1. The account owner adds their OpenAI API key in **Settings → AI Insights**
 2. The key is encrypted using Fernet symmetric encryption (same `APP_SECRET` used for email passwords) before being stored in the database
-3. On the dashboard, click **Refresh** to trigger a live query to `gpt-4o-mini`
+3. On the dashboard, click **Refresh** to trigger a live query to OpenAI
 4. The AI analyzes a 90-day projection of your schedule (not scenarios) including:
    - Current balance
    - Schedule of recurring transactions (name, amount, frequency, type)
