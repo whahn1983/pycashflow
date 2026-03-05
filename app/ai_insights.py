@@ -42,6 +42,7 @@ SYSTEM_PROMPT = (
     "- risk: a specific future event or balance level that could cause a shortfall or financial stress.\n"
     "- pattern: a recurring behaviour visible across multiple transactions (e.g. several large expenses cluster at month-end).\n"
     "- observation: a one-off or general fact about the projection that is noteworthy but not a recurring pattern or an immediate risk.\n\n"
+    "Insights may all be the same type if that is what the data supports. Do not force a mix of risk, pattern, and observation types.\n\n"
     "Return results as JSON with this structure:\n\n"
     "{\n"
     '  "insights": [\n'
