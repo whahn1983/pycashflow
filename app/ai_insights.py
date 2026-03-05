@@ -55,7 +55,7 @@ SYSTEM_PROMPT = (
     "  ]\n"
     "}\n\n"
     "The severity field is required for every insight. Use 'high' for risks that could result in a negative balance "
-    "or shortfall above $1,000, 'medium' for shortfalls under $1,000 or patterns that may escalate, "
+    "or a balance below $1,000, 'medium' for risks that could result in a balance under $2,000 or patterns that may escalate, "
     "and 'low' for minor observations with limited financial impact.\n\n"
     "Return 2-4 insights maximum but 0 is acceptable if the data does not support any meaningful findings."
 )
