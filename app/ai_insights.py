@@ -182,6 +182,24 @@ def build_payload(current_balance, schedules, holds, skips):
 DEFAULT_MODEL = 'gpt-4o-mini'
 
 
+def validate_model(api_key, model_name):
+    """
+    Check whether model_name is a valid model accessible with the given API key.
+    Returns (True, None) if valid, (False, error_message) otherwise.
+    """
+    from openai import NotFoundError, AuthenticationError
+    client = OpenAI(api_key=api_key)
+    try:
+        client.models.retrieve(model_name)
+        return True, None
+    except NotFoundError:
+        return False, f"Model '{model_name}' does not exist or is not accessible with this API key."
+    except AuthenticationError:
+        return False, "Invalid API key — could not validate the model."
+    except Exception as e:
+        return False, f"Could not validate model: {e}"
+
+
 def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips, model=None):
     """
     Decrypt the API key, build the payload, call OpenAI, and return the raw

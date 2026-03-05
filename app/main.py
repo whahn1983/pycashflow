@@ -13,7 +13,7 @@ from .auth import admin_required, global_admin_required, account_owner_required
 from .files import export, upload, version
 from .getemail import send_account_activation_notification
 from .crypto_utils import encrypt_password, decrypt_password
-from .ai_insights import fetch_insights
+from .ai_insights import fetch_insights, validate_model
 
 
 main = Blueprint('main', __name__)
@@ -949,8 +949,19 @@ def ai_settings():
             flash('API key cannot be empty')
             return redirect(url_for('main.settings'))
         # No new key provided but one is already stored — update model only
+        if model_input:
+            plaintext_key = decrypt_password(ai_config.api_key)
+            valid, err = validate_model(plaintext_key, model_input)
+            if not valid:
+                flash(err)
+                return redirect(url_for('main.settings'))
         ai_config.model_version = model_input or None
     else:
+        if model_input:
+            valid, err = validate_model(api_key_input, model_input)
+            if not valid:
+                flash(err)
+                return redirect(url_for('main.settings'))
         encrypted_key = encrypt_password(api_key_input)
         if ai_config:
             ai_config.api_key = encrypted_key
