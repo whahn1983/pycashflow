@@ -61,6 +61,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 
 ### AI-Powered Cash Flow Insights
 - **OpenAI Integration**: On-demand analysis of your 90-day cash flow projection via OpenAI
+- **Model Selection**: Choose any OpenAI model (e.g. `gpt-4o`, `gpt-4o-mini`) in settings; defaults to `gpt-4o-mini` when left blank
 - **Typed Insights**: Categorized as **Risk**, **Pattern**, or **Observation** with color-coded badges
 - **On-Demand Refresh**: Insights are only generated when you click Refresh, keeping API costs minimal
 - **Staleness Indicator**: Last-updated timestamp shown so you always know how current the analysis is
@@ -286,7 +287,7 @@ PyCashFlow implements a three-tier access control system:
 - **Balance Management**: Manual and automated balance updates
 - **Guest User Management**: Create and manage view-only users
 - **Data Management**: Import/export transaction schedules
-- **AI Insights**: Configure OpenAI API key and refresh cash flow analysis on demand
+- **AI Insights**: Configure OpenAI API key, select the model version, and refresh cash flow analysis on demand
 
 ### Guest User
 - **Dashboard Access Only**: View cash flow chart and current balance
@@ -370,7 +371,8 @@ PyCashFlow integrates with the OpenAI API to provide on-demand cash flow analysi
 1. Obtain an API key from [platform.openai.com](https://platform.openai.com)
 2. Navigate to **Settings → AI Insights → Configure API Key**
 3. Enter your `sk-...` key and save
-4. Return to the dashboard and click **Refresh** to generate your first analysis
+4. Optionally enter an **OpenAI Model** name (e.g. `gpt-4o`, `gpt-4o-mini`). Leave the field blank to use the default model (`gpt-4o-mini`)
+5. Return to the dashboard and click **Refresh** to generate your first analysis
 
 > **Note**: AI queries are only made when you click Refresh, keeping costs minimal. The last-updated timestamp on the card shows how stale the cached results are.
 
