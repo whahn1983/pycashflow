@@ -22,7 +22,9 @@ SYSTEM_PROMPT = (
     "- current_balance (number): the starting projected cash balance.\n"
     "- lowest_projected_balance (object): { amount (number), date (string YYYY-MM-DD) } — the lowest balance point within the horizon.\n"
     "- schedule_table (array of objects): each entry has name (string), amount (number, negative = expense), "
-    "frequency (string, e.g. 'monthly', 'weekly', 'onetime'), next_date (string YYYY-MM-DD), and type ('income' or 'expense').\n\n"
+    "frequency (string, e.g. 'monthly', 'weekly', 'onetime'), next_date (string YYYY-MM-DD), and type ('income' or 'expense').\n"
+    "- projected_daily_balances (array of objects): each entry has date (string YYYY-MM-DD) and balance (number), representing the "
+    "authoritative pre-calculated daily balance for each date in the horizon.\n\n"
     "Your task is to identify potential cash flow risks, patterns in the schedule, and helpful financial insights.\n\n"
     "Rules:\n"
     "- Only use the data provided.\n"
@@ -41,7 +43,11 @@ SYSTEM_PROMPT = (
     " spans multiple calendar years.\n"
     "- Do not surface patterns unless the combined value of the transactions involved exceeds 10% of the current_balance. Small recurring"
     " items that have minimal cumulative impact on the projection are not worth reporting.\n"
-    "- It is acceptable to return an empty insights array if the data does not support any meaningful findings.\n\n"
+    "- It is acceptable to return an empty insights array if the data does not support any meaningful findings.\n"
+    "- Use projected_daily_balances as ground truth for all balance values. Use schedule_table only to identify which transactions"
+    " explain balance movements; never recalculate balances independently from the schedule.\n"
+    "- lowest_projected_balance is the authoritative pre-calculated result of the projection engine including all business day rules,"
+    " holds, and skips. Do not attempt to recalculate it from the schedule_table.\n\n"
     "Insight type definitions (apply consistently):\n"
     "- risk: a specific future event where the projected balance goes negative or an overall downward trend across the entire data set.\n"
     "- pattern: a recurring behaviour visible across multiple transactions (e.g. several large expenses cluster at month-end).\n"
@@ -75,6 +81,7 @@ def build_payload(current_balance, schedules, holds, skips):
 
     min_amount = current_balance
     min_date = str(todaydate)
+    projected_daily_balances = []
     if not run.empty:
         run_copy = run.copy()
         run_copy['date_val'] = run_copy['date'].apply(
@@ -87,6 +94,13 @@ def build_payload(current_balance, schedules, holds, skips):
             min_idx = run_90['amount'].idxmin()
             min_amount = float(run_90.loc[min_idx, 'amount'])
             min_date = str(run_90.loc[min_idx, 'date_val'])
+            projected_daily_balances = sorted(
+                [
+                    {'date': str(row['date_val']), 'balance': float(row['amount'])}
+                    for _, row in run_90.iterrows()
+                ],
+                key=lambda x: x['date'],
+            )
 
     schedule_table = [
         {
@@ -105,6 +119,7 @@ def build_payload(current_balance, schedules, holds, skips):
         'current_balance': current_balance,
         'lowest_projected_balance': {'amount': min_amount, 'date': min_date},
         'schedule_table': schedule_table,
+        'projected_daily_balances': projected_daily_balances,
     }
 
 
