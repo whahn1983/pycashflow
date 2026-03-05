@@ -108,7 +108,8 @@ def settings():
     if current_user.admin:
         ai_config = AISettings.query.filter_by(user_id=current_user.id).first()
         ai_configured = ai_config is not None and bool(ai_config.api_key)
-        return render_template('settings.html', about=about, ai_configured=ai_configured)
+        ai_model = ai_config.model_version if ai_config else ''
+        return render_template('settings.html', about=about, ai_configured=ai_configured, ai_model=ai_model)
     else:
         return render_template('settings_guest.html', about=about)
 
@@ -937,8 +938,9 @@ def global_email_settings():
 @login_required
 @admin_required
 def ai_settings():
-    """Save the user's OpenAI API key (encrypted)."""
+    """Save the user's OpenAI API key (encrypted) and optional model selection."""
     api_key_input = request.form.get('api_key', '').strip()
+    model_input = request.form.get('model_version', '').strip()
 
     if not api_key_input:
         flash('API key cannot be empty')
@@ -949,8 +951,9 @@ def ai_settings():
 
     if ai_config:
         ai_config.api_key = encrypted_key
+        ai_config.model_version = model_input or None
     else:
-        ai_config = AISettings(user_id=current_user.id, api_key=encrypted_key)
+        ai_config = AISettings(user_id=current_user.id, api_key=encrypted_key, model_version=model_input or None)
         db.session.add(ai_config)
 
     db.session.commit()
@@ -978,7 +981,7 @@ def ai_insights():
     skips = Skip.query.filter_by(user_id=user_id).all()
 
     try:
-        insights_json = fetch_insights(ai_config.api_key, current_balance, schedules, holds, skips)
+        insights_json = fetch_insights(ai_config.api_key, current_balance, schedules, holds, skips, model=ai_config.model_version)
     except Exception as e:
         return Response(json.dumps({'error': str(e)}), status=500, mimetype='application/json')
 
