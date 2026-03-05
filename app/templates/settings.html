@@ -389,10 +389,22 @@
                         {% endif %}
                     </div>
 
+                    <div class="form-group-modern" style="margin-top: 1rem;">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-microchip"></i> OpenAI Model
+                        </label>
+                        <input class="form-control-modern" type="text" name="model_version"
+                               placeholder="gpt-4o-mini (default)" autocomplete="off"
+                               value="{{ ai_model or '' }}">
+                        <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                            <i class="fa-solid fa-circle-info"></i> Leave blank to use the default model (<strong>gpt-4o-mini</strong>).
+                        </small>
+                    </div>
+
                     <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
                         <button class="btn-modern" type="submit" style="flex: 1; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border: none;">
                             <i class="fa-solid fa-check"></i>
-                            Save API Key
+                            Save Settings
                         </button>
                         <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
                             <i class="fa-solid fa-xmark"></i>

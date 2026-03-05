@@ -179,7 +179,10 @@ def build_payload(current_balance, schedules, holds, skips):
     }
 
 
-def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips):
+DEFAULT_MODEL = 'gpt-4o-mini'
+
+
+def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips, model=None):
     """
     Decrypt the API key, build the payload, call OpenAI, and return the raw
     JSON string of insights.
@@ -188,10 +191,11 @@ def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips):
     """
     api_key = decrypt_password(encrypted_api_key)
     payload = build_payload(current_balance, schedules, holds, skips)
+    selected_model = model if model else DEFAULT_MODEL
 
     client = OpenAI(api_key=api_key)
     response = client.chat.completions.create(
-        model='gpt-5.4',
+        model=selected_model,
         messages=[
             {'role': 'system', 'content': SYSTEM_PROMPT},
             {'role': 'user', 'content': json.dumps(payload)},

@@ -129,6 +129,7 @@ class AISettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     api_key = db.Column(db.String(500), nullable=True)  # Fernet-encrypted OpenAI API key
+    model_version = db.Column(db.String(100), nullable=True)  # OpenAI model to use (e.g. gpt-4o-mini)
     last_updated = db.Column(db.DateTime, nullable=True)
     last_insights = db.Column(db.Text, nullable=True)  # JSON string of cached insights
 
