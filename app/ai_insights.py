@@ -4,7 +4,7 @@ Builds a 90-day projection payload from the user's schedule and queries
 gpt-4o-mini for risk, pattern, and observation insights.
 """
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from openai import OpenAI
 
@@ -24,7 +24,11 @@ SYSTEM_PROMPT = (
     "- schedule_table (array of objects): each entry has name (string), amount (number, negative = expense), "
     "frequency (string, e.g. 'monthly', 'weekly', 'onetime'), next_date (string YYYY-MM-DD), and type ('income' or 'expense').\n"
     "- projected_daily_balances (array of objects): each entry has date (string YYYY-MM-DD) and balance (number), representing the "
-    "authoritative pre-calculated daily balance for each date in the horizon.\n\n"
+    "authoritative pre-calculated daily balance for each date in the horizon.\n"
+    "- minimum_safe_balance (number): the net expense exposure in the 14 days leading up to the lowest balance point — total scheduled "
+    "expenses in that window minus any income arriving in the same window (floored at zero). A low balance observation is warranted when "
+    "the lowest_projected_balance falls below this threshold. This represents less than two weeks of scheduled expenses and indicates "
+    "meaningful financial stress regardless of whether the balance goes negative.\n\n"
     "Your task is to identify potential cash flow risks, patterns in the schedule, and helpful financial insights.\n\n"
     "Rules:\n"
     "- Only use the data provided.\n"
@@ -40,6 +44,10 @@ SYSTEM_PROMPT = (
     " not obvious from the balance curve alone.\n"
     "- A shortfall only exists when the projected balance goes negative. A balance that drops from the starting level but remains positive"
     " at all times is never a risk, regardless of how much it drops or how close it gets to zero.\n"
+    "- A low balance observation is warranted when the lowest_projected_balance falls below the minimum_safe_balance threshold."
+    " This signals meaningful financial stress even without a negative balance — it means the buffer is smaller than the net expense"
+    " pressure in the two weeks before the trough. If minimum_safe_balance is near zero (because income in the window offsets expenses),"
+    " do not surface a low balance observation even if the balance dips.\n"
     "- When referencing dates, use a friendly format (e.g. March 12th) rather than ISO format. Omit the year unless the projection"
     " spans multiple calendar years.\n"
     "- Do not surface patterns unless the combined value of the transactions involved exceeds 10% of the current_balance. Small recurring"
@@ -82,6 +90,27 @@ SYSTEM_PROMPT = (
 )
 
 
+def calculate_minimum_safe_balance(run_90, min_amount, lowest_balance_date):
+    """
+    Calculate the balance drop over the 14 days leading up to the lowest
+    balance point, using the authoritative run data (which reflects all
+    recurring expansions, business-day adjustments, holds, and skips).
+
+    Returns max(0, balance_at_window_start - min_amount), i.e. the net
+    drawdown pressure in the window.  When income in the window offsets
+    expenses the drop is small and the threshold stays low, suppressing
+    false low-balance observations.
+    """
+    window_start = lowest_balance_date - timedelta(days=14)
+    before_window = run_90[run_90['date_val'] <= window_start]
+    if before_window.empty:
+        # No data before the window — use the first available balance
+        balance_at_window_start = float(run_90.iloc[0]['amount'])
+    else:
+        balance_at_window_start = float(before_window.iloc[-1]['amount'])
+    return max(0.0, balance_at_window_start - min_amount)
+
+
 def build_payload(current_balance, schedules, holds, skips):
     """Build the JSON payload sent to OpenAI from the user's cash flow data."""
     _, run, _ = update_cash(current_balance, schedules, holds, skips, [])
@@ -91,6 +120,8 @@ def build_payload(current_balance, schedules, holds, skips):
 
     min_amount = current_balance
     min_date = str(todaydate)
+    min_date_val = todaydate
+    run_90 = None
     projected_daily_balances = []
     if not run.empty:
         run_copy = run.copy()
@@ -103,7 +134,8 @@ def build_payload(current_balance, schedules, holds, skips):
             run_90['amount'] = run_90['amount'].astype(float)
             min_idx = run_90['amount'].idxmin()
             min_amount = float(run_90.loc[min_idx, 'amount'])
-            min_date = str(run_90.loc[min_idx, 'date_val'])
+            min_date_val = run_90.loc[min_idx, 'date_val']
+            min_date = str(min_date_val)
             projected_daily_balances = sorted(
                 [
                     {'date': str(row['date_val']), 'balance': float(row['amount'])}
@@ -111,6 +143,17 @@ def build_payload(current_balance, schedules, holds, skips):
                 ],
                 key=lambda x: x['date'],
             )
+
+    lowest_balance_date = (
+        min_date_val
+        if hasattr(min_date_val, 'year')
+        else datetime.strptime(min_date, '%Y-%m-%d').date()
+    )
+    minimum_safe_balance = (
+        calculate_minimum_safe_balance(run_90, min_amount, lowest_balance_date)
+        if run_90 is not None
+        else 0.0
+    )
 
     schedule_table = [
         {
@@ -128,6 +171,7 @@ def build_payload(current_balance, schedules, holds, skips):
         'analysis_horizon_days': 90,
         'current_balance': current_balance,
         'lowest_projected_balance': {'amount': min_amount, 'date': min_date},
+        'minimum_safe_balance': minimum_safe_balance,
         'schedule_table': schedule_table,
         'projected_daily_balances': projected_daily_balances,
     }
