@@ -63,19 +63,19 @@
     </div>
     {% endif %}
 
-    <!-- Change Password Card - Available to all users -->
+    <!-- Account Settings Card - Available to all users -->
     <div class="metric-card">
         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
             <div style="width: 3rem; height: 3rem; background: linear-gradient(135deg, #8b5cf6, #a78bfa); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-                <i class="fa-solid fa-lock"></i>
+                <i class="fa-solid fa-user-gear"></i>
             </div>
             <div>
-                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-primary);">Password</h3>
-                <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">Update your account password</p>
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-primary);">Account Settings</h3>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">Update your name, email, or password</p>
             </div>
         </div>
         <button class="btn-primary-modern btn-modern" style="width: 100%;" data-bs-toggle="modal" data-bs-target="#pwmodal">
-            <i class="fa-solid fa-key"></i> Change Password
+            <i class="fa-solid fa-user-gear"></i> Edit Profile
         </button>
     </div>
 
@@ -97,13 +97,13 @@
 
 </div>
 
-<!-- Change Password Modal - Available to all users -->
+<!-- Account Settings Modal - Available to all users -->
 <div class="modal fade modal-modern" id="pwmodal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fa-solid fa-key"></i> Change Password
+                    <i class="fa-solid fa-user-gear"></i> Account Settings
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -111,29 +111,53 @@
                 <form action="{{url_for('main.changepw')}}" method="POST">
                     <div class="form-group-modern">
                         <label class="form-label-modern">
-                            <i class="fa-solid fa-lock"></i> Current Password
+                            <i class="fa-solid fa-user"></i> Name
                         </label>
-                        <input class="form-control-modern" type="password" name="current" placeholder="Enter your current password" required>
+                        <input class="form-control-modern" type="text" name="name" placeholder="Your name" required
+                               value="{{ current_user.name or '' }}">
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-envelope"></i> Email Address
+                        </label>
+                        <input class="form-control-modern" type="email" name="email" placeholder="your@email.com" required
+                               value="{{ current_user.email or '' }}">
+                        <small style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                            <i class="fa-solid fa-circle-info"></i> This is also your login username.
+                        </small>
+                    </div>
+
+                    <hr style="border-color: var(--border); margin: 1.25rem 0;">
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 1rem;">
+                        <i class="fa-solid fa-lock"></i> Leave the new password fields blank to keep your current password.
+                    </p>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-lock"></i> Current Password <span style="color: var(--danger);">*</span>
+                        </label>
+                        <input class="form-control-modern" type="password" name="current" placeholder="Required to save any changes" required>
                     </div>
 
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-lock-open"></i> New Password
                         </label>
-                        <input class="form-control-modern" type="password" name="password" placeholder="Choose a new password" required>
+                        <input class="form-control-modern" type="password" name="password" placeholder="Leave blank to keep current password">
                     </div>
 
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-shield-halved"></i> Confirm New Password
                         </label>
-                        <input class="form-control-modern" type="password" name="password2" placeholder="Re-enter your new password" required>
+                        <input class="form-control-modern" type="password" name="password2" placeholder="Re-enter new password">
                     </div>
 
                     <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
                         <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
                             <i class="fa-solid fa-check"></i>
-                            Update Password
+                            Save Changes
                         </button>
                         <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
                             <i class="fa-solid fa-xmark"></i>
@@ -164,8 +188,8 @@
                             <i class="fa-solid fa-toggle-on"></i> Allow New Sign-Ups
                         </label>
                         <select name="signupvalue" class="form-control-modern">
-                            <option value="False">Enabled (Allow sign-ups)</option>
-                            <option value="True">Disabled (Block sign-ups)</option>
+                            <option value="False" {% if not signup_setting or not signup_setting.value %}selected{% endif %}>Enabled (Allow sign-ups)</option>
+                            <option value="True" {% if signup_setting and signup_setting.value %}selected{% endif %}>Disabled (Block sign-ups)</option>
                         </select>
                     </div>
 
@@ -203,42 +227,53 @@
                         <label class="form-label-modern">
                             <i class="fa-solid fa-envelope"></i> Email Address
                         </label>
-                        <input class="form-control-modern" type="email" name="email" placeholder="your@email.com" required>
+                        <input class="form-control-modern" type="email" name="email" placeholder="your@email.com" required
+                               value="{{ email_config.email or '' if email_config else '' }}">
                     </div>
 
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-key"></i> Password
                         </label>
-                        <input class="form-control-modern" type="password" name="password" placeholder="Email account password" required>
+                        <input class="form-control-modern" type="password" name="password" placeholder="Email account password"
+                               {% if not email_config %}required{% endif %}>
+                        {% if email_config %}
+                        <small style="color: var(--success); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                            <i class="fa-solid fa-circle-check"></i> A password is currently saved. Leave blank to keep the existing password.
+                        </small>
+                        {% endif %}
                     </div>
 
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-server"></i> SMTP Server
                         </label>
-                        <input class="form-control-modern" type="text" name="server" placeholder="smtp.gmail.com" required>
+                        <input class="form-control-modern" type="text" name="server" placeholder="smtp.gmail.com" required
+                               value="{{ email_config.server or '' if email_config else '' }}">
                     </div>
 
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-tag"></i> Email Subject String
                         </label>
-                        <input class="form-control-modern" type="text" name="subject_str" placeholder="Balance Update">
+                        <input class="form-control-modern" type="text" name="subject_str" placeholder="Balance Update"
+                               value="{{ email_config.subjectstr or '' if email_config else '' }}">
                     </div>
 
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-align-left"></i> String Before Balance
                         </label>
-                        <input class="form-control-modern" type="text" name="start_str" placeholder="Current balance: $">
+                        <input class="form-control-modern" type="text" name="start_str" placeholder="Current balance: $"
+                               value="{{ email_config.startstr or '' if email_config else '' }}">
                     </div>
 
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-align-right"></i> String After Balance
                         </label>
-                        <input class="form-control-modern" type="text" name="end_str" placeholder=" as of">
+                        <input class="form-control-modern" type="text" name="end_str" placeholder=" as of"
+                               value="{{ email_config.endstr or '' if email_config else '' }}">
                     </div>
 
                     <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
