@@ -90,27 +90,25 @@ SYSTEM_PROMPT = (
 )
 
 
-def calculate_minimum_safe_balance(schedules, lowest_balance_date):
+def calculate_minimum_safe_balance(run_90, min_amount, lowest_balance_date):
     """
-    Calculate the net expense exposure in the 14 days leading up to
-    the lowest balance point, minus any income arriving in that window.
+    Calculate the balance drop over the 14 days leading up to the lowest
+    balance point, using the authoritative run data (which reflects all
+    recurring expansions, business-day adjustments, holds, and skips).
+
+    Returns max(0, balance_at_window_start - min_amount), i.e. the net
+    drawdown pressure in the window.  When income in the window offsets
+    expenses the drop is small and the threshold stays low, suppressing
+    false low-balance observations.
     """
     window_start = lowest_balance_date - timedelta(days=14)
-    window_end = lowest_balance_date
-
-    expenses_in_window = sum(
-        abs(float(s.amount)) for s in schedules
-        if s.type == 'Expense'
-        and s.startdate is not None
-        and window_start <= s.startdate <= window_end
-    )
-    income_in_window = sum(
-        float(s.amount) for s in schedules
-        if s.type == 'Income'
-        and s.startdate is not None
-        and window_start <= s.startdate <= window_end
-    )
-    return max(0.0, expenses_in_window - income_in_window)
+    before_window = run_90[run_90['date_val'] <= window_start]
+    if before_window.empty:
+        # No data before the window — use the first available balance
+        balance_at_window_start = float(run_90.iloc[0]['amount'])
+    else:
+        balance_at_window_start = float(before_window.iloc[-1]['amount'])
+    return max(0.0, balance_at_window_start - min_amount)
 
 
 def build_payload(current_balance, schedules, holds, skips):
@@ -123,6 +121,7 @@ def build_payload(current_balance, schedules, holds, skips):
     min_amount = current_balance
     min_date = str(todaydate)
     min_date_val = todaydate
+    run_90 = None
     projected_daily_balances = []
     if not run.empty:
         run_copy = run.copy()
@@ -150,7 +149,11 @@ def build_payload(current_balance, schedules, holds, skips):
         if hasattr(min_date_val, 'year')
         else datetime.strptime(min_date, '%Y-%m-%d').date()
     )
-    minimum_safe_balance = calculate_minimum_safe_balance(schedules, lowest_balance_date)
+    minimum_safe_balance = (
+        calculate_minimum_safe_balance(run_90, min_amount, lowest_balance_date)
+        if run_90 is not None
+        else 0.0
+    )
 
     schedule_table = [
         {
