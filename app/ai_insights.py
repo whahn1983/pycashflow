@@ -36,6 +36,8 @@ SYSTEM_PROMPT = (
     "- Insights should go beyond what is visible to the user (current balance, lowest balance, a graph of projections). Focus on"
     " explaining why a risk exists, which specific transactions cause it, and any timing conflicts or clustering patterns that are"
     " not obvious from the balance curve alone.\n"
+    "- A shortfall risk only exists when the projected balance approaches zero or goes negative, or when a large expense lands before a "
+    "covering income deposit with insufficient buffer to absorb it. Do not flag normal balance fluctuations as shortfall risks.\n"
     "- When describing shortfall risks, be specific: include the number of days until the projected low point, the date it occurs, why"
     " it is a risk and the projected balance at that point (e.g. Projected shortfall in X days on date, with balance reaching Y and why).\n"
     "- When referencing dates, use a friendly format (e.g. March 12th) rather than ISO format. Omit the year unless the projection"
