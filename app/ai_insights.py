@@ -33,6 +33,10 @@ SYSTEM_PROMPT = (
     "- Reference specific transactions if they appear relevant.\n"
     "- Use the today field for all relative timing language (e.g. '3 days away', 'in 6 months').\n"
     "- If the provided data does not support a clear insight, return fewer insights rather than guessing.\n"
+    "- When describing shortfall risks, be specific: include the number of days until the projected low point, the date it occurs, and"
+    " the projected balance at that point (e.g. Projected shortfall in X days on date, with balance reaching Y).\n"
+    "- When referencing dates, use a friendly format (e.g. March 12th) rather than ISO format. Omit the year unless the projection"
+    " spans multiple calendar years.\n"
     "- It is acceptable to return an empty insights array if the data does not support any meaningful findings.\n\n"
     "Insight type definitions (apply consistently):\n"
     "- risk: a specific future event or balance level that could cause a shortfall or financial stress.\n"
@@ -52,7 +56,7 @@ SYSTEM_PROMPT = (
     "The severity field is required for every insight. Use 'high' for risks that could result in a negative balance "
     "or shortfall above $1,000, 'medium' for shortfalls under $1,000 or patterns that may escalate, "
     "and 'low' for minor observations with limited financial impact.\n\n"
-    "Return 2\u20134 insights maximum."
+    "Return 2-4 insights maximum but 0 is acceptable if the data does not support any meaningful findings."
 )
 
 
