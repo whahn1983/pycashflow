@@ -76,8 +76,9 @@
         </h2>
         <div class="chart-controls" style="display: flex; align-items: center; gap: 1rem;">
             {% if ai_last_updated %}
-            <span style="font-size: 0.8rem; color: var(--text-muted);">
-                <i class="fa-solid fa-clock"></i> Last updated: {{ ai_last_updated.strftime('%b %d, %Y %I:%M %p') }} UTC
+            <span id="ai-last-updated-ts" data-utc="{{ ai_last_updated.strftime('%Y-%m-%dT%H:%M:%S') }}Z"
+                  style="font-size: 0.8rem; color: var(--text-muted);">
+                <i class="fa-solid fa-clock"></i> Last updated: {{ ai_last_updated.strftime('%b %d, %Y %I:%M %p') }}
             </span>
             {% endif %}
             {% if not current_user.account_owner_id %}
@@ -102,6 +103,11 @@
             <i class="fa-solid fa-robot" style="font-size: 2rem; margin-bottom: 0.75rem; display: block; color: #6366f1;"></i>
             <p style="margin: 0;">No insights yet. Click <strong>Refresh</strong> to generate your first analysis.</p>
         </div>
+        {% elif not ai_insights_data.insights %}
+        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+            <i class="fa-solid fa-circle-check" style="font-size: 2rem; margin-bottom: 0.75rem; display: block; color: var(--success);"></i>
+            <p style="margin: 0;">No significant findings in the current projection.</p>
+        </div>
         {% else %}
         <div id="ai-insights-list">
             {% for insight in ai_insights_data.insights %}
@@ -119,6 +125,13 @@
                     {% else %}
                     <i class="fa-solid fa-lightbulb" style="color: var(--success);"></i>
                     <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--success);">Observation</span>
+                    {% endif %}
+                    {% if insight.severity == 'high' %}
+                    <span style="margin-left: auto; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #fff; background-color: var(--danger); padding: 0.1rem 0.45rem; border-radius: 999px;">High</span>
+                    {% elif insight.severity == 'medium' %}
+                    <span style="margin-left: auto; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #fff; background-color: var(--warning); padding: 0.1rem 0.45rem; border-radius: 999px;">Medium</span>
+                    {% elif insight.severity == 'low' %}
+                    <span style="margin-left: auto; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #fff; background-color: var(--success); padding: 0.1rem 0.45rem; border-radius: 999px;">Low</span>
                     {% endif %}
                 </div>
                 <p style="margin: 0 0 0.25rem; font-weight: 600; color: var(--text-primary);">{{ insight.title }}</p>
@@ -289,15 +302,29 @@
                         pattern: {bg: 'rgba(59,130,246,0.1)', border: 'var(--accent)', icon: 'fa-chart-line', color: 'var(--accent)', label: 'Pattern'},
                         observation: {bg: 'rgba(16,185,129,0.1)', border: 'var(--success)', icon: 'fa-lightbulb', color: 'var(--success)', label: 'Observation'}
                     };
+                    const severityStyles = {
+                        high:   {bg: 'var(--danger)',  label: 'High'},
+                        medium: {bg: 'var(--warning)', label: 'Medium'},
+                        low:    {bg: 'var(--success)', label: 'Low'}
+                    };
                     const list = document.createElement('div');
                     list.id = 'ai-insights-list';
                     data.insights.forEach(insight => {
                         const s = typeStyles[insight.type] || typeStyles.observation;
                         const card = document.createElement('div');
                         card.style.cssText = 'padding:1rem;border-radius:var(--radius-md);margin-bottom:0.75rem;background-color:' + s.bg + ';border-left:4px solid ' + s.border + ';';
-                        card.innerHTML = '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">' +
-                            '<i class="fa-solid ' + s.icon + '" style="color:' + s.color + ';"></i>' +
-                            '<span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:' + s.color + ';">' + s.label + '</span></div>';
+                        const header = document.createElement('div');
+                        header.style.cssText = 'display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;';
+                        header.innerHTML = '<i class="fa-solid ' + s.icon + '" style="color:' + s.color + ';"></i>' +
+                            '<span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:' + s.color + ';">' + s.label + '</span>';
+                        const sv = severityStyles[insight.severity];
+                        if (sv) {
+                            const badge = document.createElement('span');
+                            badge.style.cssText = 'margin-left:auto;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:#fff;background-color:' + sv.bg + ';padding:0.1rem 0.45rem;border-radius:999px;';
+                            badge.textContent = sv.label;
+                            header.appendChild(badge);
+                        }
+                        card.appendChild(header);
                         const titleP = document.createElement('p');
                         titleP.style.cssText = 'margin:0 0 0.25rem;font-weight:600;color:var(--text-primary);';
                         titleP.textContent = insight.title;
@@ -312,7 +339,7 @@
 
                     // Update the last-updated timestamp display
                     const now = new Date();
-                    const timeStr = now.toUTCString().replace(' GMT', ' UTC');
+                    const timeStr = now.toLocaleString([], {year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
                     const ctrl = document.querySelector('.chart-controls span');
                     if (ctrl) {
                         ctrl.innerHTML = '<i class="fa-solid fa-clock"></i> Last updated: ' + timeStr;
@@ -326,7 +353,7 @@
                         }
                     }
                 } else {
-                    body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);">No insights were returned. Try again later.</div>';
+                    body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);"><i class="fa-solid fa-circle-check" style="font-size:2rem;margin-bottom:0.75rem;display:block;color:var(--success);"></i><p style="margin:0;">No significant findings in the current projection.</p></div>';
                 }
             })
             .catch(err => {
@@ -339,6 +366,16 @@
                 if (icon) icon.classList.remove('loading');
             });
     }
+
+    // Convert the server-rendered UTC timestamp to browser local time on page load
+    (function () {
+        const el = document.getElementById('ai-last-updated-ts');
+        if (!el) return;
+        const utc = el.getAttribute('data-utc');
+        if (!utc) return;
+        const localStr = new Date(utc).toLocaleString([], {year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+        el.innerHTML = '<i class="fa-solid fa-clock"></i> Last updated: ' + localStr;
+    })();
 </script>
 
 {% endblock %}

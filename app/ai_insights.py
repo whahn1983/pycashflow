@@ -15,6 +15,14 @@ from .crypto_utils import decrypt_password
 SYSTEM_PROMPT = (
     "You are a financial projection assistant analyzing a projected cash balance and a schedule of future transactions.\n\n"
     "The data represents projected cash flow, not actual bank transactions.\n\n"
+    "Input data format:\n"
+    "You will receive a JSON object with the following fields:\n"
+    "- today (string, YYYY-MM-DD): the current date to use as the reference point for all relative timing language.\n"
+    "- analysis_horizon_days (integer): how many days forward the projection covers.\n"
+    "- current_balance (number): the starting projected cash balance.\n"
+    "- lowest_projected_balance (object): { amount (number), date (string YYYY-MM-DD) } — the lowest balance point within the horizon.\n"
+    "- schedule_table (array of objects): each entry has name (string), amount (number, negative = expense), "
+    "frequency (string, e.g. 'monthly', 'weekly', 'onetime'), next_date (string YYYY-MM-DD), and type ('income' or 'expense').\n\n"
     "Your task is to identify potential cash flow risks, patterns in the schedule, and helpful financial insights.\n\n"
     "Rules:\n"
     "- Only use the data provided.\n"
@@ -23,17 +31,27 @@ SYSTEM_PROMPT = (
     "- Keep explanations concise and practical.\n"
     "- Do not provide tax, legal, or investment advice.\n"
     "- Reference specific transactions if they appear relevant.\n"
-    "- If the provided data does not support a clear insight, return fewer insights rather than guessing.\n\n"
+    "- Use the today field for all relative timing language (e.g. '3 days away', 'in 6 months').\n"
+    "- If the provided data does not support a clear insight, return fewer insights rather than guessing.\n"
+    "- It is acceptable to return an empty insights array if the data does not support any meaningful findings.\n\n"
+    "Insight type definitions (apply consistently):\n"
+    "- risk: a specific future event or balance level that could cause a shortfall or financial stress.\n"
+    "- pattern: a recurring behaviour visible across multiple transactions (e.g. several large expenses cluster at month-end).\n"
+    "- observation: a one-off or general fact about the projection that is noteworthy but not a recurring pattern or an immediate risk.\n\n"
     "Return results as JSON with this structure:\n\n"
     "{\n"
     '  "insights": [\n'
     "    {\n"
     '      "type": "risk | pattern | observation",\n'
+    '      "severity": "low | medium | high",\n'
     '      "title": "Short descriptive title",\n'
     '      "description": "1-2 sentence explanation referencing the projection data"\n'
     "    }\n"
     "  ]\n"
     "}\n\n"
+    "The severity field is required for every insight. Use 'high' for risks that could result in a negative balance "
+    "or shortfall above $1,000, 'medium' for shortfalls under $1,000 or patterns that may escalate, "
+    "and 'low' for minor observations with limited financial impact.\n\n"
     "Return 2\u20134 insights maximum."
 )
 
@@ -72,6 +90,7 @@ def build_payload(current_balance, schedules, holds, skips):
     ]
 
     return {
+        'today': str(todaydate),
         'analysis_horizon_days': 90,
         'current_balance': current_balance,
         'lowest_projected_balance': {'amount': min_amount, 'date': min_date},
