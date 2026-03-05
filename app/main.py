@@ -449,22 +449,42 @@ def balance():
 @main.route('/changepw', methods=('GET', 'POST'))
 @login_required
 def changepw():
-    # change the users password from the settings page
+    # update account profile (name, email) and optionally change password
     if request.method == 'POST':
-        curr_user = current_user.id
-        my_user = User.query.filter_by(id=curr_user).first()
+        my_user = User.query.filter_by(id=current_user.id).first()
         current = request.form['current']
-        password = request.form['password']
-        password2 = request.form['password2']
-        if password == password2 and check_password_hash(my_user.password, current):
-            my_user.password = generate_password_hash(password, method='scrypt')
-            db.session.commit()
-            flash('Password change successful')
-        elif password != password2:
-            flash('Passwords do not match')
-        elif not check_password_hash(my_user.password, current):
-            flash('Incorrect password')
+        new_name = request.form.get('name', '').strip()
+        new_email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '').strip()
+        password2 = request.form.get('password2', '').strip()
 
+        if not check_password_hash(my_user.password, current):
+            flash('Incorrect current password')
+            return redirect(url_for('main.settings'))
+
+        # Validate new email if it changed
+        if new_email and new_email != my_user.email.lower():
+            existing = User.query.filter(
+                db.func.lower(User.email) == new_email,
+                User.id != my_user.id
+            ).first()
+            if existing:
+                flash('That email address is already in use')
+                return redirect(url_for('main.settings'))
+            my_user.email = new_email
+
+        if new_name:
+            my_user.name = new_name
+
+        # Only update password if the user filled in the new password fields
+        if password or password2:
+            if password != password2:
+                flash('New passwords do not match')
+                return redirect(url_for('main.settings'))
+            my_user.password = generate_password_hash(password, method='scrypt')
+
+        db.session.commit()
+        flash('Account settings updated successfully')
         return redirect(url_for('main.settings'))
 
     return redirect(url_for('main.settings'))
