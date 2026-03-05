@@ -381,7 +381,7 @@
                             <i class="fa-solid fa-key"></i> OpenAI API Key
                         </label>
                         <input class="form-control-modern" type="password" name="api_key"
-                               placeholder="sk-..." autocomplete="off" required>
+                               placeholder="sk-..." autocomplete="off" {% if not ai_configured %}required{% endif %}>
                         {% if ai_configured %}
                         <small style="color: var(--success); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
                             <i class="fa-solid fa-circle-check"></i> An API key is currently saved. Enter a new key to replace it.
