@@ -265,7 +265,19 @@
         }
     }
 
-    Plotly.newPlot('chart', d.data, d.layout, {displayModeBar: false});
+    Plotly.newPlot('chart', d.data, d.layout, {displayModeBar: false, responsive: true});
+
+    // Redraw the chart when the device rotates so it fills the new viewport width.
+    // orientationchange fires before the browser finishes reflowing, so we wait
+    // briefly before asking Plotly to measure the new container size.
+    function resizePlotlyChart() {
+        var el = document.getElementById('chart');
+        if (el) { setTimeout(function() { Plotly.Plots.resize(el); }, 300); }
+    }
+    window.addEventListener('orientationchange', resizePlotlyChart);
+    if (window.screen && window.screen.orientation) {
+        window.screen.orientation.addEventListener('change', resizePlotlyChart);
+    }
 
     // Refresh button handler
     function refreshContent() {
