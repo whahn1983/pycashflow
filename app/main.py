@@ -977,21 +977,21 @@ def ai_settings():
 
     if not api_key_input:
         if not ai_config or not ai_config.api_key:
-            flash('API key cannot be empty')
+            flash('API key cannot be empty', 'error')
             return redirect(url_for('main.settings'))
         # No new key provided but one is already stored — update model only
         if model_input:
             plaintext_key = decrypt_password(ai_config.api_key)
             valid, err = validate_model(plaintext_key, model_input)
             if not valid:
-                flash(err)
+                flash(err, 'error')
                 return redirect(url_for('main.settings'))
         ai_config.model_version = model_input or None
     else:
         if model_input:
             valid, err = validate_model(api_key_input, model_input)
             if not valid:
-                flash(err)
+                flash(err, 'error')
                 return redirect(url_for('main.settings'))
         encrypted_key = encrypt_password(api_key_input)
         if ai_config:
