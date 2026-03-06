@@ -2,13 +2,13 @@
 
 {% block content %}
 
-<div style="max-width: 520px; margin: 3rem auto;">
-    <!-- Header -->
+<div style="max-width: 520px; margin: 4rem auto;">
+    <!-- Logo/Header -->
     <div style="text-align: center; margin-bottom: 2rem;">
-        <h1 style="color: var(--accent); font-size: 2rem; margin-bottom: 0.5rem;">
-            <i class="fa-solid fa-shield-halved"></i> Enable Two-Factor Authentication
+        <h1 style="color: var(--accent); font-size: 2.5rem; margin-bottom: 0.5rem;">
+            <i class="fa-solid fa-chart-line"></i> PyCashFlow
         </h1>
-        <p style="color: var(--text-secondary);">Scan the QR code with your authenticator app, then enter the 6-digit code to confirm.</p>
+        <p style="color: var(--text-secondary);">Secure your account with two-factor authentication</p>
     </div>
 
     <!-- Flash messages -->
@@ -25,6 +25,11 @@
     {% endwith %}
 
     <div class="metric-card" style="padding: 2rem;">
+
+        <h2 style="color: var(--text-primary); margin-bottom: 1.5rem; font-size: 1.5rem;">
+            <i class="fa-solid fa-shield-halved"></i> Enable Two-Factor Authentication
+        </h2>
+        <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">Scan the QR code with your authenticator app, then enter the 6-digit code to confirm.</p>
 
         <!-- Step 1 -->
         <div style="margin-bottom: 1.5rem;">
