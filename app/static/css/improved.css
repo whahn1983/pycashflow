@@ -244,9 +244,11 @@ body::before {
     font-size: 0.875rem;
   }
 
-  /* More compact collapse menu */
+  /* More compact collapse menu; push content past Dynamic Island on sides */
   .navbar-collapse {
     padding: var(--spacing-sm);
+    padding-left: calc(var(--spacing-sm) + env(safe-area-inset-left));
+    padding-right: calc(var(--spacing-sm) + env(safe-area-inset-right));
     max-height: calc(100vh - 60px);
   }
 
@@ -740,6 +742,15 @@ body.modal-open {
   padding: var(--spacing-xl) var(--spacing-lg);
   width: 100%;
   flex: 1;
+}
+
+/* Landscape override must come after the base .container-modern rule so it wins the cascade */
+@media (max-width: 1280px) and (orientation: landscape) {
+  .container-modern {
+    padding: var(--spacing-md) var(--spacing-sm);
+    padding-left: calc(var(--spacing-sm) + env(safe-area-inset-left));
+    padding-right: calc(var(--spacing-sm) + env(safe-area-inset-right));
+  }
 }
 
 .page-header {
