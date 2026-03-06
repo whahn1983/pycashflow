@@ -87,6 +87,10 @@ body::before {
   background-color: var(--secondary-dark);
   box-shadow: var(--shadow-md);
   padding: 0.75rem 1.5rem;
+  /* Compensate for notch/Dynamic Island in portrait (top inset) */
+  padding-top: calc(0.75rem + env(safe-area-inset-top));
+  padding-left: calc(1.5rem + env(safe-area-inset-left));
+  padding-right: calc(1.5rem + env(safe-area-inset-right));
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -215,18 +219,23 @@ body::before {
 
 /* Landscape Mobile and Tablet Optimization */
 @media (max-width: 1280px) and (orientation: landscape) {
-  /* Compact navbar for landscape */
+  /* Compact navbar for landscape; keep left/right safe-area insets for Dynamic Island */
   .navbar-improved {
     padding: 0.5rem 1rem;
+    padding-top: 0.5rem; /* no top inset needed in landscape */
+    padding-left: calc(1rem + env(safe-area-inset-left));
+    padding-right: calc(1rem + env(safe-area-inset-right));
   }
 
   .navbar-improved .brand {
     font-size: 1.25rem;
   }
 
-  /* Reduce container padding */
+  /* Reduce container padding; preserve left/right safe-area insets */
   .container-modern {
     padding: var(--spacing-md) var(--spacing-sm);
+    padding-left: calc(var(--spacing-sm) + env(safe-area-inset-left));
+    padding-right: calc(var(--spacing-sm) + env(safe-area-inset-right));
   }
 
   /* Compact navigation links */
