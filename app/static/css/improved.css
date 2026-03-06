@@ -295,6 +295,32 @@ body::before {
   }
 }
 
+/* Portrait Mobile: Push body below Dynamic Island at the body level.
+   The base .navbar-improved already carries env(safe-area-inset-top) padding,
+   but some browsers don't account for that dynamic value when computing the
+   sticky flex item's height, so the main content can start too high.
+   Moving the top-inset responsibility to body.padding-top guarantees the
+   entire flex column — including the navbar — starts below the safe area,
+   while the navbar reverts to its natural 0.75 rem top padding. */
+@media (max-width: 1280px) and (orientation: portrait) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Body now handles safe-area-inset-top; remove it from the navbar and
+     tighten vertical padding to match the compact landscape style. */
+  .navbar-improved {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  /* Clamp the open collapse menu so it never extends behind the bottom
+     home-indicator safe area. */
+  .navbar-collapse {
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 60px);
+  }
+}
+
 /* Metric Cards */
 .metrics-grid {
   display: grid;
@@ -788,8 +814,10 @@ body.modal-open {
 /* Toast Notifications */
 .toast-container {
   position: fixed;
-  top: var(--spacing-lg);
-  right: var(--spacing-lg);
+  /* Keep toasts below the Dynamic Island / notch in portrait and clear of the
+     side notch in landscape by adding safe-area insets to the base offsets. */
+  top: calc(var(--spacing-lg) + env(safe-area-inset-top));
+  right: calc(var(--spacing-lg) + env(safe-area-inset-right));
   z-index: 9999;
 }
 
@@ -888,6 +916,18 @@ body.modal-open {
   .table-actions {
     width: 100%;
     flex-wrap: wrap;
+  }
+}
+
+/* Landscape safe-area override for .container-modern — MUST appear after the
+   general @media (max-width: 1280px) block above; equal-specificity rules are
+   resolved by source order, so this later rule wins and restores the Dynamic
+   Island left/right insets that the block above resets to 1rem. */
+@media (max-width: 1280px) and (orientation: landscape) {
+  .container-modern {
+    padding: var(--spacing-md) var(--spacing-sm);
+    padding-left: calc(var(--spacing-sm) + env(safe-area-inset-left));
+    padding-right: calc(var(--spacing-sm) + env(safe-area-inset-right));
   }
 }
 
