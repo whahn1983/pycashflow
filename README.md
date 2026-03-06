@@ -25,6 +25,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - [User Roles & Access Control](#user-roles--access-control)
 - [Core Capabilities](#core-capabilities)
 - [AI Insights](#ai-insights)
+- [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
 - [Email Integration](#email-integration)
 - [Data Management](#data-management)
 - [Updates & Maintenance](#updates--maintenance)
@@ -76,6 +77,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 
 ### Modern Authentication
 - **Traditional Login**: Email/password authentication with Scrypt password hashing
+- **Two-Factor Authentication (2FA)**: TOTP-based 2FA with QR code setup and backup codes
 - **Passkey Support**: Modern passwordless authentication via Corbado integration
 - **Session Management**: Secure session handling with "remember me" functionality
 
@@ -107,6 +109,8 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 
 ### Security
 - **Werkzeug**: Scrypt password hashing
+- **pyotp**: TOTP-based two-factor authentication
+- **qrcode**: QR code generation for authenticator app setup
 - **Corbado SDK**: Passkey authentication (optional)
 - **python-dotenv**: Secure environment variable management
 
@@ -375,6 +379,48 @@ PyCashFlow integrates with the OpenAI API to provide on-demand cash flow analysi
 5. Return to the dashboard and click **Refresh** to generate your first analysis
 
 > **Note**: AI queries are only made when you click Refresh, keeping costs minimal. The last-updated timestamp on the card shows how stale the cached results are.
+
+---
+
+## Two-Factor Authentication (2FA)
+
+PyCashFlow supports TOTP-based two-factor authentication to add an extra layer of security to your account.
+
+### Enabling 2FA
+
+1. Log in and navigate to **Settings → Two-Factor Authentication**
+2. Click **Enable 2FA**
+3. Scan the displayed QR code with your authenticator app:
+   - Google Authenticator
+   - Authy
+   - Microsoft Authenticator
+   - 1Password
+   - Bitwarden
+   - Any other TOTP-compatible app
+4. If you can't scan the QR code, enter the secret key manually into your app
+5. Enter the 6-digit code shown in your authenticator app to confirm setup
+6. **Save your backup codes** — they are displayed once immediately after activation
+
+### Logging In with 2FA
+
+After entering your email and password, you will be prompted for your 6-digit TOTP code. Open your authenticator app and enter the current code to complete login.
+
+### Backup Codes
+
+When you enable 2FA, PyCashFlow generates **10 single-use backup codes**. Store these in a safe place. If you lose access to your authenticator app, you can use a backup code in place of the TOTP code to log in. Each backup code can only be used once.
+
+### Disabling 2FA
+
+1. Navigate to **Settings → Two-Factor Authentication**
+2. Click **Disable 2FA**
+3. Confirm with your account password and a current TOTP code (or a backup code)
+
+### Security Details
+
+- TOTP secrets are encrypted at rest using Fernet symmetric encryption (derived from `APP_SECRET`)
+- Backup codes are hashed with scrypt before storage and consumed on first use
+- A ±30-second clock skew tolerance is applied to TOTP verification
+- The 2FA verification endpoint is rate-limited to prevent brute-force attacks
 
 ---
 
