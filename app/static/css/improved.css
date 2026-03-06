@@ -295,22 +295,16 @@ body::before {
   }
 }
 
-/* Portrait Mobile: Push body below Dynamic Island at the body level.
-   The base .navbar-improved already carries env(safe-area-inset-top) padding,
-   but some browsers don't account for that dynamic value when computing the
-   sticky flex item's height, so the main content can start too high.
-   Moving the top-inset responsibility to body.padding-top guarantees the
-   entire flex column — including the navbar — starts below the safe area,
-   while the navbar reverts to its natural 0.75 rem top padding. */
+/* Portrait Mobile: Keep env(safe-area-inset-top) on the navbar itself so the
+   sticky bar stays notch-safe after the user scrolls. When position:sticky
+   kicks in the navbar pins to top:0 (the raw viewport origin, inside the
+   notch), so it must own the inset compensation — body padding scrolls away
+   and cannot protect the sticky element. */
 @media (max-width: 1280px) and (orientation: portrait) {
-  body {
-    padding-top: env(safe-area-inset-top);
-  }
-
-  /* Body now handles safe-area-inset-top; remove it from the navbar and
-     tighten vertical padding to match the compact landscape style. */
+  /* Compact vertical padding; safe-area-inset-top keeps nav content clear of
+     the Dynamic Island / notch in both the initial and sticky states. */
   .navbar-improved {
-    padding-top: 0.5rem;
+    padding-top: calc(0.5rem + env(safe-area-inset-top));
     padding-bottom: 0.5rem;
   }
 
