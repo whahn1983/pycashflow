@@ -153,6 +153,14 @@ body::before {
   outline-offset: 2px;
 }
 
+/* Remove horizontal padding from the inner container-modern inside the navbar.
+   .navbar-improved itself owns the horizontal padding (including safe-area insets),
+   so the nested container-modern must not add a second layer of left/right padding. */
+.navbar-improved .container-modern {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 /* Desktop Navigation Container */
 .navbar-nav-container {
   display: flex;
