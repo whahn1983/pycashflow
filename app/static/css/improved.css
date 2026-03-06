@@ -307,9 +307,11 @@ body::before {
     padding-top: env(safe-area-inset-top);
   }
 
-  /* Body now handles safe-area-inset-top; remove it from the navbar */
+  /* Body now handles safe-area-inset-top; remove it from the navbar and
+     tighten vertical padding to match the compact landscape style. */
   .navbar-improved {
-    padding-top: 0.75rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
   }
 
   /* Clamp the open collapse menu so it never extends behind the bottom
