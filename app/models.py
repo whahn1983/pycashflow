@@ -11,6 +11,9 @@ class User(UserMixin, db.Model):
     is_global_admin = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=False)
     account_owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    twofa_enabled = db.Column(db.Boolean, default=False, nullable=False)
+    twofa_secret = db.Column(db.String(500), nullable=True)   # Fernet-encrypted TOTP secret
+    twofa_backup_codes = db.Column(db.Text, nullable=True)    # JSON array of scrypt-hashed backup codes
 
     # Relationships
     guests = db.relationship('User', backref=db.backref('account_owner', remote_side=[id]))

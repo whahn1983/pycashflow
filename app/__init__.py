@@ -4,12 +4,15 @@ from flask_login import LoginManager
 import secrets
 import os
 from flask_migrate import Migrate
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
 
 # init SQLAlchemy so we can use it later in our models
 db = SQLAlchemy()
 migrate = Migrate()
+limiter = Limiter(key_func=get_remote_address, default_limits=[])
 
 
 def create_app():
@@ -42,6 +45,7 @@ def create_app():
 
     db.init_app(app)
     migrate.init_app(app, db)
+    limiter.init_app(app)
 
     login_manager = LoginManager()
     login_manager.login_view = 'auth.login'

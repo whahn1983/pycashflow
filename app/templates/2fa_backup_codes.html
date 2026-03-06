@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div style="max-width: 520px; margin: 3rem auto;">
+    <!-- Header -->
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 style="color: var(--success); font-size: 2rem; margin-bottom: 0.5rem;">
+            <i class="fa-solid fa-circle-check"></i> 2FA Enabled!
+        </h1>
+        <p style="color: var(--text-secondary);">Save your backup codes in a safe place. Each code can only be used once.</p>
+    </div>
+
+    <div class="metric-card" style="padding: 2rem;">
+
+        <div style="background-color: rgba(239,68,68,0.08); border-left: 4px solid var(--danger);
+                    padding: 1rem; margin-bottom: 1.5rem; border-radius: var(--radius-md);">
+            <p style="margin: 0; color: var(--text-secondary); font-size: 0.875rem;">
+                <i class="fa-solid fa-triangle-exclamation" style="color: var(--warning);"></i>
+                <strong>These codes will not be shown again.</strong>
+                Store them somewhere safe (e.g. a password manager or printed paper).
+                Use one if you ever lose access to your authenticator app.
+            </p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1.5rem;" id="codesGrid">
+            {% for code in codes %}
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border);
+                        border-radius: var(--radius-md); padding: 0.5rem 0.75rem;
+                        font-family: monospace; font-size: 0.95rem; letter-spacing: 0.1em;
+                        color: var(--text-primary); text-align: center;">
+                {{ code }}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn-outline-modern btn-modern" onclick="copyAllCodes()" style="flex: 1;">
+                <i class="fa-solid fa-copy"></i> Copy All Codes
+            </button>
+            <a href="{{ url_for('main.settings') }}" class="btn-primary-modern btn-modern" style="flex: 1; text-decoration: none; text-align: center;">
+                <i class="fa-solid fa-check"></i> Done, I've Saved Them
+            </a>
+        </div>
+
+    </div>
+</div>
+
+<script>
+function copyAllCodes() {
+    const codes = [...document.querySelectorAll('#codesGrid div')].map(d => d.textContent.trim());
+    navigator.clipboard.writeText(codes.join('\n')).then(() => {
+        const btn = event.target.closest('button');
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+        setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    }).catch(() => {
+        alert('Copy failed. Please select and copy the codes manually.');
+    });
+}
+</script>
+
+{% endblock %}

@@ -128,6 +128,36 @@
         </button>
     </div>
 
+    <!-- Two-Factor Authentication Card - Available to all users -->
+    <div class="metric-card">
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <div style="width: 3rem; height: 3rem; background: linear-gradient(135deg, #0ea5e9, #38bdf8); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div>
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-primary);">Two-Factor Authentication</h3>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">
+                    {% if current_user.twofa_enabled %}
+                    <span style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> Enabled</span>
+                    {% else %}
+                    <span style="color: var(--warning);"><i class="fa-solid fa-circle-exclamation"></i> Not enabled</span>
+                    {% endif %}
+                    &mdash; Authenticator app (TOTP)
+                </p>
+            </div>
+        </div>
+        {% if current_user.twofa_enabled %}
+        <button class="btn-modern" style="width: 100%; background: linear-gradient(135deg, #ef4444, #f87171); color: white; border: none;"
+                data-bs-toggle="modal" data-bs-target="#disable2famodal">
+            <i class="fa-solid fa-shield-xmark"></i> Disable 2FA
+        </button>
+        {% else %}
+        <a href="{{ url_for('main.setup_2fa') }}" class="btn-modern btn-primary-modern" style="width: 100%; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 0.4rem;">
+            <i class="fa-solid fa-shield-halved"></i> Enable 2FA
+        </a>
+        {% endif %}
+    </div>
+
     <!-- About Card - Available to all users -->
     <div class="metric-card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#aboutmodal">
         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
@@ -491,5 +521,70 @@
         </div>
     </div>
 </div>
+
+{% if current_user.twofa_enabled %}
+<!-- Disable 2FA Modal -->
+<div class="modal fade modal-modern" id="disable2famodal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-shield-xmark"></i> Disable Two-Factor Authentication
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div style="background-color: rgba(239,68,68,0.08); border-left: 4px solid var(--danger);
+                            padding: 1rem; margin-bottom: 1.5rem; border-radius: var(--radius-md);">
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 0.875rem;">
+                        <i class="fa-solid fa-triangle-exclamation" style="color: var(--warning);"></i>
+                        Disabling 2FA will make your account less secure. Enter your password and a
+                        current verification code to confirm.
+                    </p>
+                </div>
+                <form action="{{ url_for('main.disable_2fa') }}" method="POST">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-lock"></i> Current Password <span style="color: var(--danger);">*</span>
+                        </label>
+                        <input class="form-control-modern" type="password" name="current_password"
+                               placeholder="Your account password" required autocomplete="current-password">
+                    </div>
+
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-mobile-screen"></i> Verification Code <span style="color: var(--danger);">*</span>
+                        </label>
+                        <input class="form-control-modern" type="text" name="totp_code"
+                               placeholder="6-digit code or backup code"
+                               maxlength="10" inputmode="numeric" autocomplete="one-time-code"
+                               style="letter-spacing: 0.25em; text-align: center;">
+                        <small style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                            Enter the current code from your authenticator app, or a backup code.
+                        </small>
+                    </div>
+
+                    <div class="form-group-modern" style="margin-top: 0.25rem;">
+                        <label style="color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.875rem;">
+                            <input type="checkbox" name="use_backup" value="1" style="width: 1rem; height: 1rem; cursor: pointer;">
+                            I am using a backup code
+                        </label>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-modern" type="submit"
+                                style="flex: 1; background: linear-gradient(135deg, #ef4444, #f87171); color: white; border: none;">
+                            <i class="fa-solid fa-shield-xmark"></i> Disable 2FA
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i> Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% endblock %}

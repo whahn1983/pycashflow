@@ -2,8 +2,9 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from flask_login import login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from .models import User
-from app import db
+from app import db, limiter
 from .getemail import send_new_user_notification
+from .totp_utils import verify_totp, decrypt_totp_secret, verify_and_consume_backup_code
 import pandas as pd
 import os
 from functools import wraps
@@ -83,7 +84,66 @@ def login_post():
         flash('Your account is pending approval. Please contact an administrator.')
         return redirect(url_for('auth.login'))
 
+    # If 2FA is enabled, redirect to TOTP verification step
+    if user.twofa_enabled:
+        session['twofa_pending_user_id'] = user.id
+        session['twofa_remember'] = remember
+        return redirect(url_for('auth.login_2fa'))
+
     # if the above check passes, then we know the user has the right credentials
+    login_user(user, remember=remember)
+    session['name'] = user.name
+    session['email'] = user.email
+
+    return redirect(url_for('main.index'))
+
+
+@auth.route('/login/2fa', methods=['GET'])
+def login_2fa():
+    if 'twofa_pending_user_id' not in session:
+        return redirect(url_for('auth.login'))
+    return render_template('2fa_verify.html')
+
+
+@auth.route('/login/2fa', methods=['POST'])
+@limiter.limit("10 per minute")
+def login_2fa_post():
+    pending_id = session.get('twofa_pending_user_id')
+    if not pending_id:
+        flash('Session expired. Please log in again.')
+        return redirect(url_for('auth.login'))
+
+    user = User.query.get(pending_id)
+    if not user:
+        session.pop('twofa_pending_user_id', None)
+        session.pop('twofa_remember', None)
+        flash('User not found. Please log in again.')
+        return redirect(url_for('auth.login'))
+
+    code = request.form.get('code', '').strip()
+    use_backup = request.form.get('use_backup')
+
+    verified = False
+
+    if use_backup:
+        # Attempt backup code verification
+        verified = verify_and_consume_backup_code(user, code)
+        if not verified:
+            flash('Invalid or already-used backup code.')
+            return redirect(url_for('auth.login_2fa'))
+    else:
+        # Attempt TOTP verification
+        if user.twofa_secret:
+            plain_secret = decrypt_totp_secret(user.twofa_secret)
+            verified = verify_totp(plain_secret, code)
+        if not verified:
+            flash('Invalid or expired verification code.')
+            return redirect(url_for('auth.login_2fa'))
+
+    # Verification passed – complete login
+    remember = session.pop('twofa_remember', False)
+    session.pop('twofa_pending_user_id', None)
+
     login_user(user, remember=remember)
     session['name'] = user.name
     session['email'] = user.email
