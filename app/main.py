@@ -2,7 +2,7 @@ from flask import request, redirect, url_for, send_from_directory, flash, send_f
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip, GlobalEmailSettings, AISettings
-from app import db
+from app import db, limiter
 from datetime import datetime
 import os
 import json
@@ -14,6 +14,12 @@ from .files import export, upload, version
 from .getemail import send_account_activation_notification
 from .crypto_utils import encrypt_password, decrypt_password
 from .ai_insights import fetch_insights, validate_model
+from .totp_utils import (
+    generate_totp_secret, encrypt_totp_secret, decrypt_totp_secret,
+    generate_qr_code_b64, verify_totp,
+    generate_backup_codes, hash_backup_codes,
+    verify_and_consume_backup_code,
+)
 
 
 main = Blueprint('main', __name__)
@@ -1045,3 +1051,113 @@ def serve_manifest():
 @main.route('/sw.js')
 def serve_sw():
     return send_file('sw.js', mimetype='application/javascript')
+
+
+# ---------------------------------------------------------------------------
+# 2FA – Setup (enable)
+# ---------------------------------------------------------------------------
+
+@main.route('/setup_2fa', methods=['GET'])
+@login_required
+def setup_2fa():
+    """Show QR code and secret for the user to register in their authenticator app."""
+    from flask import session as flask_session
+    # Generate a fresh temp secret each time the setup page is (re-)loaded
+    temp_secret = generate_totp_secret()
+    flask_session['twofa_temp_secret'] = temp_secret
+
+    qr_b64 = generate_qr_code_b64(temp_secret, current_user.email)
+    return render_template('2fa_setup.html', qr_b64=qr_b64, secret=temp_secret)
+
+
+@main.route('/setup_2fa', methods=['POST'])
+@login_required
+@limiter.limit("10 per minute")
+def setup_2fa_post():
+    """Verify the first TOTP code from the authenticator app and activate 2FA."""
+    from flask import session as flask_session
+
+    temp_secret = flask_session.get('twofa_temp_secret')
+    if not temp_secret:
+        flash('Session expired. Please restart the 2FA setup.')
+        return redirect(url_for('main.setup_2fa'))
+
+    code = request.form.get('code', '').strip()
+    if not verify_totp(temp_secret, code):
+        flash('Invalid code. Please try again.')
+        return redirect(url_for('main.setup_2fa'))
+
+    # Generate and persist backup codes
+    plain_codes = generate_backup_codes()
+    hashed_json = hash_backup_codes(plain_codes)
+
+    user = User.query.get(current_user.id)
+    user.twofa_enabled = True
+    user.twofa_secret = encrypt_totp_secret(temp_secret)
+    user.twofa_backup_codes = hashed_json
+    db.session.commit()
+
+    flask_session.pop('twofa_temp_secret', None)
+
+    # Show backup codes exactly once
+    from flask import session as flask_session
+    flask_session['twofa_new_backup_codes'] = plain_codes
+    return redirect(url_for('main.setup_2fa_backup_codes'))
+
+
+@main.route('/setup_2fa/backup_codes')
+@login_required
+def setup_2fa_backup_codes():
+    """Display backup codes once immediately after 2FA is enabled."""
+    from flask import session as flask_session
+    codes = flask_session.pop('twofa_new_backup_codes', None)
+    if not codes:
+        flash('Backup codes are only shown once, immediately after enabling 2FA.')
+        return redirect(url_for('main.settings'))
+    return render_template('2fa_backup_codes.html', codes=codes)
+
+
+# ---------------------------------------------------------------------------
+# 2FA – Disable
+# ---------------------------------------------------------------------------
+
+@main.route('/disable_2fa', methods=['POST'])
+@login_required
+@limiter.limit("10 per minute")
+def disable_2fa():
+    """
+    Disable 2FA.  Requires the current account password AND a valid TOTP code
+    (or backup code) as confirmation.
+    """
+    user = User.query.get(current_user.id)
+
+    current_password = request.form.get('current_password', '').strip()
+    totp_code = request.form.get('totp_code', '').strip()
+    use_backup = request.form.get('use_backup')
+
+    # 1. Verify password
+    if not check_password_hash(user.password, current_password):
+        flash('Incorrect password. 2FA was not disabled.')
+        return redirect(url_for('main.settings'))
+
+    # 2. Verify TOTP or backup code
+    if use_backup:
+        verified = verify_and_consume_backup_code(user, totp_code)
+    else:
+        if user.twofa_secret:
+            plain_secret = decrypt_totp_secret(user.twofa_secret)
+            verified = verify_totp(plain_secret, totp_code)
+        else:
+            verified = False
+
+    if not verified:
+        flash('Invalid verification code. 2FA was not disabled.')
+        return redirect(url_for('main.settings'))
+
+    user.twofa_enabled = False
+    user.twofa_secret = None
+    user.twofa_backup_codes = None
+    db.session.commit()
+
+    flash('Two-factor authentication has been disabled.')
+    return redirect(url_for('main.settings'))
