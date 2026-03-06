@@ -742,6 +742,15 @@ body.modal-open {
   flex: 1;
 }
 
+/* Landscape override must come after the base .container-modern rule so it wins the cascade */
+@media (max-width: 1280px) and (orientation: landscape) {
+  .container-modern {
+    padding: var(--spacing-md) var(--spacing-sm);
+    padding-left: calc(var(--spacing-sm) + env(safe-area-inset-left));
+    padding-right: calc(var(--spacing-sm) + env(safe-area-inset-right));
+  }
+}
+
 .page-header {
   margin-bottom: var(--spacing-xl);
 }
