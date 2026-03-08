@@ -5,18 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#0f172a">
     <title>PyCashFlow — Offline</title>
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        body {
-            font-family: Inter, system-ui, -apple-system, sans-serif;
-            background-color: #0f172a;
-            color: #e2e8f0;
-            min-height: 100vh;
+    <!-- Bootstrap 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- App CSS (pre-cached by service worker) -->
+    <link rel="stylesheet" href="/static/css/improved.css">
+
+    <style>
+        .offline-content {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            min-height: calc(100vh - 4rem);
             padding: 2rem;
             text-align: center;
         }
@@ -42,7 +47,7 @@
             margin-bottom: 2rem;
         }
 
-        .badge {
+        .badge-offline {
             display: inline-block;
             background: rgba(239, 68, 68, 0.15);
             border: 1px solid rgba(239, 68, 68, 0.4);
@@ -69,34 +74,71 @@
         }
 
         button:hover { background: #2563eb; }
-
-        .brand {
-            position: fixed;
-            top: 1.25rem;
-            left: 1.5rem;
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #3b82f6;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
     </style>
 </head>
 <body>
-    <a href="/" class="brand">
-        &#x1F4C8; PyCashFlow
-    </a>
+    <!-- Navigation Bar -->
+    <nav class="navbar-improved">
+        <div class="container-modern" style="display: flex; justify-content: space-between; align-items: center;">
+            <a href="/" class="brand">
+                <i class="fa-solid fa-chart-line"></i>
+                PyCashFlow
+            </a>
 
-    <div class="badge">No Connection</div>
-    <div class="icon">&#x1F6AB;</div>
-    <h1>You're offline</h1>
-    <p>
-        PyCashFlow couldn't reach the server. If you've visited this page before,
-        try navigating back — your last view may still be available from cache.
-    </p>
-    <button onclick="window.location.reload()">Try Again</button>
+            <!-- Hamburger Toggle (Mobile Only) -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+
+            <!-- Navigation Links -->
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <div class="navbar-nav-container">
+                    <a href="/" class="nav-link">
+                        <i class="fa-solid fa-home"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="/schedule" class="nav-link">
+                        <i class="fa-solid fa-calendar-days"></i>
+                        <span>Schedule</span>
+                    </a>
+                    <a href="/scenarios" class="nav-link">
+                        <i class="fa-solid fa-flask"></i>
+                        <span>Scenarios</span>
+                    </a>
+                    <a href="/transactions" class="nav-link">
+                        <i class="fa-solid fa-list"></i>
+                        <span>Transactions</span>
+                    </a>
+                    <a href="/holds" class="nav-link">
+                        <i class="fa-solid fa-pause-circle"></i>
+                        <span>Holds</span>
+                    </a>
+                    <a href="/settings" class="nav-link">
+                        <i class="fa-solid fa-gear"></i>
+                        <span>Settings</span>
+                    </a>
+                    <a href="/logout" class="nav-link">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="offline-content">
+        <div class="badge-offline">No Connection</div>
+        <div class="icon">&#x1F6AB;</div>
+        <h1>You're offline</h1>
+        <p>
+            PyCashFlow couldn't reach the server. If you've visited this page before,
+            try navigating back — your last view may still be available from cache.
+        </p>
+        <button onclick="window.location.reload()">Try Again</button>
+    </div>
+
+    <!-- Bootstrap JS (for hamburger toggle) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         window.addEventListener('online', () => window.location.reload());
