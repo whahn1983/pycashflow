@@ -425,6 +425,20 @@
                                value="{{ email_config.endstr or '' if email_config else '' }}">
                     </div>
 
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-shield-halved"></i> Allowed Sender
+                        </label>
+                        <input class="form-control-modern" type="text" name="allowed_sender"
+                               placeholder="alerts@bank.com or @bank.com"
+                               value="{{ email_config.allowed_sender or '' if email_config else '' }}">
+                        <small style="color: var(--text-muted, #6c757d); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                            Only parse balances from this sender. Use <code>@domain.com</code> to allow any address at
+                            a domain, or <code>user@domain.com</code> for an exact match. Leave blank to skip the check
+                            (not recommended).
+                        </small>
+                    </div>
+
                     <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
                         <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
                             <i class="fa-solid fa-check"></i>

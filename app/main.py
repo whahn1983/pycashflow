@@ -573,6 +573,7 @@ def email():
             subjectstr = request.form['subject_str']
             startstr = request.form['start_str']
             endstr = request.form['end_str']
+            allowed_sender = request.form.get('allowed_sender', '').strip().lower() or None
             emailsettings.email = email
             if password_input:
                 emailsettings.password = encrypt_password(password_input)
@@ -580,6 +581,7 @@ def email():
             emailsettings.subjectstr = subjectstr
             emailsettings.startstr = startstr
             emailsettings.endstr = endstr
+            emailsettings.allowed_sender = allowed_sender
             db.session.commit()
 
             return redirect(url_for('main.settings'))
@@ -590,8 +592,9 @@ def email():
         subjectstr = request.form['subject_str']
         startstr = request.form['start_str']
         endstr = request.form['end_str']
+        allowed_sender = request.form.get('allowed_sender', '').strip().lower() or None
         emailentry = Email(email=email, password=password, server=server, subjectstr=subjectstr, startstr=startstr,
-                           endstr=endstr, user_id=user_id)
+                           endstr=endstr, allowed_sender=allowed_sender, user_id=user_id)
         db.session.add(emailentry)
         db.session.commit()
 

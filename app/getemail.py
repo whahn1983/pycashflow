@@ -15,10 +15,12 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
+import re
 import imaplib
 import email
 import smtplib
 from email.header import decode_header
+from email.utils import parseaddr
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
@@ -27,6 +29,60 @@ from app.models import User, Email, Balance, GlobalEmailSettings
 from app.crypto_utils import decrypt_password
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Sender / authentication-header helpers
+# ---------------------------------------------------------------------------
+
+def _extract_sender_address(from_header: str) -> str:
+    """Return the bare, lower-cased email address from a From header value.
+
+    Handles both plain addresses ('alerts@bank.com') and RFC 5322 display-name
+    form ('"Bank Alerts" <alerts@bank.com>').  Returns an empty string when
+    the header cannot be parsed.
+    """
+    _, addr = parseaddr(from_header or "")
+    return addr.lower().strip()
+
+
+def _sender_is_allowed(sender_address: str, allowed_sender: str) -> bool:
+    """Return True when *sender_address* satisfies the *allowed_sender* pattern.
+
+    Pattern formats (case-insensitive):
+      '@domain.com'      – any address whose domain part equals domain.com
+      'user@domain.com'  – exact address match
+    """
+    allowed = (allowed_sender or "").strip().lower()
+    sender = (sender_address or "").strip().lower()
+    if not allowed:
+        return True  # no restriction configured; caller must warn
+    if allowed.startswith("@"):
+        return sender.endswith(allowed)
+    return sender == allowed
+
+
+def _parse_auth_results(msg) -> dict:
+    """Parse *Authentication-Results* headers and return a mapping of
+    mechanism → result for dkim, spf, and dmarc.
+
+    Only the first result found for each mechanism is kept (the outermost
+    Authentication-Results header, added by the user's own mail provider,
+    appears first in the message).
+
+    Example return value: {'dkim': 'pass', 'spf': 'pass', 'dmarc': 'pass'}
+    """
+    results: dict = {}
+    for header_value in msg.get_all("Authentication-Results") or []:
+        for mech, result in re.findall(
+            r"\b(dkim|spf|dmarc)=(pass|fail|softfail|none|neutral|permerror|temperror)\b",
+            header_value,
+            re.IGNORECASE,
+        ):
+            key = mech.lower()
+            if key not in results:
+                results[key] = result.lower()
+    return results
 
 
 def process_email_balances():
@@ -101,6 +157,46 @@ def process_email_balances():
                                     logger.debug(
                                         "Could not decode From header for email_id %s, user %s: %s",
                                         email_id, user_id, exc,
+                                    )
+
+                            # --- Sender validation ---
+                            sender_address = _extract_sender_address(
+                                From if isinstance(From, str) else str(From or "")
+                            )
+                            allowed_sender = email_config.allowed_sender
+                            if not allowed_sender:
+                                logger.warning(
+                                    "No allowed_sender configured for user %s; "
+                                    "processing email_id %s from <%s> without sender check",
+                                    user_id, email_id, sender_address,
+                                )
+                            elif not _sender_is_allowed(sender_address, allowed_sender):
+                                logger.warning(
+                                    "Rejected email_id %s for user %s: "
+                                    "sender <%s> does not match allowed_sender %r",
+                                    email_id, user_id, sender_address, allowed_sender,
+                                )
+                                break  # skip remaining responses for this email_id
+
+                            # --- Authentication-Results inspection ---
+                            auth = _parse_auth_results(msg)
+                            for mech in ("dkim", "spf", "dmarc"):
+                                result = auth.get(mech)
+                                if result is None:
+                                    logger.debug(
+                                        "No %s result in Authentication-Results "
+                                        "for email_id %s, user %s",
+                                        mech.upper(), email_id, user_id,
+                                    )
+                                elif result != "pass":
+                                    logger.warning(
+                                        "email_id %s for user %s: %s=%s (not pass)",
+                                        email_id, user_id, mech.upper(), result,
+                                    )
+                                else:
+                                    logger.debug(
+                                        "email_id %s for user %s: %s=pass",
+                                        email_id, user_id, mech.upper(),
                                     )
 
                             # Extract email body
