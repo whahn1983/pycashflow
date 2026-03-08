@@ -7,6 +7,7 @@ This script can be run standalone from cron or called from within the applicatio
 """
 import os
 import sys
+import logging
 
 # When run as standalone script, add parent directory to path for imports
 # This allows 'from app import ...' to work when called from cron
@@ -16,14 +17,16 @@ if parent_dir not in sys.path:
 
 import imaplib
 import email
+import smtplib
 from email.header import decode_header
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import smtplib
 from datetime import datetime, timedelta
 from app import db
 from app.models import User, Email, Balance, GlobalEmailSettings
 from app.crypto_utils import decrypt_password
+
+logger = logging.getLogger(__name__)
 
 
 def process_email_balances():
@@ -65,7 +68,7 @@ def process_email_balances():
             else:
                 email_ids = []
 
-            print(f"Found {len(email_ids)} email(s) from the past day for user {user_id}")
+            logger.info("Found %d email(s) from the past day for user %s", len(email_ids), user_id)
 
             email_content = {}
 
@@ -82,7 +85,11 @@ def process_email_balances():
                             if isinstance(subject, bytes):
                                 try:
                                     subject = subject.decode(encoding)
-                                except:
+                                except (UnicodeDecodeError, LookupError) as exc:
+                                    logger.debug(
+                                        "Could not decode subject for email_id %s, user %s: %s",
+                                        email_id, user_id, exc,
+                                    )
                                     subject = "subject"
 
                             # Decode sender
@@ -90,33 +97,41 @@ def process_email_balances():
                             if isinstance(From, bytes):
                                 try:
                                     From = From.decode(encoding)
-                                except:
-                                    pass
+                                except (UnicodeDecodeError, LookupError) as exc:
+                                    logger.debug(
+                                        "Could not decode From header for email_id %s, user %s: %s",
+                                        email_id, user_id, exc,
+                                    )
 
                             # Extract email body
                             if msg.is_multipart():
                                 for part in msg.walk():
                                     content_type = part.get_content_type()
                                     content_disposition = str(part.get("Content-Disposition"))
+                                    body = None
                                     try:
                                         body = part.get_payload(decode=True).decode()
-                                    except:
-                                        pass
-                                    if content_type == "text/plain" and "attachment" not in content_disposition:
-                                        try:
-                                            email_content[subject] = body
-                                        except:
-                                            pass
+                                    except (UnicodeDecodeError, AttributeError) as exc:
+                                        logger.debug(
+                                            "Could not decode part body for email_id %s, user %s: %s",
+                                            email_id, user_id, exc,
+                                        )
+                                    if (
+                                        content_type == "text/plain"
+                                        and "attachment" not in content_disposition
+                                        and body is not None
+                                    ):
+                                        email_content[subject] = body
                             else:
                                 content_type = msg.get_content_type()
                                 body = msg.get_payload(decode=True).decode()
                                 if content_type == "text/plain":
-                                    try:
-                                        email_content[subject] = body
-                                    except:
-                                        pass
-                except:
-                    pass  # Skip individual email errors
+                                    email_content[subject] = body
+                except Exception as exc:
+                    logger.warning(
+                        "Skipping email_id %s for user %s: %s",
+                        email_id, user_id, exc,
+                    )
 
             # Extract balance from emails for THIS user
             try:
@@ -134,21 +149,22 @@ def process_email_balances():
                 )
                 db.session.add(balance)
                 db.session.commit()
-                print(f"Successfully imported balance ${new_balance} for user {user_id}")
+                logger.info("Imported balance $%s for user %s", new_balance, user_id)
             except KeyError:
                 # No email with the specified subject found
                 pass
-            except Exception as e:
-                # No balance found in emails for this user
-                print(f"Could not extract balance for user {user_id}: {e}")
+            except ValueError as exc:
+                logger.warning("Could not parse balance value for user %s: %s", user_id, exc)
+            except Exception as exc:
+                logger.error("Failed to save balance for user %s: %s", user_id, exc)
 
             # Close IMAP connection for THIS user
             imap.close()
             imap.logout()
 
-        except Exception as e:
+        except Exception as exc:
             # Failed to connect to IMAP for this user - skip to next user
-            print(f"Failed to process emails for user {user_id}: {e}")
+            logger.exception("Failed to process emails for user %s", user_id)
             continue
 
 
@@ -168,14 +184,14 @@ def send_new_user_notification(new_user_name, new_user_email):
         global_admin = User.query.filter_by(is_global_admin=True).first()
 
         if not global_admin:
-            print("No global admin found, skipping notification")
+            logger.warning("No global admin found, skipping new user notification")
             return False
 
         # Get global email settings
         email_settings = GlobalEmailSettings.query.first()
 
         if not email_settings:
-            print("No global email settings configured, skipping notification")
+            logger.warning("No global email settings configured, skipping new user notification")
             return False
 
         # Extract email credentials from global settings
@@ -243,24 +259,30 @@ Please log in to your PyCashFlow account to activate this user.
             server.login(from_email, password)
             server.sendmail(from_email, global_admin.email, msg.as_string())
             server.quit()
-            print(f"Successfully sent new user notification email to {global_admin.email}")
+            logger.info("Sent new user notification email to %s", global_admin.email)
             return True
-        except Exception as e:
+        except (smtplib.SMTPException, OSError) as exc:
             # If port 587 fails, try port 465 with SSL
-            print(f"Failed to send via port 587, trying SSL on port 465: {e}")
+            logger.warning(
+                "Port 587 (STARTTLS) failed for %s, trying port 465 (SSL): %s",
+                global_admin.email, exc,
+            )
             try:
                 server = smtplib.SMTP_SSL(smtp_server, 465, timeout=10)
                 server.login(from_email, password)
                 server.sendmail(from_email, global_admin.email, msg.as_string())
                 server.quit()
-                print(f"Successfully sent new user notification email to {global_admin.email} via SSL")
+                logger.info("Sent new user notification email to %s via SSL", global_admin.email)
                 return True
-            except Exception as e2:
-                print(f"Failed to send email via both ports: {e2}")
+            except (smtplib.SMTPException, OSError) as exc2:
+                logger.error(
+                    "Failed to send new user notification via both ports to %s: %s",
+                    global_admin.email, exc2,
+                )
                 return False
 
-    except Exception as e:
-        print(f"Error sending new user notification: {e}")
+    except Exception as exc:
+        logger.exception("Unexpected error sending new user notification for %s", new_user_email)
         return False
 
 
@@ -280,7 +302,7 @@ def send_account_activation_notification(user_name, user_email):
         email_settings = GlobalEmailSettings.query.first()
 
         if not email_settings:
-            print("No global email settings configured, skipping activation notification")
+            logger.warning("No global email settings configured, skipping activation notification")
             return False
 
         # Extract email credentials from global settings
@@ -357,24 +379,30 @@ The PyCashFlow Team
             server.login(from_email, password)
             server.sendmail(from_email, user_email, msg.as_string())
             server.quit()
-            print(f"Successfully sent account activation email to {user_email}")
+            logger.info("Sent account activation email to %s", user_email)
             return True
-        except Exception as e:
+        except (smtplib.SMTPException, OSError) as exc:
             # If port 587 fails, try port 465 with SSL
-            print(f"Failed to send via port 587, trying SSL on port 465: {e}")
+            logger.warning(
+                "Port 587 (STARTTLS) failed for %s, trying port 465 (SSL): %s",
+                user_email, exc,
+            )
             try:
                 server = smtplib.SMTP_SSL(smtp_server, 465, timeout=10)
                 server.login(from_email, password)
                 server.sendmail(from_email, user_email, msg.as_string())
                 server.quit()
-                print(f"Successfully sent account activation email to {user_email} via SSL")
+                logger.info("Sent account activation email to %s via SSL", user_email)
                 return True
-            except Exception as e2:
-                print(f"Failed to send email via both ports: {e2}")
+            except (smtplib.SMTPException, OSError) as exc2:
+                logger.error(
+                    "Failed to send activation notification via both ports to %s: %s",
+                    user_email, exc2,
+                )
                 return False
 
-    except Exception as e:
-        print(f"Error sending account activation notification: {e}")
+    except Exception as exc:
+        logger.exception("Unexpected error sending activation notification for %s", user_email)
         return False
 
 
@@ -382,13 +410,14 @@ The PyCashFlow Team
 if __name__ == "__main__":
     from app import create_app
 
-    print("Starting email balance import...")
+    logging.basicConfig(level=logging.INFO)
+    logger.info("Starting email balance import...")
     app = create_app()
 
     with app.app_context():
         try:
             process_email_balances()
-            print("Email balance import completed successfully")
-        except Exception as e:
-            print(f"Email balance import failed: {e}")
+            logger.info("Email balance import completed successfully")
+        except Exception as exc:
+            logger.exception("Email balance import failed")
             sys.exit(1)

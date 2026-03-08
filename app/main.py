@@ -59,7 +59,8 @@ def index():
         balance = Balance(amount=balance.amount, date=datetime.today(), user_id=user_id)
         db.session.add(balance)
         db.session.commit()
-    except:
+    except (ValueError, TypeError, AttributeError) as exc:
+        logger.warning("Invalid balance for user %s (%s), resetting to 0: %s", user_id, type(exc).__name__, exc)
         balance = Balance(amount='0', date=datetime.today(), user_id=user_id)
         db.session.add(balance)
         db.session.commit()
@@ -86,8 +87,8 @@ def index():
         if ai_config.last_insights:
             try:
                 ai_insights_data = json.loads(ai_config.last_insights)
-            except Exception:
-                pass
+            except (json.JSONDecodeError, ValueError) as exc:
+                logger.warning("Could not parse cached AI insights for user %s: %s", user_id, exc)
 
     if current_user.admin:
         return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
@@ -732,9 +733,9 @@ def activate_user(id):
             # Send activation notification email to the user
             try:
                 send_account_activation_notification(user.name, user.email)
-            except Exception as e:
+            except Exception as exc:
                 # Don't fail activation if email notification fails
-                print(f"Failed to send activation notification to {user.email}: {e}")
+                logger.warning("Failed to send activation notification to %s: %s", user.email, exc)
         else:
             flash("You don't have permission to activate this user")
 

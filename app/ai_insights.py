@@ -4,12 +4,15 @@ Builds a 90-day projection payload from the user's schedule and queries
 gpt-4o-mini for risk, pattern, and observation insights.
 """
 import json
+import logging
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from openai import OpenAI
 
 from .cashflow import update_cash
 from .crypto_utils import decrypt_password
+
+logger = logging.getLogger(__name__)
 
 
 SYSTEM_PROMPT = (
@@ -196,8 +199,9 @@ def validate_model(api_key, model_name):
         return False, f"Model '{model_name}' does not exist or is not accessible with this API key."
     except AuthenticationError:
         return False, "Invalid API key — could not validate the model."
-    except Exception as e:
-        return False, f"Could not validate model: {e}"
+    except Exception as exc:
+        logger.warning("Unexpected error validating model %r: %s", model_name, exc)
+        return False, f"Could not validate model: {exc}"
 
 
 def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips, model=None):

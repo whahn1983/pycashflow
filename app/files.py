@@ -26,7 +26,8 @@ def export(user_id):
     """
     try:
         engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
-    except:
+    except Exception as exc:
+        logger.warning("DATABASE_URL connection failed, falling back to SQLite: %s", exc)
         engine = db.create_engine('sqlite:///db.sqlite').connect()
 
     # pull the schedule information for this user only
