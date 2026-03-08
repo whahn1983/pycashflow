@@ -4,11 +4,11 @@
 # appuser can read/write them, regardless of host directory ownership.
 chown -R appuser:appgroup /app/app/data
 chown -R appuser:appgroup /app/migrations
-chown appuser:appgroup /var/log/getemail.log
+chown appuser:appgroup /app/getemail.log
 
 # Run crond in daemon mode as root so it can read /app/crontabs/appuser
 # and drop to appuser for each job.
-/usr/sbin/crond -l 8 -L /var/log/getemail.log -c /app/crontabs/
+/usr/sbin/crond -l 8 -L /app/getemail.log -c /app/crontabs/
 
 # Flask migrations as appuser
 su-exec appuser /usr/local/bin/flask --app app db init

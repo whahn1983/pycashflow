@@ -30,8 +30,8 @@ RUN chmod +x /entry.sh
 
 # Create SQLite data directory and log file, then hand ownership to appuser
 RUN mkdir -p /app/app/data && \
-    touch /var/log/getemail.log && \
-    chown -R appuser:appgroup /app /entry.sh /var/log/getemail.log
+    touch /app/getemail.log && \
+    chown -R appuser:appgroup /app /entry.sh
 
 ENV PYTHONPATH=/app
 ENV DATABASE_URL=sqlite:////app/app/data/db.sqlite
