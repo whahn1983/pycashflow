@@ -258,7 +258,7 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
 
    Add the following line:
    ```
-   * * * * * { cd /path/to/pycashflow; echo "[$(date +"%Y-%m-%dT%H:%M:%S%z")] cron: starting email import"; python3 -u app/getemail.py; rc=$?; echo "[$(date +"%Y-%m-%dT%H:%M:%S%z")] cron: email import exit code $rc"; } >> /var/log/getemail.log 2>&1
+   */1 * * * * /usr/local/bin/python3 -u /path/to/pycashflow/app/getemail.py >> /path/to/pycashflow/getemail.log 2>&1
    ```
 
 7. **Set Up Reverse Proxy (Recommended)**
