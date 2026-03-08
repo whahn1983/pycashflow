@@ -6,6 +6,9 @@ chown -R appuser:appgroup /app/app/data
 chown -R appuser:appgroup /app/migrations
 chown appuser:appgroup /var/log/getemail.log
 
+# Emit a startup marker to confirm log writeability and aid cron troubleshooting.
+echo "[$(date +"%Y-%m-%dT%H:%M:%S%z")] entrypoint: container startup" >> /var/log/getemail.log 2>&1
+
 # Snapshot the full container environment so cron jobs can source it.
 # busybox crond strips environment variables before running jobs, so we save
 # the current env here (as root, before dropping privileges) and restore it
