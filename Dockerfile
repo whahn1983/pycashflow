@@ -13,15 +13,25 @@ COPY constraints.txt constraints.txt
 # install everything except greenlet
 RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt
 
+RUN apk --no-cache add curl su-exec
+
+# Create a dedicated non-root runtime user and group
+RUN addgroup -S appgroup && adduser -S -G appgroup appuser
+
 COPY . .
 
-#Run Cron
-ADD crontab.txt /crontab.txt
+# Set up user-specific crontab directory for busybox crond (via -c flag)
+RUN mkdir -p /app/crontabs && \
+    cp crontab.txt /app/crontabs/appuser && \
+    chmod 600 /app/crontabs/appuser
+
 COPY entry.sh /entry.sh
 RUN chmod +x /entry.sh
-RUN /usr/bin/crontab /crontab.txt
 
-RUN apk --no-cache add curl
+# Create SQLite data directory and log file, then hand ownership to appuser
+RUN mkdir -p /app/app/data && \
+    touch /var/log/getemail.log && \
+    chown -R appuser:appgroup /app /entry.sh /var/log/getemail.log
 
 ENV PYTHONPATH=/app
 ENV DATABASE_URL=sqlite:////app/app/data/db.sqlite

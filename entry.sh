@@ -1,12 +1,18 @@
 #!/bin/sh
 
-# start cron
-/usr/sbin/crond -f -l 8 > /dev/null 2>&1 &
+# Running as root here — fix ownership of any bind-mounted volumes so
+# appuser can read/write them, regardless of host directory ownership.
+chown -R appuser:appgroup /app/app/data
+chown -R appuser:appgroup /app/migrations
+chown appuser:appgroup /var/log/getemail.log
 
-#flask migrate
-/usr/local/bin/flask --app app db init
-/usr/local/bin/flask --app app db migrate
-/usr/local/bin/flask --app app db upgrade
+# Drop to appuser for cron (busybox crond reads /app/crontabs/appuser)
+su-exec appuser /usr/sbin/crond -f -l 8 -c /app/crontabs/ > /dev/null 2>&1 &
 
-#run waitress
-exec waitress-serve --listen=0.0.0.0:5000 --call app:create_app
+# Flask migrations as appuser
+su-exec appuser /usr/local/bin/flask --app app db init
+su-exec appuser /usr/local/bin/flask --app app db migrate
+su-exec appuser /usr/local/bin/flask --app app db upgrade
+
+# Run waitress as appuser (exec replaces the root shell — no root process remains)
+exec su-exec appuser waitress-serve --listen=0.0.0.0:5000 --call app:create_app
