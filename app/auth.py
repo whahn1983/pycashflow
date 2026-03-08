@@ -60,27 +60,7 @@ def login_post():
         flash('Please check your login details and try again.')
         return redirect(url_for('auth.login')) # if the user doesn't exist or password is wrong, reload the page
 
-    # fix for no admin user to make current user an admin
-    user_test = User.query.filter_by(admin=True).first()
-    if not user_test:
-        user.admin = 1
-        db.session.commit()
-
-    # ensure there's at least one global admin in the system
-    global_admin_test = User.query.filter_by(is_global_admin=True).first()
-    if not global_admin_test:
-        # Set the first admin user to be a global admin
-        first_admin = User.query.filter_by(admin=True).order_by(User.id).first()
-        if first_admin:
-            first_admin.is_global_admin = True
-            db.session.commit()
-
-    # IMPORTANT: Global admins are always active - auto-activate if needed
-    if user.is_global_admin and not user.is_active:
-        user.is_active = True
-        db.session.commit()
-
-    # check if the user account is active (after global admin auto-activation)
+    # check if the user account is active
     if not user.is_active:
         flash('Your account is pending approval. Please contact an administrator.')
         return redirect(url_for('auth.login'))
@@ -184,14 +164,18 @@ def signup_post():
         flash('Email address already exists')
         return redirect(url_for('auth.signup'))
 
-    # if no admin user, make new user an admin AND global admin AND active
+    # If BOOTSTRAP_ADMIN_EMAIL is configured, the env-var mechanism is the sole path
+    # for creating the initial global admin; signup should never auto-elevate anyone.
+    # If no bootstrap env var is set and no admin exists yet, the first registrant
+    # becomes the global admin (backwards-compatible initial-setup path).
+    bootstrap_email_configured = bool(os.environ.get('BOOTSTRAP_ADMIN_EMAIL'))
     user_test = User.query.filter_by(admin=True).first()
-    if not user_test:
+    if not user_test and not bootstrap_email_configured:
         admin = True
         is_global_admin = True
         is_active = True
     else:
-        # New signups are admins but inactive until approved by global admin
+        # New signups are inactive until approved by a global admin
         admin = True
         is_global_admin = False
         is_active = False
@@ -285,7 +269,7 @@ def login_passkey():
         return redirect(url_for('auth.login'))
 
 
-@auth.route('/passkey_login_post')
+@auth.route('/passkey_login_post', methods=['POST'])
 @limiter.limit("10 per minute")
 def login_passkey_post():
 
@@ -304,27 +288,7 @@ def login_passkey_post():
         flash('Please check your login details and try again.')
         return redirect(url_for('auth.login'))
 
-    # fix for no admin user to make current user an admin
-    user_test = User.query.filter_by(admin=True).first()
-    if not user_test:
-        user.admin = 1
-        db.session.commit()
-
-    # ensure there's at least one global admin in the system
-    global_admin_test = User.query.filter_by(is_global_admin=True).first()
-    if not global_admin_test:
-        # Set the first admin user to be a global admin
-        first_admin = User.query.filter_by(admin=True).order_by(User.id).first()
-        if first_admin:
-            first_admin.is_global_admin = True
-            db.session.commit()
-
-    # IMPORTANT: Global admins are always active - auto-activate if needed
-    if user.is_global_admin and not user.is_active:
-        user.is_active = True
-        db.session.commit()
-
-    # check if the user account is active (after global admin auto-activation)
+    # check if the user account is active
     if not user.is_active:
         flash('Your account is pending approval. Please contact an administrator.')
         return redirect(url_for('auth.login'))

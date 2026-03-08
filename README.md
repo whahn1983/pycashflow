@@ -218,6 +218,16 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
    # WARNING: Changing this value after first run will make all stored encrypted data unreadable.
    APP_SECRET=your_generated_secret_key
 
+   # Required: Protects Flask session cookies. Set a stable value so sessions
+   # survive application restarts.
+   # Generate with: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+   SECRET_KEY=your_generated_secret_key
+
+   # Optional: Create the initial global admin on first startup instead of relying
+   # on the signup form. Remove or leave blank after the account is created.
+   BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+   BOOTSTRAP_ADMIN_PASSWORD=your_strong_password
+
    # Optional: For Passkey Authentication
    PROJECT_ID=your_corbado_project_id
    API_SECRET=your_corbado_api_secret

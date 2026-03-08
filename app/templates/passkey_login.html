@@ -60,7 +60,19 @@
 
     const authElement = document.getElementById("corbado-auth");
     Corbado.mountAuthUI(authElement, {
-        onLoggedIn: () => (window.location.href = "/passkey_login_post"),
+        onLoggedIn: () => {
+            // Submit a CSRF-protected POST so the callback is not reachable via plain GET links.
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/passkey_login_post';
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrf_token';
+            csrfInput.value = '{{ csrf_token() }}';
+            form.appendChild(csrfInput);
+            document.body.appendChild(form);
+            form.submit();
+        },
     });
 </script>
 
