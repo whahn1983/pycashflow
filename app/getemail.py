@@ -508,7 +508,7 @@ The PyCashFlow Team
 if __name__ == "__main__":
     from app import create_app
 
-    log_path = os.getenv("GETEMAIL_LOG_FILE", "/var/log/getemail.log")
+    log_path = os.getenv("GETEMAIL_LOG_FILE", "/app/getemail.log")
     handlers = [logging.StreamHandler(sys.stdout)]
 
     try:
