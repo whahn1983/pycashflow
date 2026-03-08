@@ -59,7 +59,8 @@ def index():
         balance = Balance(amount=balance.amount, date=datetime.today(), user_id=user_id)
         db.session.add(balance)
         db.session.commit()
-    except:
+    except (ValueError, TypeError, AttributeError) as exc:
+        logger.warning("Invalid balance for user %s (%s), resetting to 0: %s", user_id, type(exc).__name__, exc)
         balance = Balance(amount='0', date=datetime.today(), user_id=user_id)
         db.session.add(balance)
         db.session.commit()
@@ -86,8 +87,8 @@ def index():
         if ai_config.last_insights:
             try:
                 ai_insights_data = json.loads(ai_config.last_insights)
-            except Exception:
-                pass
+            except (json.JSONDecodeError, ValueError) as exc:
+                logger.warning("Could not parse cached AI insights for user %s: %s", user_id, exc)
 
     if current_user.admin:
         return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
@@ -572,6 +573,7 @@ def email():
             subjectstr = request.form['subject_str']
             startstr = request.form['start_str']
             endstr = request.form['end_str']
+            allowed_sender = request.form.get('allowed_sender', '').strip().lower() or None
             emailsettings.email = email
             if password_input:
                 emailsettings.password = encrypt_password(password_input)
@@ -579,6 +581,7 @@ def email():
             emailsettings.subjectstr = subjectstr
             emailsettings.startstr = startstr
             emailsettings.endstr = endstr
+            emailsettings.allowed_sender = allowed_sender
             db.session.commit()
 
             return redirect(url_for('main.settings'))
@@ -589,8 +592,9 @@ def email():
         subjectstr = request.form['subject_str']
         startstr = request.form['start_str']
         endstr = request.form['end_str']
+        allowed_sender = request.form.get('allowed_sender', '').strip().lower() or None
         emailentry = Email(email=email, password=password, server=server, subjectstr=subjectstr, startstr=startstr,
-                           endstr=endstr, user_id=user_id)
+                           endstr=endstr, allowed_sender=allowed_sender, user_id=user_id)
         db.session.add(emailentry)
         db.session.commit()
 
@@ -627,10 +631,10 @@ def update_user():
         my_data.name = request.form['name']
         my_data.email = request.form['email']
 
-        # Global admins can change roles, regular admins cannot
+        # Global admins can change roles, Account Owners cannot
         if current_user.is_global_admin:
             # Handle role assignment
-            role = request.form.get('role', 'user')
+            role = request.form.get('role', 'guest')
             if role == 'global_admin':
                 my_data.admin = True
                 my_data.is_global_admin = True
@@ -639,7 +643,7 @@ def update_user():
             elif role == 'admin':
                 my_data.admin = True
                 my_data.is_global_admin = False
-            else:  # user
+            else:  # guest
                 my_data.admin = False
                 my_data.is_global_admin = False
 
@@ -667,7 +671,7 @@ def delete_user(id):
     user = User.query.filter_by(id=int(id)).first()
 
     if user:
-        # Global admins can delete any user (except themselves), regular admins can only delete their guests
+        # Global admins can delete any user (except themselves), Account Owners can only delete their guests
         if current_user.is_global_admin or user.account_owner_id == current_user.id:
             # Prevent deleting yourself
             if user.id == current_user.id:
@@ -723,7 +727,7 @@ def activate_user(id):
     user = User.query.filter_by(id=int(id)).first()
 
     if user:
-        # Global admins can activate any user, regular admins can only activate their guests
+        # Global admins can activate any user, Account Owners can only activate their guests
         if current_user.is_global_admin or user.account_owner_id == current_user.id:
             user.is_active = True
             db.session.commit()
@@ -732,9 +736,9 @@ def activate_user(id):
             # Send activation notification email to the user
             try:
                 send_account_activation_notification(user.name, user.email)
-            except Exception as e:
+            except Exception as exc:
                 # Don't fail activation if email notification fails
-                print(f"Failed to send activation notification to {user.email}: {e}")
+                logger.warning("Failed to send activation notification to %s: %s", user.email, exc)
         else:
             flash("You don't have permission to activate this user")
 
@@ -761,7 +765,7 @@ def deactivate_user(id):
             else:
                 return redirect(url_for('main.manage_guests'))
 
-        # Global admins can deactivate any user, regular admins can only deactivate their guests
+        # Global admins can deactivate any user, Account Owners can only deactivate their guests
         if current_user.is_global_admin or user.account_owner_id == current_user.id:
             user.is_active = False
             db.session.commit()
@@ -787,7 +791,7 @@ def create_user():
         password = generate_password_hash(request.form['password'], method='scrypt')
 
         # Handle role assignment
-        role = request.form.get('role', 'user')
+        role = request.form.get('role', 'guest')
 
         # Global admins can create any type of user
         if current_user.is_global_admin:
@@ -797,18 +801,18 @@ def create_user():
             elif role == 'admin':
                 admin = True
                 is_global_admin = False
-            else:  # user
+            else:  # guest
                 admin = False
                 is_global_admin = False
             account_owner_id = None
             # Users created by global admin are active by default
             is_active = True
         else:
-            # Regular admins can only create guest users (non-admin users)
+            # Account Owners can only create guest users
             admin = False
             is_global_admin = False
             account_owner_id = current_user.id
-            # Guests created by regular admins are active by default
+            # Guests created by Account Owners are active by default
             is_active = True
 
         user = User(name=name, email=email, admin=admin, is_global_admin=is_global_admin,

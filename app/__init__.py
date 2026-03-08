@@ -3,11 +3,14 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 import secrets
 import os
+import logging
 from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_wtf.csrf import CSRFProtect
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 
 # init SQLAlchemy so we can use it later in our models
@@ -108,7 +111,10 @@ def create_app():
                         )
                         db.session.add(bootstrap_user)
                         db.session.commit()
-            except Exception:
-                pass  # Tables may not exist yet (pre-migration); safe to skip
+            except Exception as exc:
+                logger.warning(
+                    "Bootstrap admin creation skipped (%s: %s); tables may not exist yet",
+                    type(exc).__name__, exc,
+                )
 
     return app

@@ -5,11 +5,14 @@ from .models import User
 from app import db, limiter
 from .getemail import send_new_user_notification
 from .totp_utils import verify_totp, decrypt_totp_secret, verify_and_consume_backup_code
+import logging
 import pandas as pd
 import os
 from functools import wraps
 from werkzeug.exceptions import Unauthorized
 from corbado_python_sdk import Config, CorbadoSDK, UserEntity
+
+logger = logging.getLogger(__name__)
 
 
 auth = Blueprint('auth', __name__)
@@ -136,7 +139,8 @@ def login_2fa_post():
 def signup():
     try:
         engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
-    except:
+    except Exception as exc:
+        logger.warning("DATABASE_URL connection failed, falling back to SQLite: %s", exc)
         engine = db.create_engine('sqlite:///db.sqlite').connect()
 
     try:
@@ -144,8 +148,10 @@ def signup():
 
         if df['value'][0] == 1:
             return render_template('login.html')
-    except:
-        pass
+    except (KeyError, IndexError) as exc:
+        logger.debug("Settings table returned unexpected shape: %s", exc)
+    except Exception as exc:
+        logger.debug("Settings table not available: %s", exc)
 
     return render_template('signup.html')
 
@@ -199,9 +205,9 @@ def signup_post():
     if not is_global_admin:
         try:
             send_new_user_notification(name, email)
-        except Exception as e:
+        except Exception as exc:
             # Don't fail registration if email notification fails
-            print(f"Failed to send new user notification: {e}")
+            logger.warning("Failed to send new user notification for %s: %s", email, exc)
 
     return redirect(url_for('auth.login'))
 
@@ -314,5 +320,6 @@ def get_authenticated_user_from_cookie() -> UserEntity | None:
         return None
     try:
         return sdk.sessions.validate_token(session_token)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Passkey session token validation failed: %s", exc)
         raise Unauthorized()

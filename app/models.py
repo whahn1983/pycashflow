@@ -111,6 +111,10 @@ class Email(db.Model):
     subjectstr = db.Column(db.String(100))
     startstr = db.Column(db.String(100))
     endstr = db.Column(db.String(100))
+    # Expected sender address or domain for inbound balance emails.
+    # Exact match: 'alerts@bank.com'  Domain match: '@bank.com'
+    # NULL means no restriction is configured (ingestion proceeds with a warning).
+    allowed_sender = db.Column(db.String(200), nullable=True)
 
     # Relationships
     user = db.relationship('User', backref='email_configs')
