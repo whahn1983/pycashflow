@@ -32,6 +32,7 @@
 
         <!-- TOTP form -->
         <form method="POST" action="/login/2fa" id="totpForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group-modern">
                 <label class="form-label-modern">
                     <i class="fa-solid fa-key"></i> 6-Digit Code
@@ -60,6 +61,7 @@
 
             <div id="backupSection" class="d-none" style="margin-top: 1rem;">
                 <form method="POST" action="/login/2fa">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="use_backup" value="1">
                     <div class="form-group-modern">
                         <label class="form-label-modern">

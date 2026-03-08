@@ -188,6 +188,7 @@
             </div>
             <div class="modal-body">
                 <form action="{{url_for('main.changepw')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-user"></i> Name
@@ -268,6 +269,7 @@
                     </p>
                 </div>
                 <form action="{{url_for('main.global_email_settings')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-envelope"></i> Email Address
@@ -328,6 +330,7 @@
             </div>
             <div class="modal-body">
                 <form action="{{url_for('main.signups')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-toggle-on"></i> Allow New Sign-Ups
@@ -368,6 +371,7 @@
             </div>
             <div class="modal-body">
                 <form action="{{url_for('main.email')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-envelope"></i> Email Address
@@ -457,6 +461,7 @@
                     </p>
                 </div>
                 <form action="{{url_for('main.ai_settings')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-key"></i> OpenAI API Key
@@ -580,6 +585,7 @@
                     </p>
                 </div>
                 <form action="{{ url_for('main.disable_2fa') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-lock"></i> Current Password <span style="color: var(--danger);">*</span>

@@ -17,3 +17,4 @@ openai
 pyotp
 qrcode[pil]
 Flask-Limiter
+Flask-WTF

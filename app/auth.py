@@ -45,6 +45,7 @@ def login():
 
 
 @auth.route('/login', methods=['POST'])
+@limiter.limit("10 per minute")
 def login_post():
     # login code goes here
     email = request.form.get('email')
@@ -170,6 +171,7 @@ def signup():
 
 
 @auth.route('/signup', methods=['POST'])
+@limiter.limit("5 per minute")
 def signup_post():
     # code to validate and add user to database goes here
     email = request.form.get('email')
@@ -284,6 +286,7 @@ def login_passkey():
 
 
 @auth.route('/passkey_login_post')
+@limiter.limit("10 per minute")
 def login_passkey_post():
 
     auth_user = get_authenticated_user_from_cookie()
@@ -297,10 +300,9 @@ def login_passkey_post():
     user = User.query.filter_by(email=email).first()
 
     # check if the user actually exists
-    # take the user-supplied password, hash it, and compare it to the hashed password in the database
     if not user:
         flash('Please check your login details and try again.')
-        return redirect(url_for('auth.login'))  # if the user doesn't exist or password is wrong, reload the page
+        return redirect(url_for('auth.login'))
 
     # fix for no admin user to make current user an admin
     user_test = User.query.filter_by(admin=True).first()
@@ -316,6 +318,16 @@ def login_passkey_post():
         if first_admin:
             first_admin.is_global_admin = True
             db.session.commit()
+
+    # IMPORTANT: Global admins are always active - auto-activate if needed
+    if user.is_global_admin and not user.is_active:
+        user.is_active = True
+        db.session.commit()
+
+    # check if the user account is active (after global admin auto-activation)
+    if not user.is_active:
+        flash('Your account is pending approval. Please contact an administrator.')
+        return redirect(url_for('auth.login'))
 
     # if the above check passes, then we know the user has the right credentials
     login_user(user, remember=True)

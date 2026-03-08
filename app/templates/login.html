@@ -30,6 +30,7 @@
 
         <!-- Login Form -->
         <form method="POST" action="/login">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group-modern">
                 <label class="form-label-modern">
                     <i class="fa-solid fa-envelope"></i> Email Address

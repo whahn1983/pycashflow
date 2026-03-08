@@ -202,6 +202,7 @@
             </div>
             <div class="modal-body">
                 <form action="{{url_for('main.balance')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-dollar-sign"></i> Current Balance
@@ -296,7 +297,7 @@
         if (btn) btn.disabled = true;
         if (icon) icon.classList.add('loading');
 
-        fetch('/ai_insights', {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'}})
+        fetch('/ai_insights', {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')}})
             .then(response => response.json())
             .then(data => {
                 if (data.error) {

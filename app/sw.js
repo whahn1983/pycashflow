@@ -1,6 +1,6 @@
 // sw.js - PyCashFlow Service Worker
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const STATIC_CACHE = `pycashflow-static-${CACHE_VERSION}`;
 const PAGE_CACHE = `pycashflow-pages-${CACHE_VERSION}`;
 
@@ -89,24 +89,13 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Network-first with cache fallback for HTML page navigations
+  // Network-only for HTML page navigations — authenticated pages must not be cached
+  // to prevent stale financial data from persisting across sessions on shared devices.
+  // On offline, fall back to the generic offline page only.
   const acceptsHtml = request.headers.get('Accept') && request.headers.get('Accept').includes('text/html');
   if (request.mode === 'navigate' || acceptsHtml) {
     event.respondWith(
-      fetch(request)
-        .then(response => {
-          // Cache only successful HTML responses — never binary downloads like CSV exports
-          const contentType = response.headers.get('Content-Type') || '';
-          if (response.ok && contentType.includes('text/html')) {
-            caches.open(PAGE_CACHE).then(cache => cache.put(request, response.clone()));
-          }
-          return response;
-        })
-        .catch(() =>
-          caches.open(PAGE_CACHE).then(cache =>
-            cache.match(request).then(cached => cached || caches.match('/offline.html'))
-          )
-        )
+      fetch(request).catch(() => caches.match('/offline.html'))
     );
     return;
   }
@@ -116,6 +105,8 @@ self.addEventListener('fetch', event => {
 });
 
 // ── Message: clear page cache on logout ──────────────────────────────────────
+// Page caching for authenticated routes is disabled; this handler is retained
+// for forward-compatibility in case the SW is updated in future.
 self.addEventListener('message', event => {
   if (event.data === 'CLEAR_PAGE_CACHE') {
     event.waitUntil(

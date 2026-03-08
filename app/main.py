@@ -1,4 +1,4 @@
-from flask import request, redirect, url_for, send_from_directory, flash, send_file, Response
+from flask import request, redirect, url_for, send_from_directory, flash, send_file, Response, session
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip, GlobalEmailSettings, AISettings
@@ -6,6 +6,7 @@ from app import db, limiter
 from datetime import datetime
 import os
 import json
+import logging
 from sqlalchemy import desc, extract, asc
 from werkzeug.security import generate_password_hash, check_password_hash
 from .cashflow import update_cash, plot_cash
@@ -23,6 +24,7 @@ from .totp_utils import (
 
 
 main = Blueprint('main', __name__)
+logger = logging.getLogger(__name__)
 
 
 def get_effective_user_id():
@@ -224,7 +226,7 @@ def update():
     return redirect(url_for('main.schedule'))
 
 
-@main.route('/addhold/<id>')
+@main.route('/addhold/<id>', methods=['POST'])
 @login_required
 @admin_required
 def addhold(id):
@@ -239,7 +241,7 @@ def addhold(id):
     return redirect(url_for('main.schedule'))
 
 
-@main.route('/addskip/<id>')
+@main.route('/addskip/<id>', methods=['POST'])
 @login_required
 @admin_required
 def addskip(id):
@@ -267,7 +269,7 @@ def addskip(id):
     return redirect(url_for('main.transactions'))
 
 
-@main.route('/deletehold/<id>')
+@main.route('/deletehold/<id>', methods=['POST'])
 @login_required
 @admin_required
 def holds_delete(id):
@@ -283,7 +285,7 @@ def holds_delete(id):
     return redirect(url_for('main.holds'))
 
 
-@main.route('/deleteskip/<id>')
+@main.route('/deleteskip/<id>', methods=['POST'])
 @login_required
 @admin_required
 def skips_delete(id):
@@ -299,7 +301,7 @@ def skips_delete(id):
     return redirect(url_for('main.holds'))
 
 
-@main.route('/clearholds')
+@main.route('/clearholds', methods=['POST'])
 @login_required
 @admin_required
 def clear_holds():
@@ -311,7 +313,7 @@ def clear_holds():
     return redirect(url_for('main.holds'))
 
 
-@main.route('/clearskips')
+@main.route('/clearskips', methods=['POST'])
 @login_required
 @admin_required
 def clear_skips():
@@ -323,7 +325,7 @@ def clear_skips():
     return redirect(url_for('main.holds'))
 
 
-@main.route('/delete/<id>')
+@main.route('/delete/<id>', methods=['POST'])
 @login_required
 @admin_required
 def schedule_delete(id):
@@ -414,7 +416,7 @@ def update_scenario():
     return redirect(url_for('main.scenarios'))
 
 
-@main.route('/delete_scenario/<id>')
+@main.route('/delete_scenario/<id>', methods=['POST'])
 @login_required
 @admin_required
 def scenario_delete(id):
@@ -657,7 +659,7 @@ def update_user():
         return redirect(url_for('main.manage_guests'))
 
 
-@main.route('/delete_user/<id>')
+@main.route('/delete_user/<id>', methods=['POST'])
 @login_required
 @admin_required
 def delete_user(id):
@@ -713,7 +715,7 @@ def delete_user(id):
         return redirect(url_for('main.manage_guests'))
 
 
-@main.route('/activate_user/<id>')
+@main.route('/activate_user/<id>', methods=['POST'])
 @login_required
 @admin_required
 def activate_user(id):
@@ -743,7 +745,7 @@ def activate_user(id):
         return redirect(url_for('main.manage_guests'))
 
 
-@main.route('/deactivate_user/<id>')
+@main.route('/deactivate_user/<id>', methods=['POST'])
 @login_required
 @admin_required
 def deactivate_user(id):
@@ -850,17 +852,21 @@ def export_csv():
     return response
 
 
-@main.route('/import', methods=('GET', 'POST'))
+@main.route('/import', methods=['POST'])
 @login_required
 @admin_required
 def import_csv():
-    if request.method == 'POST':
-        user_id = get_effective_user_id()
-        csv_file = request.files.get('file')
+    user_id = get_effective_user_id()
+    csv_file = request.files.get('file')
 
-        upload(csv_file, user_id)
-
-        flash("Import Successful")
+    try:
+        success_count, error_count = upload(csv_file, user_id)
+        if error_count:
+            flash(f"Import completed: {success_count} row(s) imported, {error_count} row(s) skipped due to validation errors.")
+        else:
+            flash(f"Import successful: {success_count} row(s) imported.")
+    except ValueError as e:
+        flash(str(e))
 
     return redirect(url_for('main.schedule'))
 
@@ -903,8 +909,24 @@ def add_guest():
     db.session.add(new_guest)
     db.session.commit()
 
-    flash(f'Guest user {name} added successfully. Temporary password: {temp_password}')
-    return redirect(url_for('main.manage_guests'))
+    # Store temp password in session for one-time display; do NOT flash it
+    session['guest_temp_password'] = temp_password
+    session['guest_temp_name'] = name
+    session['guest_temp_email'] = email
+    return redirect(url_for('main.guest_password_page'))
+
+
+@main.route('/guest_password')
+@login_required
+@account_owner_required
+def guest_password_page():
+    """One-time display of a newly created guest's temporary password."""
+    temp_password = session.pop('guest_temp_password', None)
+    name = session.pop('guest_temp_name', None)
+    email = session.pop('guest_temp_email', None)
+    if not temp_password:
+        return redirect(url_for('main.manage_guests'))
+    return render_template('guest_password.html', temp_password=temp_password, name=name, email=email)
 
 
 @main.route('/remove_guest/<int:guest_id>', methods=['POST'])
@@ -1042,7 +1064,8 @@ def ai_insights():
     try:
         insights_json = fetch_insights(ai_config.api_key, current_balance, schedules, holds, skips, model=ai_config.model_version)
     except Exception as e:
-        return Response(json.dumps({'error': str(e)}), status=500, mimetype='application/json')
+        logger.exception("AI insights generation failed for user %s", user_id)
+        return Response(json.dumps({'error': 'An error occurred generating insights. Please try again later.'}), status=500, mimetype='application/json')
 
     ai_config.last_insights = insights_json
     ai_config.last_updated = datetime.utcnow()
