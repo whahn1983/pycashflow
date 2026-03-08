@@ -61,6 +61,11 @@ def create_app():
     app.config['REMEMBER_COOKIE_HTTPONLY'] = True
     app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
 
+    # Configure Flask-Limiter storage backend.
+    # Defaults to in-memory (single-process only). For multi-process deployments,
+    # set RATELIMIT_STORAGE_URI to a Redis URL, e.g. redis://localhost:6379/0
+    app.config['RATELIMIT_STORAGE_URI'] = os.environ.get('RATELIMIT_STORAGE_URI', 'memory://')
+
     db.init_app(app)
     migrate.init_app(app, db)
     limiter.init_app(app)
