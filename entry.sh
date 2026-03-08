@@ -6,8 +6,8 @@ chown -R appuser:appgroup /app/app/data
 chown -R appuser:appgroup /app/migrations
 chown appuser:appgroup /var/log/getemail.log
 
-# Drop to appuser for cron (busybox crond reads /app/crontabs/appuser)
-su-exec appuser /usr/sbin/crond -f -l 8 -c /app/crontabs/ > /dev/null 2>&1 &
+# Run crond as root so busybox can read /app/crontabs/appuser and drop to appuser per job
+/usr/sbin/crond -f -l 8 -c /app/crontabs/ &
 
 # Flask migrations as appuser
 su-exec appuser /usr/local/bin/flask --app app db init
