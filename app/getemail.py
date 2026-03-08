@@ -126,7 +126,10 @@ def process_email_balances():
             else:
                 email_ids = []
 
-            logger.info("Found %d email(s) from the past day for user %s", len(email_ids), user_id)
+            emails_scanned = len(email_ids)
+            emails_allowed = 0
+            emails_rejected = 0
+            logger.info("Found %d email(s) from the past day for user %s", emails_scanned, user_id)
 
             email_content = {}
 
@@ -145,8 +148,8 @@ def process_email_balances():
                                     subject = subject.decode(encoding)
                                 except (UnicodeDecodeError, LookupError) as exc:
                                     logger.debug(
-                                        "Could not decode subject for email_id %s, user %s: %s",
-                                        email_id, user_id, exc,
+                                        "Could not decode subject for user %s: %s",
+                                        user_id, exc,
                                     )
                                     subject = "subject"
 
@@ -157,8 +160,8 @@ def process_email_balances():
                                     From = From.decode(encoding)
                                 except (UnicodeDecodeError, LookupError) as exc:
                                     logger.debug(
-                                        "Could not decode From header for email_id %s, user %s: %s",
-                                        email_id, user_id, exc,
+                                        "Could not decode From header for user %s: %s",
+                                        user_id, exc,
                                     )
 
                             # --- Sender validation ---
@@ -169,16 +172,20 @@ def process_email_balances():
                             if not allowed_sender:
                                 logger.warning(
                                     "No allowed_sender configured for user %s; "
-                                    "processing email_id %s from <%s> without sender check",
-                                    user_id, email_id, sender_address,
+                                    "processing email without sender check",
+                                    user_id,
                                 )
+                                emails_allowed += 1
                             elif not _sender_is_allowed(sender_address, allowed_sender):
+                                emails_rejected += 1
                                 logger.warning(
-                                    "Rejected email_id %s for user %s: "
-                                    "sender <%s> does not match allowed_sender %r",
-                                    email_id, user_id, sender_address, allowed_sender,
+                                    "Rejected email for user %s: "
+                                    "sender does not match allowed_sender",
+                                    user_id,
                                 )
                                 break  # skip remaining responses for this email_id
+                            else:
+                                emails_allowed += 1
 
                             # --- Authentication-Results inspection ---
                             auth = _parse_auth_results(msg)
@@ -186,19 +193,18 @@ def process_email_balances():
                                 result = auth.get(mech)
                                 if result is None:
                                     logger.debug(
-                                        "No %s result in Authentication-Results "
-                                        "for email_id %s, user %s",
-                                        mech.upper(), email_id, user_id,
+                                        "No %s result in Authentication-Results for user %s",
+                                        mech.upper(), user_id,
                                     )
                                 elif result != "pass":
                                     logger.warning(
-                                        "email_id %s for user %s: %s=%s (not pass)",
-                                        email_id, user_id, mech.upper(), result,
+                                        "user %s: %s check did not pass",
+                                        user_id, mech.upper(),
                                     )
                                 else:
                                     logger.debug(
-                                        "email_id %s for user %s: %s=pass",
-                                        email_id, user_id, mech.upper(),
+                                        "user %s: %s=pass",
+                                        user_id, mech.upper(),
                                     )
 
                             # Extract email body
@@ -211,8 +217,8 @@ def process_email_balances():
                                         body = part.get_payload(decode=True).decode()
                                     except (UnicodeDecodeError, AttributeError) as exc:
                                         logger.debug(
-                                            "Could not decode part body for email_id %s, user %s: %s",
-                                            email_id, user_id, exc,
+                                            "Could not decode part body for user %s: %s",
+                                            user_id, exc,
                                         )
                                     if (
                                         content_type == "text/plain"
@@ -227,11 +233,17 @@ def process_email_balances():
                                     email_content[subject] = body
                 except Exception as exc:
                     logger.warning(
-                        "Skipping email_id %s for user %s: %s",
-                        email_id, user_id, exc,
+                        "Skipping an email for user %s due to error: %s",
+                        user_id, exc,
                     )
 
+            logger.info(
+                "User %s: scanned %d email(s), %d passed sender check, %d rejected",
+                user_id, emails_scanned, emails_allowed, emails_rejected,
+            )
+
             # Extract balance from emails for THIS user
+            balance_updated = False
             try:
                 start_index = email_content[subjectstr].find(startstr) + len(startstr)
                 end_index = email_content[subjectstr].find(endstr)
@@ -247,7 +259,8 @@ def process_email_balances():
                 )
                 db.session.add(balance)
                 db.session.commit()
-                logger.info("Imported balance $%s for user %s", new_balance, user_id)
+                balance_updated = True
+                logger.info("Balance updated successfully for user %s", user_id)
             except KeyError:
                 # No email with the specified subject found
                 pass
@@ -255,6 +268,9 @@ def process_email_balances():
                 logger.warning("Could not parse balance value for user %s: %s", user_id, exc)
             except Exception as exc:
                 logger.error("Failed to save balance for user %s: %s", user_id, exc)
+
+            if not balance_updated:
+                logger.info("Balance was not updated for user %s (no matching email found)", user_id)
 
             # Close IMAP connection for THIS user
             imap.close()
@@ -357,30 +373,30 @@ Please log in to your PyCashFlow account to activate this user.
             server.login(from_email, password)
             server.sendmail(from_email, global_admin.email, msg.as_string())
             server.quit()
-            logger.info("Sent new user notification email to %s", global_admin.email)
+            logger.info("Sent new user notification email to global admin")
             return True
         except (smtplib.SMTPException, OSError) as exc:
             # If port 587 fails, try port 465 with SSL
             logger.warning(
-                "Port 587 (STARTTLS) failed for %s, trying port 465 (SSL): %s",
-                global_admin.email, exc,
+                "Port 587 (STARTTLS) failed for new user notification, trying port 465 (SSL): %s",
+                exc,
             )
             try:
                 server = smtplib.SMTP_SSL(smtp_server, 465, timeout=10)
                 server.login(from_email, password)
                 server.sendmail(from_email, global_admin.email, msg.as_string())
                 server.quit()
-                logger.info("Sent new user notification email to %s via SSL", global_admin.email)
+                logger.info("Sent new user notification email to global admin via SSL")
                 return True
             except (smtplib.SMTPException, OSError) as exc2:
                 logger.error(
-                    "Failed to send new user notification via both ports to %s: %s",
-                    global_admin.email, exc2,
+                    "Failed to send new user notification via both ports: %s",
+                    exc2,
                 )
                 return False
 
     except Exception as exc:
-        logger.exception("Unexpected error sending new user notification for %s", new_user_email)
+        logger.exception("Unexpected error sending new user notification")
         return False
 
 
@@ -477,30 +493,30 @@ The PyCashFlow Team
             server.login(from_email, password)
             server.sendmail(from_email, user_email, msg.as_string())
             server.quit()
-            logger.info("Sent account activation email to %s", user_email)
+            logger.info("Sent account activation email successfully")
             return True
         except (smtplib.SMTPException, OSError) as exc:
             # If port 587 fails, try port 465 with SSL
             logger.warning(
-                "Port 587 (STARTTLS) failed for %s, trying port 465 (SSL): %s",
-                user_email, exc,
+                "Port 587 (STARTTLS) failed for activation notification, trying port 465 (SSL): %s",
+                exc,
             )
             try:
                 server = smtplib.SMTP_SSL(smtp_server, 465, timeout=10)
                 server.login(from_email, password)
                 server.sendmail(from_email, user_email, msg.as_string())
                 server.quit()
-                logger.info("Sent account activation email to %s via SSL", user_email)
+                logger.info("Sent account activation email successfully via SSL")
                 return True
             except (smtplib.SMTPException, OSError) as exc2:
                 logger.error(
-                    "Failed to send activation notification via both ports to %s: %s",
-                    user_email, exc2,
+                    "Failed to send activation notification via both ports: %s",
+                    exc2,
                 )
                 return False
 
     except Exception as exc:
-        logger.exception("Unexpected error sending activation notification for %s", user_email)
+        logger.exception("Unexpected error sending activation notification")
         return False
 
 
