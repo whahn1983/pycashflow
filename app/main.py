@@ -627,10 +627,10 @@ def update_user():
         my_data.name = request.form['name']
         my_data.email = request.form['email']
 
-        # Global admins can change roles, regular admins cannot
+        # Global admins can change roles, Account Owners cannot
         if current_user.is_global_admin:
             # Handle role assignment
-            role = request.form.get('role', 'user')
+            role = request.form.get('role', 'guest')
             if role == 'global_admin':
                 my_data.admin = True
                 my_data.is_global_admin = True
@@ -639,7 +639,7 @@ def update_user():
             elif role == 'admin':
                 my_data.admin = True
                 my_data.is_global_admin = False
-            else:  # user
+            else:  # guest
                 my_data.admin = False
                 my_data.is_global_admin = False
 
@@ -667,7 +667,7 @@ def delete_user(id):
     user = User.query.filter_by(id=int(id)).first()
 
     if user:
-        # Global admins can delete any user (except themselves), regular admins can only delete their guests
+        # Global admins can delete any user (except themselves), Account Owners can only delete their guests
         if current_user.is_global_admin or user.account_owner_id == current_user.id:
             # Prevent deleting yourself
             if user.id == current_user.id:
@@ -723,7 +723,7 @@ def activate_user(id):
     user = User.query.filter_by(id=int(id)).first()
 
     if user:
-        # Global admins can activate any user, regular admins can only activate their guests
+        # Global admins can activate any user, Account Owners can only activate their guests
         if current_user.is_global_admin or user.account_owner_id == current_user.id:
             user.is_active = True
             db.session.commit()
@@ -761,7 +761,7 @@ def deactivate_user(id):
             else:
                 return redirect(url_for('main.manage_guests'))
 
-        # Global admins can deactivate any user, regular admins can only deactivate their guests
+        # Global admins can deactivate any user, Account Owners can only deactivate their guests
         if current_user.is_global_admin or user.account_owner_id == current_user.id:
             user.is_active = False
             db.session.commit()
@@ -787,7 +787,7 @@ def create_user():
         password = generate_password_hash(request.form['password'], method='scrypt')
 
         # Handle role assignment
-        role = request.form.get('role', 'user')
+        role = request.form.get('role', 'guest')
 
         # Global admins can create any type of user
         if current_user.is_global_admin:
@@ -797,18 +797,18 @@ def create_user():
             elif role == 'admin':
                 admin = True
                 is_global_admin = False
-            else:  # user
+            else:  # guest
                 admin = False
                 is_global_admin = False
             account_owner_id = None
             # Users created by global admin are active by default
             is_active = True
         else:
-            # Regular admins can only create guest users (non-admin users)
+            # Account Owners can only create guest users
             admin = False
             is_global_admin = False
             account_owner_id = current_user.id
-            # Guests created by regular admins are active by default
+            # Guests created by Account Owners are active by default
             is_active = True
 
         user = User(name=name, email=email, admin=admin, is_global_admin=is_global_admin,
