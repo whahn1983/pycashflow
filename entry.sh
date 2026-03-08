@@ -15,8 +15,10 @@ echo "[$(date +"%Y-%m-%dT%H:%M:%S%z")] entrypoint: container startup" >> /var/lo
 # inside each job via `. /app/crontab-env`.
 export -p > /app/crontab-env
 
-# Run crond as root so busybox can read /app/crontabs/appuser and drop to appuser per job
-/usr/sbin/crond -f -l 8 -c /app/crontabs/ &
+# Run crond in daemon mode as root so it can read /app/crontabs/appuser
+# and drop to appuser for each job. Logging to getemail.log keeps all email
+# import diagnostics in one place.
+/usr/sbin/crond -l 8 -L /var/log/getemail.log -c /app/crontabs/
 
 # Flask migrations as appuser
 su-exec appuser /usr/local/bin/flask --app app db init
