@@ -95,8 +95,9 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(request)
         .then(response => {
-          // Cache only successful, non-redirect responses (i.e. authenticated pages)
-          if (response.ok) {
+          // Cache only successful HTML responses — never binary downloads like CSV exports
+          const contentType = response.headers.get('Content-Type') || '';
+          if (response.ok && contentType.includes('text/html')) {
             caches.open(PAGE_CACHE).then(cache => cache.put(request, response.clone()));
           }
           return response;
