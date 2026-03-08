@@ -273,6 +273,10 @@ def login_passkey():
 @limiter.limit("10 per minute")
 def login_passkey_post():
 
+    if not corbado_enabled:
+        flash('Passkey authentication is not enabled.')
+        return redirect(url_for('auth.login'))
+
     auth_user = get_authenticated_user_from_cookie()
     if auth_user:
         email_identifiers = sdk.identifiers.list_all_emails_by_user_id(user_id=auth_user.user_id)
@@ -302,10 +306,13 @@ def login_passkey_post():
 
 
 def get_authenticated_user_from_cookie() -> UserEntity | None:
+    if not corbado_enabled:
+        return None
+
     session_token = request.cookies.get('cbo_session_token')
     if not session_token:
         return None
     try:
         return sdk.sessions.validate_token(session_token)
-    except:
+    except Exception:
         raise Unauthorized()
