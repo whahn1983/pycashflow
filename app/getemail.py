@@ -97,6 +97,8 @@ def process_email_balances():
         Email, User.id == Email.user_id
     ).all()
 
+    logger.info("Email import run discovered %d user email configuration(s)", len(users_with_email))
+
     for user, email_config in users_with_email:
         user_id = user.id
         username = email_config.email
@@ -506,7 +508,11 @@ The PyCashFlow Team
 if __name__ == "__main__":
     from app import create_app
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        force=True,
+    )
     logger.info("Starting email balance import...")
     app = create_app()
 
