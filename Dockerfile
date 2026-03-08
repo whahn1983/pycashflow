@@ -20,18 +20,19 @@ RUN addgroup -S appgroup && adduser -S -G appgroup appuser
 
 COPY . .
 
-# Set up user-specific crontab directory for busybox crond (via -c flag)
-RUN mkdir -p /app/crontabs && \
-    cp crontab.txt /app/crontabs/appuser && \
-    chmod 600 /app/crontabs/appuser
-
 COPY entry.sh /entry.sh
 RUN chmod +x /entry.sh
 
-# Create SQLite data directory and log file, then hand ownership to appuser
+# Create SQLite data directory, log files, then hand ownership to appuser.
+# Crontab spool file is set up AFTER the chown-R so it stays root:root (mode
+# 600) — busybox crond refuses to run a spool file that isn't owned by root.
 RUN mkdir -p /app/app/data && \
-    touch /app/getemail.log && \
-    chown -R appuser:appgroup /app /entry.sh
+    touch /app/getemail.log /app/crond.log && \
+    chown -R appuser:appgroup /app /entry.sh && \
+    mkdir -p /app/crontabs && \
+    cp /app/crontab.txt /app/crontabs/appuser && \
+    chown root:root /app/crontabs /app/crontabs/appuser && \
+    chmod 600 /app/crontabs/appuser
 
 ENV PYTHONPATH=/app
 ENV DATABASE_URL=sqlite:////app/app/data/db.sqlite
