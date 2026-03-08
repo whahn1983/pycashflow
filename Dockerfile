@@ -13,7 +13,7 @@ COPY constraints.txt constraints.txt
 # install everything except greenlet
 RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt
 
-RUN apk --no-cache add curl
+RUN apk --no-cache add curl su-exec
 
 # Create a dedicated non-root runtime user and group
 RUN addgroup -S appgroup && adduser -S -G appgroup appuser
@@ -39,7 +39,5 @@ ENV DATABASE_URL=sqlite:////app/app/data/db.sqlite
 HEALTHCHECK CMD curl --fail http://localhost:5000
 
 EXPOSE 5000
-
-USER appuser
 
 CMD ["/entry.sh"]
