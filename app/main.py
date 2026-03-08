@@ -110,6 +110,13 @@ def refresh():
 def settings():
     # get about info - available to all users
     about = version()
+    try:
+        _parts = about.split('::')
+        app_version = _parts[0].split(':', 1)[1].strip()
+        py_version = _parts[1].split(':', 1)[1].strip()
+    except (IndexError, ValueError):
+        app_version = about.strip()
+        py_version = ''
     user_id = get_effective_user_id()
 
     if current_user.admin:
@@ -119,14 +126,15 @@ def settings():
         email_config = Email.query.filter_by(user_id=user_id).first()
         global_email_config = GlobalEmailSettings.query.first()
         signup_setting = Settings.query.filter_by(name='signup').first()
-        return render_template('settings.html', about=about, ai_configured=ai_configured, ai_model=ai_model,
+        return render_template('settings.html', about=about, app_version=app_version, py_version=py_version,
+                             ai_configured=ai_configured, ai_model=ai_model,
                              email_config=email_config, global_email_config=global_email_config,
                              signup_setting=signup_setting)
     else:
         email_config = Email.query.filter_by(user_id=user_id).first()
         signup_setting = Settings.query.filter_by(name='signup').first()
-        return render_template('settings_guest.html', about=about, email_config=email_config,
-                             signup_setting=signup_setting)
+        return render_template('settings_guest.html', about=about, app_version=app_version, py_version=py_version,
+                             email_config=email_config, signup_setting=signup_setting)
 
 
 @main.route('/schedule')
