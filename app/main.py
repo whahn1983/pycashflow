@@ -1053,6 +1053,11 @@ def serve_sw():
     return send_file('sw.js', mimetype='application/javascript')
 
 
+@main.route('/offline.html')
+def serve_offline():
+    return render_template('offline.html')
+
+
 # ---------------------------------------------------------------------------
 # 2FA – Setup (enable)
 # ---------------------------------------------------------------------------
