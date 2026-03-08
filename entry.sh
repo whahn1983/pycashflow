@@ -5,10 +5,12 @@
 chown -R appuser:appgroup /app/app/data
 chown -R appuser:appgroup /app/migrations
 chown appuser:appgroup /app/getemail.log
+# crond.log is written by root crond — leave as root:root
 
-# Run crond in daemon mode as root so it can read /app/crontabs/appuser
-# and drop to appuser for each job.
-/usr/sbin/crond -l 8 -L /app/getemail.log -c /app/crontabs/
+# Run crond in foreground mode (-f) so it doesn't double-fork into an
+# unreachable daemon; & sends it to the background so this script continues.
+# Daemon log goes to /app/crond.log (separate from job output in getemail.log).
+/usr/sbin/crond -f -l 8 -L /app/crond.log -c /app/crontabs/ &
 
 # Flask migrations as appuser
 su-exec appuser /usr/local/bin/flask --app app db init
