@@ -64,13 +64,24 @@
 
 <body>
     <!-- Offline Status Banner -->
-    <div id="offline-banner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:9999; background:rgba(239,68,68,0.95); color:#fff; text-align:center; padding:0.5rem 1rem; font-size:0.875rem; font-weight:600;">
+    <div id="offline-banner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:999; background:rgba(239,68,68,0.95); color:#fff; text-align:center; padding:0.5rem 1rem; font-size:0.875rem; font-weight:600;">
         You are offline — showing cached data
     </div>
     <script>
         (function() {
             var banner = document.getElementById('offline-banner');
-            function update() { banner.style.display = navigator.onLine ? 'none' : 'block'; }
+            function positionBanner() {
+                var nav = document.querySelector('.navbar-improved');
+                if (nav) banner.style.top = nav.offsetHeight + 'px';
+            }
+            function update() {
+                banner.style.display = navigator.onLine ? 'none' : 'block';
+                if (!navigator.onLine) positionBanner();
+            }
+            document.addEventListener('DOMContentLoaded', function() {
+                positionBanner();
+                window.addEventListener('resize', positionBanner);
+            });
             update();
             window.addEventListener('online', update);
             window.addEventListener('offline', update);
