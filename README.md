@@ -83,7 +83,11 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 
 ### Progressive Web App (PWA)
 - **Installable**: Add to home screen on mobile and desktop devices
-- **Service Worker**: Enhanced performance and offline capabilities
+- **Offline Support**: Service worker caches pages and static assets so previously visited views remain accessible without a network connection
+- **Cache Strategies**: Cache-first for static assets, stale-while-revalidate for CDN resources, and network-first with cache fallback for HTML pages
+- **Offline Banner**: An automatic banner notifies users when the app is operating in offline mode
+- **Secure Cache Handling**: Page cache is cleared on logout so no financial data remains on shared devices
+- **Offline Fallback**: A branded offline page is shown when a page has not been previously cached
 - **Mobile Optimized**: Responsive design for all screen sizes
 
 ---
@@ -209,6 +213,11 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
 
    Create a `.env` file in `/app/app/.env`:
    ```bash
+   # Required: Encryption key for email passwords, OpenAI API keys, and 2FA secrets
+   # Generate with: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+   # WARNING: Changing this value after first run will make all stored encrypted data unreadable.
+   APP_SECRET=your_generated_secret_key
+
    # Optional: For Passkey Authentication
    PROJECT_ID=your_corbado_project_id
    API_SECRET=your_corbado_api_secret

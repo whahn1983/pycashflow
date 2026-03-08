@@ -509,8 +509,45 @@
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p style="color: var(--text-primary); line-height: 1.6;">{{ about }}</p>
+            <div class="modal-body" style="padding: 1.5rem;">
+                <!-- Identity -->
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border);">
+                    <img src="/static/icons/icon_144x144.png" alt="PyCashFlow" style="width: 3.5rem; height: 3.5rem; border-radius: var(--radius-md);">
+                    <div>
+                        <div style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary);">PyCashFlow</div>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap; align-items: center;">
+                            <span style="background: rgba(59,130,246,0.15); color: #60a5fa; font-size: 0.75rem; font-weight: 600; padding: 0.15rem 0.6rem; border-radius: 9999px; border: 1px solid rgba(59,130,246,0.3);">
+                                v{{ app_version }}
+                            </span>
+                            <span style="background: rgba(100,116,139,0.1); color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; padding: 0.15rem 0.6rem; border-radius: 9999px; border: 1px solid var(--border);">
+                                Python {{ py_version }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Feature highlights -->
+                <div style="margin-bottom: 1.5rem;">
+                    <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.75rem;">Features</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; font-size: 0.85rem; color: var(--text-secondary);">
+                        <div><i class="fa-solid fa-chart-line" style="color: #3b82f6; width: 1.25rem;"></i> Cash Flow Forecasting</div>
+                        <div><i class="fa-solid fa-flask" style="color: #8b5cf6; width: 1.25rem;"></i> Scenario Modeling</div>
+                        <div><i class="fa-solid fa-robot" style="color: #10b981; width: 1.25rem;"></i> AI Insights</div>
+                        <div><i class="fa-solid fa-shield-halved" style="color: #f59e0b; width: 1.25rem;"></i> 2FA &amp; Passkeys</div>
+                        <div><i class="fa-solid fa-wifi" style="color: #06b6d4; width: 1.25rem;"></i> PWA Offline Support</div>
+                        <div><i class="fa-solid fa-envelope" style="color: #ec4899; width: 1.25rem;"></i> Email Integration</div>
+                    </div>
+                </div>
+                <!-- Links -->
+                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                    <a href="https://github.com/whahn1983/pycashflow" target="_blank" rel="noopener"
+                       style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-secondary); text-decoration: none; padding: 0.375rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+                        <i class="fa-brands fa-github"></i> GitHub
+                    </a>
+                    <a href="https://hub.docker.com/r/whahn1983/pycashflow" target="_blank" rel="noopener"
+                       style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-secondary); text-decoration: none; padding: 0.375rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+                        <i class="fa-brands fa-docker"></i> Docker Hub
+                    </a>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
