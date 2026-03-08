@@ -6,6 +6,12 @@ chown -R appuser:appgroup /app/app/data
 chown -R appuser:appgroup /app/migrations
 chown appuser:appgroup /var/log/getemail.log
 
+# Snapshot the full container environment so cron jobs can source it.
+# busybox crond strips environment variables before running jobs, so we save
+# the current env here (as root, before dropping privileges) and restore it
+# inside each job via `. /app/crontab-env`.
+export -p > /app/crontab-env
+
 # Run crond as root so busybox can read /app/crontabs/appuser and drop to appuser per job
 /usr/sbin/crond -f -l 8 -c /app/crontabs/ &
 
