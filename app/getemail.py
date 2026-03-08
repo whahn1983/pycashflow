@@ -508,9 +508,19 @@ The PyCashFlow Team
 if __name__ == "__main__":
     from app import create_app
 
+    log_path = os.getenv("GETEMAIL_LOG_FILE", "/var/log/getemail.log")
+    handlers = [logging.StreamHandler(sys.stdout)]
+
+    try:
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        handlers.append(logging.FileHandler(log_path))
+    except OSError as exc:
+        logger.warning("Could not attach file logger at %s: %s", log_path, exc)
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        handlers=handlers,
         force=True,
     )
     logger.info("Starting email balance import...")
