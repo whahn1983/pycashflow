@@ -524,14 +524,16 @@ The PyCashFlow Team
 if __name__ == "__main__":
     from app import create_app
 
-    log_path = os.getenv("GETEMAIL_LOG_FILE", "/app/getemail.log")
-    handlers = [logging.StreamHandler(sys.stdout)]
-
-    try:
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        handlers.append(logging.FileHandler(log_path))
-    except OSError as exc:
-        logger.warning("Could not attach file logger at %s: %s", log_path, exc)
+    log_path = os.getenv("GETEMAIL_LOG_FILE")
+    if log_path:
+        try:
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            handlers = [logging.FileHandler(log_path)]
+        except OSError as exc:
+            handlers = [logging.StreamHandler(sys.stdout)]
+            print(f"WARNING: Could not open log file {log_path}: {exc}; falling back to stdout", file=sys.stderr)
+    else:
+        handlers = [logging.StreamHandler(sys.stdout)]
 
     logging.basicConfig(
         level=logging.INFO,
