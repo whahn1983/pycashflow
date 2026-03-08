@@ -3,6 +3,7 @@
 # Running as root here — fix ownership of any bind-mounted volumes so
 # appuser can read/write them, regardless of host directory ownership.
 chown -R appuser:appgroup /app/app/data
+chown -R appuser:appgroup /app/migrations
 chown appuser:appgroup /var/log/getemail.log
 
 # Drop to appuser for cron (busybox crond reads /app/crontabs/appuser)
