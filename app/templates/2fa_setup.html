@@ -66,6 +66,7 @@
                 Enter the 6-digit code to confirm
             </h3>
             <form method="POST" action="{{ url_for('main.setup_2fa_post') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group-modern">
                     <input type="text" class="form-control-modern" name="code"
                            placeholder="000000" maxlength="6" inputmode="numeric"

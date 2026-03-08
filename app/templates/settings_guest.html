@@ -109,6 +109,7 @@
             </div>
             <div class="modal-body">
                 <form action="{{url_for('main.changepw')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-user"></i> Name
@@ -183,6 +184,7 @@
             </div>
             <div class="modal-body">
                 <form action="{{url_for('main.signups')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-toggle-on"></i> Allow New Sign-Ups
@@ -223,6 +225,7 @@
             </div>
             <div class="modal-body">
                 <form action="{{url_for('main.email')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group-modern">
                         <label class="form-label-modern">
                             <i class="fa-solid fa-envelope"></i> Email Address

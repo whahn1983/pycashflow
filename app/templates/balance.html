@@ -15,6 +15,7 @@
 <div style="max-width: 600px; margin: 0 auto;">
     <div class="metric-card">
         <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group-modern">
                 <label class="form-label-modern">
                     <i class="fa-solid fa-dollar-sign"></i> Balance Amount
