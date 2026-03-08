@@ -170,7 +170,7 @@ def process_email_balances():
                             )
                             allowed_sender = email_config.allowed_sender
                             if not allowed_sender:
-                                logger.warning(
+                                logger.debug(
                                     "No allowed_sender configured for user %s; "
                                     "processing email without sender check",
                                     user_id,
@@ -178,7 +178,7 @@ def process_email_balances():
                                 emails_allowed += 1
                             elif not _sender_is_allowed(sender_address, allowed_sender):
                                 emails_rejected += 1
-                                logger.warning(
+                                logger.debug(
                                     "Rejected email for user %s: "
                                     "sender does not match allowed_sender",
                                     user_id,
@@ -197,7 +197,7 @@ def process_email_balances():
                                         mech.upper(), user_id,
                                     )
                                 elif result != "pass":
-                                    logger.warning(
+                                    logger.debug(
                                         "user %s: %s check did not pass",
                                         user_id, mech.upper(),
                                     )
@@ -232,7 +232,7 @@ def process_email_balances():
                                 if content_type == "text/plain":
                                     email_content[subject] = body
                 except Exception as exc:
-                    logger.warning(
+                    logger.debug(
                         "Skipping an email for user %s due to error: %s",
                         user_id, exc,
                     )
