@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# start cron
-/usr/sbin/crond -f -l 8 > /dev/null 2>&1 &
+# start cron using the user-specific crontab directory (appuser crontab lives at /app/crontabs/appuser)
+/usr/sbin/crond -f -l 8 -c /app/crontabs/ > /dev/null 2>&1 &
 
 #flask migrate
 /usr/local/bin/flask --app app db init
