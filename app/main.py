@@ -611,6 +611,13 @@ def update_user():
     if request.method == 'POST':
         current = User.query.filter_by(id=int(request.form['id'])).first()
 
+        if not current:
+            flash("User not found")
+            if current_user.is_global_admin:
+                return redirect(url_for('main.global_admin_panel'))
+            else:
+                return redirect(url_for('main.manage_guests'))
+
         # Check if the current user has permission to update this user
         if not current_user.is_global_admin and current.account_owner_id != current_user.id:
             flash("You don't have permission to update this user")

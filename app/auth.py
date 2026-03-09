@@ -144,9 +144,9 @@ def signup():
         engine = db.create_engine('sqlite:///db.sqlite').connect()
 
     try:
-        df = pd.read_sql('SELECT * FROM settings;', engine)
+        df = pd.read_sql("SELECT value FROM settings WHERE name = 'signup' LIMIT 1;", engine)
 
-        if df['value'][0] == 1:
+        if not df.empty and df['value'].iloc[0] == 1:
             return render_template('login.html')
     except (KeyError, IndexError) as exc:
         logger.debug("Settings table returned unexpected shape: %s", exc)

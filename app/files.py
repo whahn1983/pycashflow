@@ -5,7 +5,7 @@ import os
 import logging
 from natsort import index_natsorted
 import numpy as np
-from io import TextIOWrapper
+from io import TextIOWrapper, StringIO
 import csv
 from .models import Schedule
 import platform
@@ -35,13 +35,27 @@ def export(user_id):
     df = df.sort_values(by="startdate",
                         key=lambda x: np.argsort(index_natsorted(df["startdate"]))).reset_index(drop=True)
 
-    csv_data = "Name,Amount,Type,Frequency,Next Date,First Date\n"
-    for i in range(len(df.index)):
-        # Create a CSV string from the data
-        csv_data += (f"{df['name'][i]},{df['amount'][i]},{df['type'][i]},{df['frequency'][i]},{df['startdate'][i]}"
-                     f",{df['firstdate'][i]}\n")
+    def _sanitize_cell(value):
+        """Prefix formula-triggering characters to prevent CSV injection."""
+        s = str(value)
+        if s and s[0] in ('=', '+', '-', '@', '\t', '\r'):
+            return "'" + s
+        return s
 
-    return csv_data
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Name", "Amount", "Type", "Frequency", "Next Date", "First Date"])
+    for i in range(len(df.index)):
+        writer.writerow([
+            _sanitize_cell(df['name'][i]),
+            _sanitize_cell(df['amount'][i]),
+            _sanitize_cell(df['type'][i]),
+            _sanitize_cell(df['frequency'][i]),
+            _sanitize_cell(df['startdate'][i]),
+            _sanitize_cell(df['firstdate'][i]),
+        ])
+
+    return output.getvalue()
 
 
 def validate_upload(csv_file):
