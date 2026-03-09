@@ -51,7 +51,7 @@ def login():
 @limiter.limit("10 per minute")
 def login_post():
     # login code goes here
-    email = request.form.get('email')
+    email = (request.form.get('email') or '').strip().lower()
     password = request.form.get('password')
     remember = True if request.form.get('remember') else False
 
@@ -160,7 +160,7 @@ def signup():
 @limiter.limit("5 per minute")
 def signup_post():
     # code to validate and add user to database goes here
-    email = request.form.get('email')
+    email = (request.form.get('email') or '').strip().lower()
     name = request.form.get('name')
     password = request.form.get('password')
 
@@ -170,21 +170,12 @@ def signup_post():
         flash('Email address already exists')
         return redirect(url_for('auth.signup'))
 
-    # If BOOTSTRAP_ADMIN_EMAIL is configured, the env-var mechanism is the sole path
-    # for creating the initial global admin; signup should never auto-elevate anyone.
-    # If no bootstrap env var is set and no admin exists yet, the first registrant
-    # becomes the global admin (backwards-compatible initial-setup path).
-    bootstrap_email_configured = bool(os.environ.get('BOOTSTRAP_ADMIN_EMAIL'))
-    user_test = User.query.filter_by(admin=True).first()
-    if not user_test and not bootstrap_email_configured:
-        admin = True
-        is_global_admin = True
-        is_active = True
-    else:
-        # New signups are inactive until approved by a global admin
-        admin = True
-        is_global_admin = False
-        is_active = False
+    # Signup never auto-elevates anyone to global admin regardless of whether an
+    # admin already exists.  The bootstrap env-var path in __init__.py is the sole
+    # mechanism for creating the first global admin account.
+    admin = True
+    is_global_admin = False
+    is_active = False
 
     # create a new user with the form data. Hash the password so the plaintext version isn't saved.
     new_user = User(

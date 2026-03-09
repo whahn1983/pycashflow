@@ -626,9 +626,10 @@ def update_user():
             else:
                 return redirect(url_for('main.manage_guests'))
 
-        existing = User.query.filter_by(email=request.form['email']).first()
+        new_email = request.form['email'].strip().lower()
+        existing = User.query.filter_by(email=new_email).first()
         if existing:
-            if current.email != request.form['email']:
+            if current.email != new_email:
                 flash("Email already exists")
                 if current_user.is_global_admin:
                     return redirect(url_for('main.global_admin_panel'))
@@ -636,7 +637,7 @@ def update_user():
                     return redirect(url_for('main.manage_guests'))
         my_data = User.query.get(request.form.get('id'))
         my_data.name = request.form['name']
-        my_data.email = request.form['email']
+        my_data.email = new_email
 
         # Global admins can change roles, Account Owners cannot
         if current_user.is_global_admin:
@@ -794,7 +795,7 @@ def create_user():
     # create a new user
     if request.method == 'POST':
         name = request.form['name']
-        email = request.form['email']
+        email = request.form['email'].strip().lower()
         password = generate_password_hash(request.form['password'], method='scrypt')
 
         # Handle role assignment
