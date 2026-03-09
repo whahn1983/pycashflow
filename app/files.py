@@ -9,6 +9,7 @@ from io import TextIOWrapper, StringIO
 import csv
 from .models import Schedule
 import platform
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ def export(user_id):
         engine = db.create_engine('sqlite:///db.sqlite').connect()
 
     # pull the schedule information for this user only
-    df = pd.read_sql(f'SELECT * FROM schedule WHERE user_id = {user_id};', engine)
+    df = pd.read_sql(text('SELECT * FROM schedule WHERE user_id = :uid'), engine, params={'uid': user_id})
     df = df.sort_values(by="startdate",
                         key=lambda x: np.argsort(index_natsorted(df["startdate"]))).reset_index(drop=True)
 
