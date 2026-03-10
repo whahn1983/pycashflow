@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip, GlobalEmailSettings, AISettings
 from app import db, limiter
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import json
 import logging
@@ -25,6 +25,12 @@ from .totp_utils import (
 
 main = Blueprint('main', __name__)
 logger = logging.getLogger(__name__)
+
+# Input validation constants
+_VALID_TYPES = {'Income', 'Expense'}
+_VALID_FREQUENCIES = {'Monthly', 'Quarterly', 'Yearly', 'Weekly', 'BiWeekly', 'Onetime'}
+_MAX_NAME_LEN = 100
+_MAX_EMAIL_LEN = 254
 
 
 def get_effective_user_id():
@@ -169,11 +175,27 @@ def create():
     user_id = get_effective_user_id()
     format = '%Y-%m-%d'
     if request.method == 'POST':
-        name = request.form['name']
+        name = request.form['name'].strip()
         amount = request.form['amount']
         frequency = request.form['frequency']
         startdate = request.form['startdate']
         type = request.form['type']
+
+        if not name or len(name) > _MAX_NAME_LEN:
+            flash(f"Name must be between 1 and {_MAX_NAME_LEN} characters")
+            return redirect(url_for('main.schedule'))
+        try:
+            float(amount)
+        except (ValueError, TypeError):
+            flash("Amount must be a number")
+            return redirect(url_for('main.schedule'))
+        if type not in _VALID_TYPES:
+            flash("Invalid type")
+            return redirect(url_for('main.schedule'))
+        if frequency not in _VALID_FREQUENCIES:
+            flash("Invalid frequency")
+            return redirect(url_for('main.schedule'))
+
         schedule = Schedule(name=name,
                             type=type,
                             amount=amount,
@@ -203,17 +225,37 @@ def update():
     format = '%Y-%m-%d'
 
     if request.method == 'POST':
+        new_name = request.form['name'].strip()
+        new_amount = request.form['amount']
+        new_type = request.form['type']
+        new_frequency = request.form['frequency']
+
+        if not new_name or len(new_name) > _MAX_NAME_LEN:
+            flash(f"Name must be between 1 and {_MAX_NAME_LEN} characters")
+            return redirect(url_for('main.schedule'))
+        try:
+            float(new_amount)
+        except (ValueError, TypeError):
+            flash("Amount must be a number")
+            return redirect(url_for('main.schedule'))
+        if new_type not in _VALID_TYPES:
+            flash("Invalid type")
+            return redirect(url_for('main.schedule'))
+        if new_frequency not in _VALID_FREQUENCIES:
+            flash("Invalid frequency")
+            return redirect(url_for('main.schedule'))
+
         current = Schedule.query.filter_by(id=int(request.form['id']), user_id=user_id).first()
-        existing = Schedule.query.filter_by(name=request.form['name'], user_id=user_id).first()
+        existing = Schedule.query.filter_by(name=new_name, user_id=user_id).first()
         if existing:
-            if current.name != request.form['name']:
+            if current.name != new_name:
                 flash("Schedule name already exists")
                 return redirect(url_for('main.schedule'))
         my_data = Schedule.query.filter_by(id=int(request.form.get('id')), user_id=user_id).first()
-        my_data.name = request.form['name']
-        my_data.amount = request.form['amount']
-        my_data.type = request.form['type']
-        my_data.frequency = request.form['frequency']
+        my_data.name = new_name
+        my_data.amount = new_amount
+        my_data.type = new_type
+        my_data.frequency = new_frequency
         startdate = request.form['startdate']
         if (datetime.strptime(startdate, format).date() != my_data.startdate and my_data.startdate.day !=
                 datetime.strptime(startdate, format).day):
@@ -359,11 +401,27 @@ def create_scenario():
     user_id = get_effective_user_id()
     format = '%Y-%m-%d'
     if request.method == 'POST':
-        name = request.form['name']
+        name = request.form['name'].strip()
         amount = request.form['amount']
         frequency = request.form['frequency']
         startdate = request.form['startdate']
         type = request.form['type']
+
+        if not name or len(name) > _MAX_NAME_LEN:
+            flash(f"Name must be between 1 and {_MAX_NAME_LEN} characters")
+            return redirect(url_for('main.scenarios'))
+        try:
+            float(amount)
+        except (ValueError, TypeError):
+            flash("Amount must be a number")
+            return redirect(url_for('main.scenarios'))
+        if type not in _VALID_TYPES:
+            flash("Invalid type")
+            return redirect(url_for('main.scenarios'))
+        if frequency not in _VALID_FREQUENCIES:
+            flash("Invalid frequency")
+            return redirect(url_for('main.scenarios'))
+
         scenario = Scenario(name=name,
                             type=type,
                             amount=amount,
@@ -392,18 +450,38 @@ def update_scenario():
     format = '%Y-%m-%d'
 
     if request.method == 'POST':
+        new_name = request.form['name'].strip()
+        new_amount = request.form['amount']
+        new_type = request.form['type']
+        new_frequency = request.form['frequency']
+
+        if not new_name or len(new_name) > _MAX_NAME_LEN:
+            flash(f"Name must be between 1 and {_MAX_NAME_LEN} characters")
+            return redirect(url_for('main.scenarios'))
+        try:
+            float(new_amount)
+        except (ValueError, TypeError):
+            flash("Amount must be a number")
+            return redirect(url_for('main.scenarios'))
+        if new_type not in _VALID_TYPES:
+            flash("Invalid type")
+            return redirect(url_for('main.scenarios'))
+        if new_frequency not in _VALID_FREQUENCIES:
+            flash("Invalid frequency")
+            return redirect(url_for('main.scenarios'))
+
         current = Scenario.query.filter_by(id=int(request.form['id']), user_id=user_id).first()
         if not current:
             flash("Scenario not found")
             return redirect(url_for('main.scenarios'))
-        existing = Scenario.query.filter_by(name=request.form['name'], user_id=user_id).first()
-        if existing and current.name != request.form['name']:
+        existing = Scenario.query.filter_by(name=new_name, user_id=user_id).first()
+        if existing and current.name != new_name:
             flash("Scenario name already exists")
             return redirect(url_for('main.scenarios'))
-        current.name = request.form['name']
-        current.amount = request.form['amount']
-        current.type = request.form['type']
-        current.frequency = request.form['frequency']
+        current.name = new_name
+        current.amount = new_amount
+        current.type = new_type
+        current.frequency = new_frequency
         startdate = request.form['startdate']
         if (datetime.strptime(startdate, format).date() != current.startdate and current.startdate.day !=
                 datetime.strptime(startdate, format).day):
@@ -465,6 +543,7 @@ def balance():
 
 @main.route('/changepw', methods=('GET', 'POST'))
 @login_required
+@limiter.limit("5 per minute")
 def changepw():
     # update account profile (name, email) and optionally change password
     if request.method == 'POST':
@@ -495,8 +574,14 @@ def changepw():
 
         # Only update password if the user filled in the new password fields
         if password or password2:
+            if not password or not password2:
+                flash('Please fill in both new password fields')
+                return redirect(url_for('main.settings'))
             if password != password2:
                 flash('New passwords do not match')
+                return redirect(url_for('main.settings'))
+            if len(password) < 8:
+                flash('New password must be at least 8 characters')
                 return redirect(url_for('main.settings'))
             my_user.password = generate_password_hash(password, method='scrypt')
 
@@ -626,18 +711,35 @@ def update_user():
             else:
                 return redirect(url_for('main.manage_guests'))
 
+        new_name = request.form['name'].strip()
         new_email = request.form['email'].strip().lower()
-        existing = User.query.filter_by(email=new_email).first()
+
+        if not new_name or len(new_name) > _MAX_NAME_LEN:
+            flash(f"Name must be between 1 and {_MAX_NAME_LEN} characters")
+            if current_user.is_global_admin:
+                return redirect(url_for('main.global_admin_panel'))
+            return redirect(url_for('main.manage_guests'))
+        if not new_email or len(new_email) > _MAX_EMAIL_LEN:
+            flash(f"Email must be between 1 and {_MAX_EMAIL_LEN} characters")
+            if current_user.is_global_admin:
+                return redirect(url_for('main.global_admin_panel'))
+            return redirect(url_for('main.manage_guests'))
+
+        # Use a single query that excludes the current user to avoid TOCTOU;
+        # the unique constraint on email also protects against concurrent races.
+        existing = User.query.filter(
+            db.func.lower(User.email) == new_email,
+            User.id != current.id
+        ).first()
         if existing:
-            if current.email != new_email:
-                flash("Email already exists")
-                if current_user.is_global_admin:
-                    return redirect(url_for('main.global_admin_panel'))
-                else:
-                    return redirect(url_for('main.manage_guests'))
-        my_data = User.query.get(request.form.get('id'))
-        my_data.name = request.form['name']
-        my_data.email = new_email
+            flash("Email already exists")
+            if current_user.is_global_admin:
+                return redirect(url_for('main.global_admin_panel'))
+            else:
+                return redirect(url_for('main.manage_guests'))
+        # Reuse the already-fetched 'current' object instead of issuing a second query
+        current.name = new_name
+        current.email = new_email
 
         # Global admins can change roles, Account Owners cannot
         if current_user.is_global_admin:
@@ -794,9 +896,27 @@ def deactivate_user(id):
 def create_user():
     # create a new user
     if request.method == 'POST':
-        name = request.form['name']
+        name = request.form['name'].strip()
         email = request.form['email'].strip().lower()
-        password = generate_password_hash(request.form['password'], method='scrypt')
+        raw_password = request.form['password']
+
+        if not name or len(name) > _MAX_NAME_LEN:
+            flash(f"Name must be between 1 and {_MAX_NAME_LEN} characters")
+            if current_user.is_global_admin:
+                return redirect(url_for('main.global_admin_panel'))
+            return redirect(url_for('main.manage_guests'))
+        if not email or len(email) > _MAX_EMAIL_LEN:
+            flash(f"Email must be between 1 and {_MAX_EMAIL_LEN} characters")
+            if current_user.is_global_admin:
+                return redirect(url_for('main.global_admin_panel'))
+            return redirect(url_for('main.manage_guests'))
+        if not raw_password or len(raw_password) < 8:
+            flash("Password must be at least 8 characters")
+            if current_user.is_global_admin:
+                return redirect(url_for('main.global_admin_panel'))
+            return redirect(url_for('main.manage_guests'))
+
+        password = generate_password_hash(raw_password, method='scrypt')
 
         # Handle role assignment
         role = request.form.get('role', 'guest')
@@ -823,15 +943,16 @@ def create_user():
             # Guests created by Account Owners are active by default
             is_active = True
 
-        user = User(name=name, email=email, admin=admin, is_global_admin=is_global_admin,
-                    is_active=is_active, password=password, account_owner_id=account_owner_id)
-        existing = User.query.filter_by(email=email).first()
+        # Check uniqueness before constructing the User object to avoid TOCTOU
+        existing = User.query.filter(db.func.lower(User.email) == email).first()
         if existing:
             flash("User already exists")
             if current_user.is_global_admin:
                 return redirect(url_for('main.global_admin_panel'))
             else:
                 return redirect(url_for('main.manage_guests'))
+        user = User(name=name, email=email, admin=admin, is_global_admin=is_global_admin,
+                    is_active=is_active, password=password, account_owner_id=account_owner_id)
         db.session.add(user)
         db.session.commit()
         flash("Added Successfully")
@@ -897,8 +1018,15 @@ def manage_guests():
 @account_owner_required
 def add_guest():
     """Create a guest user linked to current account owner"""
-    email = request.form.get('email')
-    name = request.form.get('name')
+    email = (request.form.get('email') or '').strip().lower()
+    name = (request.form.get('name') or '').strip()
+
+    if not name or len(name) > _MAX_NAME_LEN:
+        flash(f"Name must be between 1 and {_MAX_NAME_LEN} characters")
+        return redirect(url_for('main.manage_guests'))
+    if not email or len(email) > _MAX_EMAIL_LEN:
+        flash(f"Email must be between 1 and {_MAX_EMAIL_LEN} characters")
+        return redirect(url_for('main.manage_guests'))
 
     # Check if user already exists
     existing_user = User.query.filter_by(email=email).first()
@@ -921,24 +1049,17 @@ def add_guest():
     db.session.add(new_guest)
     db.session.commit()
 
-    # Store temp password in session for one-time display; do NOT flash it
-    session['guest_temp_password'] = temp_password
-    session['guest_temp_name'] = name
-    session['guest_temp_email'] = email
-    return redirect(url_for('main.guest_password_page'))
+    # Return template directly so the plaintext password is never stored in the session cookie.
+    # The password is only held in this request's local scope and rendered once.
+    return render_template('guest_password.html', temp_password=temp_password, name=name, email=email)
 
 
 @main.route('/guest_password')
 @login_required
 @account_owner_required
 def guest_password_page():
-    """One-time display of a newly created guest's temporary password."""
-    temp_password = session.pop('guest_temp_password', None)
-    name = session.pop('guest_temp_name', None)
-    email = session.pop('guest_temp_email', None)
-    if not temp_password:
-        return redirect(url_for('main.manage_guests'))
-    return render_template('guest_password.html', temp_password=temp_password, name=name, email=email)
+    """Legacy route kept for backwards compatibility; new flow returns directly from add_guest."""
+    return redirect(url_for('main.manage_guests'))
 
 
 @main.route('/remove_guest/<int:guest_id>', methods=['POST'])
@@ -963,7 +1084,7 @@ def remove_guest(guest_id):
 @global_admin_required
 def global_admin_panel():
     """Global admin can see all users and accounts"""
-    all_users = User.query.all()
+    all_users = User.query.limit(500).all()
 
     # Organize users by account owners
     account_owners = [u for u in all_users if u.account_owner_id is None and not u.is_global_admin]
@@ -1080,7 +1201,7 @@ def ai_insights():
         return Response(json.dumps({'error': 'An error occurred generating insights. Please try again later.'}), status=500, mimetype='application/json')
 
     ai_config.last_insights = insights_json
-    ai_config.last_updated = datetime.utcnow()
+    ai_config.last_updated = datetime.now(timezone.utc)
     db.session.commit()
 
     return Response(insights_json, status=200, mimetype='application/json')

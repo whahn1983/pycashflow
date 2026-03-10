@@ -15,7 +15,7 @@ from .crypto_utils import encrypt_password, decrypt_password
 
 ISSUER_NAME = "PyCashFlow"
 BACKUP_CODE_COUNT = 10
-BACKUP_CODE_LENGTH = 8  # hex chars -> 32-bit entropy each
+BACKUP_CODE_LENGTH = 32  # hex chars -> 128-bit entropy each (16 bytes via token_hex)
 
 
 def generate_totp_secret() -> str:
