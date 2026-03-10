@@ -53,13 +53,19 @@ def create_app():
     # Harden session and remember-me cookies.
     # SESSION_COOKIE_SECURE defaults to True; set SESSION_COOKIE_SECURE=false in .env
     # only when running without TLS (e.g. local dev over plain HTTP).
-    _secure_cookies = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() != 'false'
+    # Use == 'true' (not != 'false') so that any value other than exactly 'true'
+    # keeps cookies secure, preventing accidental exposure from typos like 'False'.
+    _secure_cookies = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() == 'true'
     app.config['SESSION_COOKIE_SECURE'] = _secure_cookies
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['REMEMBER_COOKIE_SECURE'] = _secure_cookies
     app.config['REMEMBER_COOKIE_HTTPONLY'] = True
     app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
+
+    # Reject request bodies larger than 2 MB before any route handler runs,
+    # preventing the server from buffering huge uploads into memory.
+    app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2 MB
 
     # Configure Flask-Limiter storage backend.
     # Defaults to in-memory (single-process only). For multi-process deployments,
@@ -95,8 +101,9 @@ def create_app():
     #     db.create_all()
 
     # Bootstrap global admin from environment variables.
-    # Set BOOTSTRAP_ADMIN_EMAIL + BOOTSTRAP_ADMIN_PASSWORD to create the initial
-    # admin account on first startup instead of relying on signup-flow auto-elevation.
+    # Set BOOTSTRAP_ADMIN_EMAIL + BOOTSTRAP_ADMIN_PASSWORD only for initial setup.
+    # IMPORTANT: Remove these environment variables after the first admin account
+    # has been created to avoid leaving credentials in the process environment.
     _bootstrap_email = os.environ.get('BOOTSTRAP_ADMIN_EMAIL')
     _bootstrap_password = os.environ.get('BOOTSTRAP_ADMIN_PASSWORD')
     if _bootstrap_email and _bootstrap_password:
@@ -117,9 +124,10 @@ def create_app():
                         db.session.add(bootstrap_user)
                         db.session.commit()
             except Exception as exc:
-                logger.warning(
-                    "Bootstrap admin creation skipped (%s: %s); tables may not exist yet",
-                    type(exc).__name__, exc,
+                # Expected during pre-migration startup when tables don't exist yet.
+                logger.debug(
+                    "Bootstrap admin creation skipped (%s); tables may not exist yet",
+                    type(exc).__name__,
                 )
 
     return app

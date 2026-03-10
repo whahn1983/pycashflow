@@ -1,12 +1,11 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, session
 from flask_login import login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from .models import User
+from .models import User, Settings
 from app import db, limiter
 from .getemail import send_new_user_notification
 from .totp_utils import verify_totp, decrypt_totp_secret, verify_and_consume_backup_code
 import logging
-import pandas as pd
 import os
 from functools import wraps
 from werkzeug.exceptions import Unauthorized
@@ -14,6 +13,10 @@ from corbado_python_sdk import Config, CorbadoSDK, UserEntity
 
 logger = logging.getLogger(__name__)
 
+# Pre-computed hash used to perform a constant-time dummy check when the
+# submitted email doesn't match any user, preventing username enumeration
+# via response-time differences.
+_DUMMY_HASH = generate_password_hash('__dummy__', method='scrypt')
 
 auth = Blueprint('auth', __name__)
 
@@ -57,11 +60,18 @@ def login_post():
 
     user = User.query.filter_by(email=email).first()
 
-    # check if the user actually exists
-    # take the user-supplied password, hash it, and compare it to the hashed password in the database
-    if not user or not check_password_hash(user.password, password):
+    # Always run the hash comparison to prevent username enumeration via timing.
+    # When no user is found we compare against a dummy hash so the response time
+    # is indistinguishable from a wrong-password attempt for a real user.
+    if user:
+        password_ok = check_password_hash(user.password, password)
+    else:
+        check_password_hash(_DUMMY_HASH, password)
+        password_ok = False
+
+    if not password_ok:
         flash('Please check your login details and try again.')
-        return redirect(url_for('auth.login')) # if the user doesn't exist or password is wrong, reload the page
+        return redirect(url_for('auth.login'))
 
     # check if the user account is active
     if not user.is_active:
@@ -138,18 +148,9 @@ def login_2fa_post():
 @auth.route('/signup')
 def signup():
     try:
-        engine = db.create_engine(os.environ.get('DATABASE_URL')).connect()
-    except Exception as exc:
-        logger.warning("DATABASE_URL connection failed, falling back to SQLite: %s", exc)
-        engine = db.create_engine('sqlite:///db.sqlite').connect()
-
-    try:
-        df = pd.read_sql("SELECT value FROM settings WHERE name = 'signup' LIMIT 1;", engine)
-
-        if not df.empty and df['value'].iloc[0] == 1:
+        setting = Settings.query.filter_by(name='signup').first()
+        if setting and setting.value == 1:
             return render_template('login.html')
-    except (KeyError, IndexError) as exc:
-        logger.debug("Settings table returned unexpected shape: %s", exc)
     except Exception as exc:
         logger.debug("Settings table not available: %s", exc)
 
@@ -206,6 +207,7 @@ def signup_post():
 @auth.route('/logout')
 @login_required
 def logout():
+    session.clear()
     logout_user()
     return redirect(url_for('main.index'))
 
