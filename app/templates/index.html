@@ -45,6 +45,19 @@
             &nbsp;&mdash;&nbsp;<span style="color: #f59e0b;">amber = with scenarios</span>
             {% endif %}
         </div>
+        {% if cash_risk %}
+        <div style="margin-top: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 0.78rem; color: var(--text-muted);">Cash Risk:</span>
+            <span style="font-size: 0.88rem; font-weight: 700;
+                {% if cash_risk.color == 'green' %}color: var(--success);
+                {% elif cash_risk.color == 'blue' %}color: var(--accent);
+                {% elif cash_risk.color == 'yellow' %}color: var(--warning);
+                {% elif cash_risk.color == 'orange' %}color: #f97316;
+                {% else %}color: var(--danger);{% endif %}">
+                {{ cash_risk.score }} &mdash; {{ cash_risk.status }}
+            </span>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -90,6 +103,50 @@
         </div>
     </div>
     <div class="chart-body" id="ai-insights-body">
+
+        <!-- Mandatory Cash Risk Score Card (always shown, server-rendered) -->
+        {% if cash_risk %}
+        <div id="cash-risk-card" style="padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1rem;
+            {% if cash_risk.color == 'green' %}background-color: rgba(16,185,129,0.1); border-left: 4px solid var(--success);
+            {% elif cash_risk.color == 'blue' %}background-color: rgba(59,130,246,0.1); border-left: 4px solid var(--accent);
+            {% elif cash_risk.color == 'yellow' %}background-color: rgba(245,158,11,0.1); border-left: 4px solid var(--warning);
+            {% elif cash_risk.color == 'orange' %}background-color: rgba(249,115,22,0.1); border-left: 4px solid #f97316;
+            {% else %}background-color: rgba(239,68,68,0.1); border-left: 4px solid var(--danger);{% endif %}">
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.6rem;">
+                <i class="fa-solid fa-shield-halved" style="font-size: 1.1rem;
+                    {% if cash_risk.color == 'green' %}color: var(--success);
+                    {% elif cash_risk.color == 'blue' %}color: var(--accent);
+                    {% elif cash_risk.color == 'yellow' %}color: var(--warning);
+                    {% elif cash_risk.color == 'orange' %}color: #f97316;
+                    {% else %}color: var(--danger);{% endif %}"></i>
+                <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+                    {% if cash_risk.color == 'green' %}color: var(--success);
+                    {% elif cash_risk.color == 'blue' %}color: var(--accent);
+                    {% elif cash_risk.color == 'yellow' %}color: var(--warning);
+                    {% elif cash_risk.color == 'orange' %}color: #f97316;
+                    {% else %}color: var(--danger);{% endif %}">Cash Risk Score</span>
+                <span style="font-size: 1.6rem; font-weight: 800; line-height: 1;
+                    {% if cash_risk.color == 'green' %}color: var(--success);
+                    {% elif cash_risk.color == 'blue' %}color: var(--accent);
+                    {% elif cash_risk.color == 'yellow' %}color: var(--warning);
+                    {% elif cash_risk.color == 'orange' %}color: #f97316;
+                    {% else %}color: var(--danger);{% endif %}">{{ cash_risk.score }}</span>
+                <span style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: #fff; padding: 0.2rem 0.6rem; border-radius: 999px;
+                    {% if cash_risk.color == 'green' %}background-color: var(--success);
+                    {% elif cash_risk.color == 'blue' %}background-color: var(--accent);
+                    {% elif cash_risk.color == 'yellow' %}background-color: var(--warning);
+                    {% elif cash_risk.color == 'orange' %}background-color: #f97316;
+                    {% else %}background-color: var(--danger);{% endif %}">{{ cash_risk.status }}</span>
+            </div>
+            <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-muted);">
+                <span><i class="fa-solid fa-gauge"></i> Runway: {{ cash_risk.runway_days }} days</span>
+                <span><i class="fa-solid fa-calendar-xmark"></i> Lowest in {{ cash_risk.days_to_lowest }} days (${{ cash_risk.lowest_balance }})</span>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- AI-generated insights (replaced on refresh) -->
+        <div id="ai-insights-list">
         {% if not has_ai_key %}
         <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
             <i class="fa-solid fa-robot" style="font-size: 2rem; margin-bottom: 0.75rem; display: block; color: #6366f1;"></i>
@@ -109,14 +166,17 @@
             <p style="margin: 0;">No significant findings in the current projection.</p>
         </div>
         {% else %}
-        <div id="ai-insights-list">
             {% for insight in ai_insights_data.insights %}
             <div style="padding: 1rem; border-radius: var(--radius-md); margin-bottom: 0.75rem;
-                {% if insight.type == 'risk' %}background-color: rgba(239, 68, 68, 0.1); border-left: 4px solid var(--danger);
+                {% if insight.type == 'cash_risk' %}background-color: rgba(99,102,241,0.1); border-left: 4px solid #6366f1;
+                {% elif insight.type == 'risk' %}background-color: rgba(239, 68, 68, 0.1); border-left: 4px solid var(--danger);
                 {% elif insight.type == 'pattern' %}background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--accent);
                 {% else %}background-color: rgba(16, 185, 129, 0.1); border-left: 4px solid var(--success);{% endif %}">
                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;">
-                    {% if insight.type == 'risk' %}
+                    {% if insight.type == 'cash_risk' %}
+                    <i class="fa-solid fa-shield-halved" style="color: #6366f1;"></i>
+                    <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #6366f1;">Cash Risk</span>
+                    {% elif insight.type == 'risk' %}
                     <i class="fa-solid fa-triangle-exclamation" style="color: var(--danger);"></i>
                     <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--danger);">Risk</span>
                     {% elif insight.type == 'pattern' %}
@@ -138,8 +198,8 @@
                 <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">{{ insight.description }}</p>
             </div>
             {% endfor %}
-        </div>
         {% endif %}
+        </div>
     </div>
 </div>
 
@@ -292,7 +352,7 @@
     function refreshAIInsights() {
         const btn = document.getElementById('ai-refresh-btn');
         const icon = document.getElementById('ai-refresh-icon');
-        const body = document.getElementById('ai-insights-body');
+        const list = document.getElementById('ai-insights-list');
 
         if (btn) btn.disabled = true;
         if (icon) icon.classList.add('loading');
@@ -308,20 +368,21 @@
                     errText.style.color = 'var(--text-secondary)';
                     errText.textContent = data.error;
                     errDiv.appendChild(errText);
-                    body.replaceChildren(errDiv);
+                    list.replaceChildren(errDiv);
                 } else if (data.insights && data.insights.length > 0) {
                     const typeStyles = {
-                        risk: {bg: 'rgba(239,68,68,0.1)', border: 'var(--danger)', icon: 'fa-triangle-exclamation', color: 'var(--danger)', label: 'Risk'},
-                        pattern: {bg: 'rgba(59,130,246,0.1)', border: 'var(--accent)', icon: 'fa-chart-line', color: 'var(--accent)', label: 'Pattern'},
-                        observation: {bg: 'rgba(16,185,129,0.1)', border: 'var(--success)', icon: 'fa-lightbulb', color: 'var(--success)', label: 'Observation'}
+                        cash_risk:   {bg: 'rgba(99,102,241,0.1)',  border: '#6366f1',         icon: 'fa-shield-halved',       color: '#6366f1',         label: 'Cash Risk'},
+                        risk:        {bg: 'rgba(239,68,68,0.1)',    border: 'var(--danger)',    icon: 'fa-triangle-exclamation',color: 'var(--danger)',    label: 'Risk'},
+                        pattern:     {bg: 'rgba(59,130,246,0.1)',   border: 'var(--accent)',    icon: 'fa-chart-line',          color: 'var(--accent)',    label: 'Pattern'},
+                        observation: {bg: 'rgba(16,185,129,0.1)',   border: 'var(--success)',   icon: 'fa-lightbulb',           color: 'var(--success)',   label: 'Observation'}
                     };
                     const severityStyles = {
                         high:   {bg: 'var(--danger)',  label: 'High'},
                         medium: {bg: 'var(--warning)', label: 'Medium'},
                         low:    {bg: 'var(--success)', label: 'Low'}
                     };
-                    const list = document.createElement('div');
-                    list.id = 'ai-insights-list';
+                    const newList = document.createElement('div');
+                    newList.id = 'ai-insights-list';
                     data.insights.forEach(insight => {
                         const s = typeStyles[insight.type] || typeStyles.observation;
                         const card = document.createElement('div');
@@ -346,9 +407,9 @@
                         descP.textContent = insight.description;
                         card.appendChild(titleP);
                         card.appendChild(descP);
-                        list.appendChild(card);
+                        newList.appendChild(card);
                     });
-                    body.replaceChildren(list);
+                    list.replaceWith(newList);
 
                     // Update the last-updated timestamp display
                     const now = new Date();
@@ -367,11 +428,11 @@
                         }
                     }
                 } else {
-                    body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);"><i class="fa-solid fa-circle-check" style="font-size:2rem;margin-bottom:0.75rem;display:block;color:var(--success);"></i><p style="margin:0;">No significant findings in the current projection.</p></div>';
+                    list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);"><i class="fa-solid fa-circle-check" style="font-size:2rem;margin-bottom:0.75rem;display:block;color:var(--success);"></i><p style="margin:0;">No significant findings in the current projection.</p></div>';
                 }
             })
             .catch(err => {
-                body.innerHTML = '<div style="padding:1rem;border-radius:var(--radius-md);background-color:rgba(239,68,68,0.1);border-left:4px solid var(--danger);">' +
+                list.innerHTML = '<div style="padding:1rem;border-radius:var(--radius-md);background-color:rgba(239,68,68,0.1);border-left:4px solid var(--danger);">' +
                     '<i class="fa-solid fa-circle-exclamation" style="color:var(--danger);"></i> ' +
                     '<strong style="color:var(--danger);">Error:</strong> <span style="color:var(--text-secondary);">Network error. Please try again.</span></div>';
             })
