@@ -9,7 +9,7 @@ import json
 import logging
 from sqlalchemy import desc, extract, asc
 from werkzeug.security import generate_password_hash, check_password_hash
-from .cashflow import update_cash, plot_cash
+from .cashflow import update_cash, plot_cash, calculate_cash_risk_score
 from .auth import admin_required, global_admin_required, account_owner_required
 from .files import export, upload, version
 from .getemail import send_account_activation_notification
@@ -82,6 +82,9 @@ def index():
     # plot cash flow results
     minbalance, min_scenario, graphJSON = plot_cash(run, run_scenario)
 
+    # calculate cash risk score
+    cash_risk = calculate_cash_risk_score(float(balance.amount), run)
+
     # Load AI insights for dashboard card (uses effective user_id so guests see owner's insights)
     ai_config = AISettings.query.filter_by(user_id=user_id).first()
     ai_insights_data = None
@@ -100,11 +103,12 @@ def index():
         return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
                            minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON,
                            ai_insights_data=ai_insights_data, ai_last_updated=ai_last_updated,
-                           has_ai_key=has_ai_key)
+                           has_ai_key=has_ai_key, cash_risk=cash_risk)
     else:
         return render_template('index_guest.html', title='Index', todaydate=todaydate, balance=balance.amount,
                            minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON,
-                           ai_insights_data=ai_insights_data, ai_last_updated=ai_last_updated)
+                           ai_insights_data=ai_insights_data, ai_last_updated=ai_last_updated,
+                           cash_risk=cash_risk)
 
 
 @main.route('/refresh')

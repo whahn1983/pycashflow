@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from openai import OpenAI
 
-from .cashflow import update_cash
+from .cashflow import update_cash, calculate_cash_risk_score
 from .crypto_utils import decrypt_password
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,10 @@ SYSTEM_PROMPT = (
     "authoritative pre-calculated daily balance for each date in the horizon.\n"
     "- minimum_safe_balance (number): pre-calculated server-side threshold tied to near-term expense pressure.\n"
     "- low_balance_observation_warranted (boolean): pre-calculated server-side flag. True only when a low-balance observation should be "
-    "allowed. Do not re-evaluate or override this flag.\n\n"
+    "allowed. Do not re-evaluate or override this flag.\n"
+    "- cash_risk_score (object): pre-calculated server-side risk assessment with fields: score (integer 0-100, higher = safer), "
+    "status (string: Safe/Stable/Watch/Risk/Critical), runway_days (number), lowest_balance (number), days_to_lowest (integer), "
+    "avg_daily_expense (number).\n\n"
     "Your task is to identify potential cash flow risks, patterns in the schedule, and helpful financial insights.\n\n"
     "Hard rules (must follow):\n"
     "1) Data boundaries\n"
@@ -68,6 +71,8 @@ SYSTEM_PROMPT = (
     "- Insights may all be the same type. Do not force variety across risk, pattern, and observation.\n"
     "- It is acceptable to return an empty insights array.\n\n"
     "Insight type definitions:\n"
+    "- cash_risk: mandatory — always the first insight. Explains the pre-calculated cash_risk_score in 1-2 sentences, "
+    "naming the one or two factors that matter most (e.g. runway, days until lowest balance, volatility).\n"
     "- risk: a specific future event/date where projected balance is below zero.\n"
     "- pattern: recurring behavior across multiple transactions that passes the significance rules above.\n"
     "- observation: a noteworthy non-recurring fact that is neither a risk nor a recurring pattern.\n\n"
@@ -75,7 +80,7 @@ SYSTEM_PROMPT = (
     "{\n"
     '  "insights": [\n'
     "    {\n"
-    '      "type": "risk | pattern | observation",\n'
+    '      "type": "cash_risk | risk | pattern | observation",\n'
     '      "severity": "low | medium | high",\n'
     '      "title": "Short descriptive title",\n'
     '      "description": "1-2 sentence explanation referencing the projection data"\n'
@@ -87,7 +92,8 @@ SYSTEM_PROMPT = (
     "- medium: meaningful pressure or structural stress that is real but less single-step actionable.\n"
     "- low: noteworthy but limited urgency/actionability.\n"
     "Do not let severity decide whether an insight exists; determine validity using the rules above first.\n\n"
-    "Return up to 4 insights maximum. 0 insights is valid when no meaningful findings are supported by the data."
+    "The cash_risk insight is ALWAYS required as the first entry in the insights array, regardless of other findings. "
+    "Return up to 4 additional insights after the cash_risk insight. The cash_risk insight does not count toward the 4-insight limit."
 )
 
 
@@ -170,6 +176,8 @@ def build_payload(current_balance, schedules, holds, skips):
 
     low_balance_observation_warranted = min_amount < minimum_safe_balance
 
+    cash_risk = calculate_cash_risk_score(current_balance, run)
+
     return {
         'today': str(todaydate),
         'analysis_horizon_days': 90,
@@ -179,6 +187,14 @@ def build_payload(current_balance, schedules, holds, skips):
         'low_balance_observation_warranted': low_balance_observation_warranted,
         'schedule_table': schedule_table,
         'projected_daily_balances': projected_daily_balances,
+        'cash_risk_score': {
+            'score': cash_risk['score'],
+            'status': cash_risk['status'],
+            'runway_days': cash_risk['runway_days'],
+            'lowest_balance': cash_risk['lowest_balance'],
+            'days_to_lowest': cash_risk['days_to_lowest'],
+            'avg_daily_expense': cash_risk['avg_daily_expense'],
+        },
     }
 
 

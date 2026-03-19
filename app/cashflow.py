@@ -478,6 +478,127 @@ def calc_transactions(balance, total):
     return trans, run
 
 
+def calculate_cash_risk_score(balance, run):
+    """
+    Calculate a 0-100 cash risk score (higher = safer).
+
+    Factors and weights:
+        40% runway score        — current_balance / avg_daily_expense
+        25% lowest balance score — lowest_projected_balance / avg_monthly_expense
+        20% days-to-lowest score — days until the lowest balance occurs
+        15% volatility score     — spread of balance over the projection
+
+    Returns a dict with: score, status, color, runway_days,
+    lowest_balance, days_to_lowest, avg_daily_expense.
+    """
+    todaydate = datetime.today().date()
+    current_balance = float(balance)
+
+    if run.empty or len(run) < 2 or current_balance <= 0:
+        return {
+            'score': 50,
+            'status': 'Watch',
+            'color': 'yellow',
+            'runway_days': 0,
+            'lowest_balance': current_balance,
+            'days_to_lowest': 0,
+            'avg_daily_expense': 0,
+        }
+
+    run_copy = run.copy()
+    run_copy['amount'] = run_copy['amount'].astype(float)
+    run_copy['date_val'] = run_copy['date'].apply(
+        lambda d: d if hasattr(d, 'year') else datetime.strptime(str(d), '%Y-%m-%d').date()
+    )
+    run_copy = run_copy.sort_values('date_val').reset_index(drop=True)
+
+    # Lowest balance and when it occurs
+    min_idx = run_copy['amount'].idxmin()
+    lowest_balance = float(run_copy.loc[min_idx, 'amount'])
+    lowest_date = run_copy.loc[min_idx, 'date_val']
+    days_to_lowest = max(0, (lowest_date - todaydate).days)
+
+    # Max balance for volatility
+    max_balance = float(run_copy['amount'].max())
+
+    # Average daily expense from negative balance changes over the full projection
+    amounts = run_copy['amount'].values
+    total_days = max(1, (run_copy['date_val'].iloc[-1] - run_copy['date_val'].iloc[0]).days)
+    expense_total = sum(
+        abs(amounts[i] - amounts[i - 1])
+        for i in range(1, len(amounts))
+        if amounts[i] < amounts[i - 1]
+    )
+    avg_daily_expense = expense_total / total_days if total_days > 0 else 1.0
+    if avg_daily_expense == 0:
+        avg_daily_expense = 1.0
+
+    avg_monthly_expense = avg_daily_expense * 30
+    cash_runway_days = current_balance / avg_daily_expense
+
+    # --- Component scores (0-100, higher = safer) ---
+
+    # 1. Runway score (40%)
+    if cash_runway_days >= 90:
+        runway_score = 100.0
+    elif cash_runway_days >= 45:
+        runway_score = 40.0 + (cash_runway_days - 45.0) * (60.0 / 45.0)
+    else:
+        runway_score = max(0.0, cash_runway_days * (40.0 / 45.0))
+
+    # 2. Lowest balance score (25%)
+    ratio = lowest_balance / avg_monthly_expense if avg_monthly_expense > 0 else 1.0
+    lowest_score = max(0.0, min(100.0, ratio * 100.0))
+
+    # 3. Days-to-lowest score (20%)
+    if days_to_lowest >= 30:
+        days_score = 100.0
+    elif days_to_lowest >= 14:
+        days_score = 40.0 + (days_to_lowest - 14.0) * (60.0 / 16.0)
+    else:
+        days_score = max(0.0, days_to_lowest * (40.0 / 14.0))
+
+    # 4. Volatility score (15%)
+    volatility = max_balance - lowest_balance
+    vol_ratio = volatility / current_balance if current_balance > 0 else 1.0
+    if vol_ratio <= 0.5:
+        vol_score = 100.0
+    elif vol_ratio <= 2.0:
+        vol_score = max(0.0, 100.0 - ((vol_ratio - 0.5) / 1.5) * 100.0)
+    else:
+        vol_score = 0.0
+
+    # Weighted composite
+    score = (
+        runway_score * 0.40 +
+        lowest_score * 0.25 +
+        days_score * 0.20 +
+        vol_score * 0.15
+    )
+    score = int(max(0, min(100, round(score))))
+
+    if score >= 80:
+        status, color = 'Safe', 'green'
+    elif score >= 60:
+        status, color = 'Stable', 'blue'
+    elif score >= 40:
+        status, color = 'Watch', 'yellow'
+    elif score >= 20:
+        status, color = 'Risk', 'orange'
+    else:
+        status, color = 'Critical', 'red'
+
+    return {
+        'score': score,
+        'status': status,
+        'color': color,
+        'runway_days': round(cash_runway_days, 1),
+        'lowest_balance': round(lowest_balance, 2),
+        'days_to_lowest': days_to_lowest,
+        'avg_daily_expense': round(avg_daily_expense, 2),
+    }
+
+
 def plot_cash(run, run_scenario=None):
     # plot the running balances by date on a line plot
     # Schedule-only line
