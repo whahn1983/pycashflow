@@ -25,6 +25,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - [User Roles & Access Control](#user-roles--access-control)
 - [Core Capabilities](#core-capabilities)
 - [AI Insights](#ai-insights)
+  - [Cash Risk Score](#cash-risk-score)
 - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
 - [Email Integration](#email-integration)
 - [Data Management](#data-management)
@@ -63,7 +64,8 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 ### AI-Powered Cash Flow Insights
 - **OpenAI Integration**: On-demand analysis of your 90-day cash flow projection via OpenAI
 - **Model Selection**: Choose any OpenAI model (e.g. `gpt-4o`, `gpt-4o-mini`) in settings; defaults to `gpt-4o-mini` when left blank
-- **Typed Insights**: Categorized as **Risk**, **Pattern**, or **Observation** with color-coded badges
+- **Typed Insights**: Categorized as **Cash Risk**, **Risk**, **Pattern**, or **Observation** with color-coded badges
+- **Cash Risk Score**: Deterministic 0–100 score computed on every refresh — no AI required; always displayed as a mandatory card in the AI Insights section and as an inline indicator on the Lowest Balance card
 - **On-Demand Refresh**: Insights are only generated when you click Refresh, keeping API costs minimal
 - **Staleness Indicator**: Last-updated timestamp shown so you always know how current the analysis is
 - **Secure Key Storage**: Your OpenAI API key is encrypted at rest using the same Fernet/APP_SECRET pattern as email passwords
@@ -381,10 +383,47 @@ PyCashFlow integrates with the OpenAI API to provide on-demand cash flow analysi
 5. Results are cached in the database and displayed as color-coded insight cards
 6. Guest users can view cached insights but cannot trigger a refresh
 
+### Cash Risk Score
+
+The Cash Risk Score is a deterministic **0–100 indicator** calculated on every page refresh from your projected cash flow data — no OpenAI API key required. It is always visible as a mandatory card at the top of the AI Insights section and as an inline badge on the Lowest Balance metric card.
+
+#### Score Categories
+
+| Score | Status | Color |
+|-------|--------|-------|
+| 80–100 | Safe | Green |
+| 60–79 | Stable | Blue |
+| 40–59 | Watch | Yellow |
+| 20–39 | Risk | Orange |
+| 0–19 | Critical | Red |
+
+#### How the Score Is Calculated
+
+The score is a weighted composite of four factors derived from your 60-day projection:
+
+| Factor | Weight | Description |
+|--------|--------|-------------|
+| **Cash Runway** | 40% | `current_balance ÷ avg_daily_expense` — how many days the current balance can cover expenses. ≥90 days = full score; <45 days = risky. |
+| **Lowest Projected Balance** | 25% | `lowest_balance ÷ avg_monthly_expense` — how the dip compares to a typical month of spending. |
+| **Days Until Lowest Balance** | 20% | How far away the projected balance dip is. ≥30 days = full score; <14 days = high risk. |
+| **Volatility** | 15% | `(max_balance − min_balance) ÷ current_balance` — large balance swings increase risk. |
+
+Each factor is scored 0–100 individually, then combined into the final weighted score.
+
+#### What Is Displayed
+
+The mandatory cash risk card always shows:
+- The numeric score and status badge in the appropriate status color
+- Cash runway in days
+- Days until the lowest projected balance, and the projected low amount
+
+When an OpenAI API key is configured and insights are refreshed, the AI also generates a **Cash Risk** explanation insight as its first entry, describing the primary factors behind the score in plain language.
+
 ### Insight Types
 
 | Type | Color | Meaning |
 |------|-------|---------|
+| **Cash Risk** | Indigo | Always-present AI explanation of the cash risk score and its key drivers |
 | **Risk** | Red | Potential cash flow shortfalls or timing problems |
 | **Pattern** | Blue | Recurring patterns in your transaction schedule |
 | **Observation** | Green | General financial observations about your projection |
