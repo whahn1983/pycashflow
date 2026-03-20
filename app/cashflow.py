@@ -610,10 +610,12 @@ def plot_cash(run, run_scenario=None):
     # Schedule-only line
     df = run.sort_values(by='date', ascending=False)
     df['amount'] = df['amount'].astype(float)
-    minbalance = df['amount'].min()
+    todaydate = datetime.today().date()
+    horizon_90 = todaydate + timedelta(days=90)
+    df_90 = df[df['date'] <= horizon_90]
+    minbalance = df_90['amount'].min() if not df_90.empty else df['amount'].min()
     minbalance = decimal.Decimal(str(minbalance)).quantize(decimal.Decimal('.01'))
 
-    todaydate = datetime.today().date()
     todaydateplus = todaydate + relativedelta(months=2)
 
     if float(minbalance) >= 0:
@@ -633,7 +635,8 @@ def plot_cash(run, run_scenario=None):
     if run_scenario is not None:
         df_s = run_scenario.sort_values(by='date', ascending=False)
         df_s['amount'] = df_s['amount'].astype(float)
-        scenario_min = df_s['amount'].min()
+        df_s_90 = df_s[df_s['date'] <= horizon_90]
+        scenario_min = df_s_90['amount'].min() if not df_s_90.empty else df_s['amount'].min()
         min_scenario = decimal.Decimal(str(scenario_min)).quantize(decimal.Decimal('.01'))
 
         # Expand y-axis range to fit both lines
