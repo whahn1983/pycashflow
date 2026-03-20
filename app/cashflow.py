@@ -1,6 +1,6 @@
 from app import db
 from .models import Schedule, Skip
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import pandas as pd
 import json
 import plotly
@@ -512,18 +512,24 @@ def calculate_cash_risk_score(balance, run):
     )
     run_copy = run_copy.sort_values('date_val').reset_index(drop=True)
 
-    # Lowest balance and when it occurs
-    min_idx = run_copy['amount'].idxmin()
-    lowest_balance = float(run_copy.loc[min_idx, 'amount'])
-    lowest_date = run_copy.loc[min_idx, 'date_val']
+    # Scope all calculations to 90-day window
+    horizon = todaydate + timedelta(days=90)
+    run_90 = run_copy[run_copy['date_val'] <= horizon]
+    if run_90.empty:
+        run_90 = run_copy
+
+    # Lowest balance and when it occurs (within 90-day window)
+    min_idx = run_90['amount'].idxmin()
+    lowest_balance = float(run_90.loc[min_idx, 'amount'])
+    lowest_date = run_90.loc[min_idx, 'date_val']
     days_to_lowest = max(0, (lowest_date - todaydate).days)
 
-    # Max balance for volatility
-    max_balance = float(run_copy['amount'].max())
+    # Max balance for volatility (within 90-day window)
+    max_balance = float(run_90['amount'].max())
 
-    # Average daily expense from negative balance changes over the full projection
-    amounts = run_copy['amount'].values
-    total_days = max(1, (run_copy['date_val'].iloc[-1] - run_copy['date_val'].iloc[0]).days)
+    # Average daily expense from negative balance changes over the 90-day window
+    amounts = run_90['amount'].values
+    total_days = max(1, (run_90['date_val'].iloc[-1] - run_90['date_val'].iloc[0]).days)
     expense_total = sum(
         abs(amounts[i] - amounts[i - 1])
         for i in range(1, len(amounts))
