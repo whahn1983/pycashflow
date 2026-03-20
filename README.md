@@ -41,7 +41,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - **12-Month Projections**: Visualize your future cash flow up to one year in advance
 - **Interactive Charts**: Plotly-powered interactive visualizations with zoom, pan, and hover details
 - **Minimum Balance Warnings**: Automatically identifies potential low balance periods
-- **60-Day Transaction Preview**: Detailed view of upcoming transactions with running balance calculations
+- **90-Day Transaction Preview**: Detailed view of upcoming transactions with running balance calculations
 - **Scenario Modeling**: Create what-if income and expense scenarios alongside your real schedule; the dashboard chart displays a second dashed line showing the projected impact, and the lowest balance card shows the scenario minimum in amber parentheses
 
 ### Transaction Management
@@ -353,7 +353,7 @@ Model hypothetical "what-if" financial situations without affecting your live sc
 - **Separate Scenario Table**: Create and manage scenarios independently from your real schedules
 - **Same Frequency Support**: All six frequencies (Monthly, Weekly, BiWeekly, Quarterly, Yearly, One-Time) work identically to regular schedules, including business day adjustments
 - **Dual-Line Chart**: The dashboard chart renders a solid blue line for your current schedule and a dashed amber line for schedules + scenarios, so both projections are visible simultaneously
-- **Scenario Minimum Balance**: The Lowest Balance (60 days) card displays the schedule-only minimum alongside the scenario minimum in amber e.g. `$1,200 ($850)`
+- **Scenario Minimum Balance**: The Lowest Balance (90 days) card displays the schedule-only minimum alongside the scenario minimum in amber e.g. `$1,200 ($850)`
 - **No Auto-Delete**: One-time scenarios that have passed are skipped in projection but never auto-deleted — remove them manually when no longer needed
 - **Full CRUD**: Edit and delete scenarios via the Scenarios page; no holds or skips needed since scenarios are purely hypothetical
 
@@ -399,7 +399,7 @@ The Cash Risk Score is a deterministic **0–100 indicator** calculated on every
 
 #### How the Score Is Calculated
 
-The score is a weighted composite of four factors derived from your 60-day projection:
+The score is a weighted composite of four factors derived from your 90-day projection:
 
 | Factor | Weight | Description |
 |--------|--------|-------------|
