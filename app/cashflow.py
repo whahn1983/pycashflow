@@ -494,22 +494,22 @@ def calculate_cash_risk_score(balance, run):
     todaydate = datetime.today().date()
     current_balance = float(balance)
 
-    if run.empty or len(run) < 2:
+    if current_balance <= 0:
         return {
-            'score': 50,
-            'status': 'Watch',
-            'color': 'yellow',
+            'score': 0,
+            'status': 'Critical',
+            'color': 'red',
             'runway_days': 0,
             'lowest_balance': current_balance,
             'days_to_lowest': 0,
             'avg_daily_expense': 0,
         }
 
-    if current_balance <= 0:
+    if run.empty or len(run) < 2:
         return {
-            'score': 0,
-            'status': 'Critical',
-            'color': 'red',
+            'score': 50,
+            'status': 'Watch',
+            'color': 'yellow',
             'runway_days': 0,
             'lowest_balance': current_balance,
             'days_to_lowest': 0,
@@ -627,7 +627,7 @@ def plot_cash(run, run_scenario=None):
     minbalance = df_90['amount'].min() if not df_90.empty else df['amount'].min()
     minbalance = decimal.Decimal(str(minbalance)).quantize(decimal.Decimal('.01'))
 
-    todaydateplus = todaydate + relativedelta(months=2)
+    todaydateplus = todaydate + timedelta(days=90)
 
     if float(minbalance) >= 0:
         minrange = 0.0
@@ -661,7 +661,7 @@ def plot_cash(run, run_scenario=None):
     maxrange = maxbalance * 1.1
 
     start_date = str(todaydate)
-    end_date = str(todaydate + relativedelta(months=2))
+    end_date = str(todaydate + timedelta(days=90))
 
     layout = go.Layout(
         yaxis=dict(range=[minrange, maxrange]),
