@@ -433,7 +433,7 @@ def calc_transactions(balance, total):
     df = total.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(total["date"]))).reset_index(drop=True)
     trans_dict = {}
     todaydate = datetime.today().date()
-    todaydateplus = todaydate + relativedelta(months=2)
+    todaydateplus = todaydate + timedelta(days=90)
     for i in df.itertuples(index=False):
         if todaydateplus > \
                 i.date > todaydate and "(SKIP)" not in i.name:
