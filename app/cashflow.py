@@ -494,11 +494,22 @@ def calculate_cash_risk_score(balance, run):
     todaydate = datetime.today().date()
     current_balance = float(balance)
 
-    if run.empty or len(run) < 2 or current_balance <= 0:
+    if run.empty or len(run) < 2:
         return {
             'score': 50,
             'status': 'Watch',
             'color': 'yellow',
+            'runway_days': 0,
+            'lowest_balance': current_balance,
+            'days_to_lowest': 0,
+            'avg_daily_expense': 0,
+        }
+
+    if current_balance <= 0:
+        return {
+            'score': 0,
+            'status': 'Critical',
+            'color': 'red',
             'runway_days': 0,
             'lowest_balance': current_balance,
             'days_to_lowest': 0,
