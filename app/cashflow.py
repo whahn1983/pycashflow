@@ -1,6 +1,6 @@
 from app import db
 from .models import Schedule, Skip
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import pandas as pd
 import json
 import plotly
@@ -433,7 +433,7 @@ def calc_transactions(balance, total):
     df = total.sort_values(by="date", key=lambda x: np.argsort(index_natsorted(total["date"]))).reset_index(drop=True)
     trans_dict = {}
     todaydate = datetime.today().date()
-    todaydateplus = todaydate + relativedelta(months=2)
+    todaydateplus = todaydate + timedelta(days=90)
     for i in df.itertuples(index=False):
         if todaydateplus > \
                 i.date > todaydate and "(SKIP)" not in i.name:
@@ -494,11 +494,22 @@ def calculate_cash_risk_score(balance, run):
     todaydate = datetime.today().date()
     current_balance = float(balance)
 
-    if run.empty or len(run) < 2 or current_balance <= 0:
+    if run.empty or len(run) < 2:
         return {
             'score': 50,
             'status': 'Watch',
             'color': 'yellow',
+            'runway_days': 0,
+            'lowest_balance': current_balance,
+            'days_to_lowest': 0,
+            'avg_daily_expense': 0,
+        }
+
+    if current_balance <= 0:
+        return {
+            'score': 0,
+            'status': 'Critical',
+            'color': 'red',
             'runway_days': 0,
             'lowest_balance': current_balance,
             'days_to_lowest': 0,
@@ -512,18 +523,24 @@ def calculate_cash_risk_score(balance, run):
     )
     run_copy = run_copy.sort_values('date_val').reset_index(drop=True)
 
-    # Lowest balance and when it occurs
-    min_idx = run_copy['amount'].idxmin()
-    lowest_balance = float(run_copy.loc[min_idx, 'amount'])
-    lowest_date = run_copy.loc[min_idx, 'date_val']
+    # Scope all calculations to 90-day window
+    horizon = todaydate + timedelta(days=90)
+    run_90 = run_copy[run_copy['date_val'] <= horizon]
+    if run_90.empty:
+        run_90 = run_copy
+
+    # Lowest balance and when it occurs (within 90-day window)
+    min_idx = run_90['amount'].idxmin()
+    lowest_balance = float(run_90.loc[min_idx, 'amount'])
+    lowest_date = run_90.loc[min_idx, 'date_val']
     days_to_lowest = max(0, (lowest_date - todaydate).days)
 
-    # Max balance for volatility
-    max_balance = float(run_copy['amount'].max())
+    # Max balance for volatility (within 90-day window)
+    max_balance = float(run_90['amount'].max())
 
-    # Average daily expense from negative balance changes over the full projection
-    amounts = run_copy['amount'].values
-    total_days = max(1, (run_copy['date_val'].iloc[-1] - run_copy['date_val'].iloc[0]).days)
+    # Average daily expense from negative balance changes over the 90-day window
+    amounts = run_90['amount'].values
+    total_days = max(1, (run_90['date_val'].iloc[-1] - run_90['date_val'].iloc[0]).days)
     expense_total = sum(
         abs(amounts[i] - amounts[i - 1])
         for i in range(1, len(amounts))
@@ -604,10 +621,12 @@ def plot_cash(run, run_scenario=None):
     # Schedule-only line
     df = run.sort_values(by='date', ascending=False)
     df['amount'] = df['amount'].astype(float)
-    minbalance = df['amount'].min()
+    todaydate = datetime.today().date()
+    horizon_90 = todaydate + timedelta(days=90)
+    df_90 = df[df['date'] <= horizon_90]
+    minbalance = df_90['amount'].min() if not df_90.empty else df['amount'].min()
     minbalance = decimal.Decimal(str(minbalance)).quantize(decimal.Decimal('.01'))
 
-    todaydate = datetime.today().date()
     todaydateplus = todaydate + relativedelta(months=2)
 
     if float(minbalance) >= 0:
@@ -627,7 +646,8 @@ def plot_cash(run, run_scenario=None):
     if run_scenario is not None:
         df_s = run_scenario.sort_values(by='date', ascending=False)
         df_s['amount'] = df_s['amount'].astype(float)
-        scenario_min = df_s['amount'].min()
+        df_s_90 = df_s[df_s['date'] <= horizon_90]
+        scenario_min = df_s_90['amount'].min() if not df_s_90.empty else df_s['amount'].min()
         min_scenario = decimal.Decimal(str(scenario_min)).quantize(decimal.Decimal('.01'))
 
         # Expand y-axis range to fit both lines
