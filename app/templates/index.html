@@ -66,7 +66,7 @@
     <div class="chart-header">
         <h2>
             <i class="fa-solid fa-chart-area"></i>
-            90-Day Cash Flow Projection
+            Cash Flow
         </h2>
         <div class="chart-controls">
             <button class="refresh-btn" id="chart-lock-btn" onclick="toggleChartLock();" title="Toggle chart interaction">
@@ -312,7 +312,8 @@
                 url: "/callback", data: { 'data': selection }, success: function (result) {
                     Plotly.newPlot('chart', result.data, result.layout, {
                         staticPlot: isPlotLocked,
-                        displayModeBar: !isPlotLocked,
+                        displayModeBar: false,
+                        scrollZoom: !isPlotLocked,
                         responsive: true
                     });
                 }
@@ -347,7 +348,8 @@
     function renderChart() {
         Plotly.newPlot('chart', d.data, d.layout, {
             staticPlot: isPlotLocked,
-            displayModeBar: !isPlotLocked,
+            displayModeBar: false,
+            scrollZoom: !isPlotLocked,
             responsive: true
         });
     }
