@@ -385,16 +385,21 @@
         var chartDiv = document.getElementById('chart');
         if (!chartDiv) return;
 
-        // Show point details on click (works in both locked and unlocked modes)
+        // Show point details on click. In locked mode only show the tooltip — no range
+        // manipulation so there is zero movement. In unlocked mode also guard against
+        // Plotly internally resetting the view after a point click.
         chartDiv.on('plotly_click', function(data) {
             if (!data || !data.points || !data.points.length) return;
 
-            // Snapshot current axis ranges so we can restore them if Plotly resets the view
+            showPointTooltip(data.points[0], data.event);
+
+            // Locked mode: tooltip only, no view changes.
+            if (isPlotLocked) return;
+
+            // Snapshot current axis ranges so we can restore them if Plotly resets the view.
             var curLayout = document.getElementById('chart').layout;
             var xR = (curLayout && curLayout.xaxis && curLayout.xaxis.range) ? curLayout.xaxis.range.slice() : null;
             var yR = (curLayout && curLayout.yaxis && curLayout.yaxis.range) ? curLayout.yaxis.range.slice() : null;
-
-            showPointTooltip(data.points[0], data.event);
 
             // Restore ranges in case Plotly's click handling altered them.
             // Store the timer ID so plotly_doubleclick can cancel it before it undoes a zoom toggle.
@@ -416,19 +421,27 @@
             }, 50);
         });
 
-        // Double-click toggles between home zoom (90-day window) and full data view.
-        // Cancel any pending single-click range restore so it doesn't undo the zoom toggle.
+        // Double-click (unlocked mode only): toggle between full data view and home/default view.
+        // Read actual autorange state from layout instead of relying on isFullView flag so that
+        // panning before double-clicking still returns to the correct default range.
         chartDiv.on('plotly_doubleclick', function() {
+            if (isPlotLocked) return;
             if (rangeRestoreTimer) { clearTimeout(rangeRestoreTimer); rangeRestoreTimer = null; }
             hidePointTooltip();
-            isFullView = !isFullView;
-            if (isFullView) {
-                Plotly.relayout('chart', {'xaxis.autorange': true, 'yaxis.autorange': true});
-            } else {
+            var el = document.getElementById('chart');
+            var curLayout = el && el.layout;
+            var inFullView = !!(curLayout && curLayout.xaxis && curLayout.xaxis.autorange);
+            if (inFullView) {
+                // Currently showing full data — restore home/default range.
+                isFullView = false;
                 var update = {};
                 if (homeXRange) { update['xaxis.range'] = homeXRange; update['xaxis.autorange'] = false; }
                 if (homeYRange) { update['yaxis.range'] = homeYRange; update['yaxis.autorange'] = false; }
                 if (Object.keys(update).length) Plotly.relayout('chart', update);
+            } else {
+                // At home or panned — go to full data view.
+                isFullView = true;
+                Plotly.relayout('chart', {'xaxis.autorange': true, 'yaxis.autorange': true});
             }
         });
 
