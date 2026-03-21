@@ -144,7 +144,7 @@
                     {% else %}background-color: var(--danger);{% endif %}">{{ cash_risk.status }}</span>
             </div>
             <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-muted);">
-                <span><i class="fa-solid fa-gauge"></i> Runway: {{ cash_risk.runway_days }} days</span>
+                <span><i class="fa-solid fa-gauge"></i> Runway: {% if cash_risk.runway_days is none %}Stable{% else %}{{ cash_risk.runway_days }} days{% endif %}</span>
                 <span><i class="fa-solid fa-calendar-xmark"></i> Lowest in {{ cash_risk.days_to_lowest }} days (${{ cash_risk.lowest_balance }})</span>
             </div>
         </div>

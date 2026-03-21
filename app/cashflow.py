@@ -554,11 +554,18 @@ def calculate_cash_risk_score(balance, run):
 
         # Rough daily expense from balance delta.
         # When balance_delta <= 0 (income-only or flat row) there are no observable
-        # expenses, so use 0.  This causes ai_insights to emit min_balance_ratio=None
-        # rather than a fabricated large value.
+        # expenses, so avg_daily_expense stays 0 (used by ai_insights to emit
+        # min_balance_ratio=None rather than a fabricated large value).
+        # Runway is calculated independently: stable/improving balance means indefinite
+        # runway, represented as float('inf') so templates can show it correctly.
         balance_delta = current_balance - single_balance
         avg_daily_expense = balance_delta / max(1, days_to_row) if balance_delta > 0 else 0
-        cash_runway_days = current_balance / avg_daily_expense if avg_daily_expense > 0 else 0
+        if avg_daily_expense > 0:
+            cash_runway_days: float | None = current_balance / avg_daily_expense
+        else:
+            # No observable expense drain: runway is effectively infinite; use None
+            # so templates can display a human-friendly label instead of "inf".
+            cash_runway_days = None
 
         # days_below_threshold: count remaining horizon days when balance goes negative
         horizon_days = 90
@@ -575,7 +582,7 @@ def calculate_cash_risk_score(balance, run):
             'score': score,
             'status': status,
             'color': color,
-            'runway_days': round(cash_runway_days, 1),
+            'runway_days': round(cash_runway_days, 1) if cash_runway_days is not None else None,
             'lowest_balance': round(lowest_balance, 2),
             'days_to_lowest': days_to_lowest,
             'avg_daily_expense': round(avg_daily_expense, 2),
