@@ -518,7 +518,7 @@ def calculate_cash_risk_score(balance, run):
             'near_term_buffer': current_balance,
         }
 
-    if run.empty or len(run) < 2:
+    if run.empty:
         return {
             'score': 50,
             'status': 'Watch',
@@ -531,6 +531,53 @@ def calculate_cash_risk_score(balance, run):
             'pct_below_threshold': 0.0,
             'recovery_days': None,
             'near_term_buffer': current_balance,
+        }
+
+    if len(run) == 1:
+        # Single checkpoint: derive actual risk factors from the lone projection row
+        # rather than hard-coding safe-looking defaults that mask cash-negative events.
+        single_row = run.iloc[0]
+        single_balance = float(single_row['amount'])
+        single_date = (
+            single_row['date'] if hasattr(single_row['date'], 'year')
+            else datetime.strptime(str(single_row['date']), '%Y-%m-%d').date()
+        )
+        days_to_row = max(0, (single_date - todaydate).days)
+
+        lowest_balance = min(current_balance, single_balance)
+        days_to_lowest = days_to_row if single_balance < current_balance else 0
+
+        # near_term_buffer: use the projected balance when it falls within 14 days
+        near_term_buffer = single_balance if days_to_row <= 14 else current_balance
+
+        # Rough daily expense from balance delta; guard against income-only rows
+        balance_delta = current_balance - single_balance
+        avg_daily_expense = balance_delta / max(1, days_to_row) if balance_delta > 0 else 1.0
+        cash_runway_days = current_balance / avg_daily_expense if avg_daily_expense > 0 else 0
+
+        # days_below_threshold: count remaining horizon days when balance goes negative
+        horizon_days = 90
+        if single_balance < 0:
+            days_below = max(0, horizon_days - days_to_row)
+            pct_below = days_below / horizon_days
+            score, status, color = 0, 'Critical', 'red'
+        else:
+            days_below = 0
+            pct_below = 0.0
+            score, status, color = 50, 'Watch', 'yellow'
+
+        return {
+            'score': score,
+            'status': status,
+            'color': color,
+            'runway_days': round(cash_runway_days, 1),
+            'lowest_balance': round(lowest_balance, 2),
+            'days_to_lowest': days_to_lowest,
+            'avg_daily_expense': round(avg_daily_expense, 2),
+            'days_below_threshold': days_below,
+            'pct_below_threshold': round(pct_below, 4),
+            'recovery_days': None,
+            'near_term_buffer': round(near_term_buffer, 2),
         }
 
     run_copy = run.copy()
