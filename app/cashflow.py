@@ -603,10 +603,11 @@ def calculate_cash_risk_score(balance, run):
             if i < len(run_90) - 1:
                 seg_days = (run_90.loc[i + 1, 'date_val'] - run_90.loc[i, 'date_val']).days
             else:
-                seg_days = 1  # last row counts as one day
+                # Last checkpoint: count remaining days to the end of the 90-day horizon
+                seg_days = max(0, (horizon - run_90.loc[i, 'date_val']).days)
             days_below += max(0, seg_days)
 
-    horizon_days = max(1, (run_90['date_val'].iloc[-1] - run_90['date_val'].iloc[0]).days)
+    horizon_days = 90
     pct_below = days_below / horizon_days
     # Linear: 0% of horizon below threshold → 100; 50%+ → 0
     days_below_score = max(0.0, 100.0 - (pct_below / 0.5) * 100.0)
@@ -615,15 +616,18 @@ def calculate_cash_risk_score(balance, run):
     # Answers: "After the worst-case low, how quickly does cash recover above the threshold?"
     # Fast recovery (e.g. payroll income arriving soon after month-end) signals a healthy
     # cyclical pattern. Slow or absent recovery signals sustained structural risk.
+    recovery_days_val = None  # None = never recovered; 0 = threshold never breached
     if lowest_balance >= liquidity_threshold:
         # Balance never fell below threshold — no recovery needed
         recovery_score = 100.0
+        recovery_days_val = 0
     else:
         post_low = run_90[run_90['date_val'] >= lowest_date]
         recovered = post_low[post_low['amount'] >= liquidity_threshold]
         if not recovered.empty:
             recovery_date = recovered.iloc[0]['date_val']
             recovery_days = max(0, (recovery_date - lowest_date).days)
+            recovery_days_val = recovery_days
             if recovery_days <= 7:
                 # Very fast (≤1 week): near-perfect score
                 recovery_score = 90.0 + (7 - recovery_days) / 7.0 * 10.0
@@ -682,6 +686,10 @@ def calculate_cash_risk_score(balance, run):
         'lowest_balance': round(lowest_balance, 2),
         'days_to_lowest': days_to_lowest,
         'avg_daily_expense': round(avg_daily_expense, 2),
+        'days_below_threshold': days_below,
+        'pct_below_threshold': round(pct_below, 4),
+        'recovery_days': recovery_days_val,
+        'near_term_buffer': round(near_term_min, 2),
     }
 
 
