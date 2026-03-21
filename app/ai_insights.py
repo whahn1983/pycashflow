@@ -31,9 +31,12 @@ SYSTEM_PROMPT = (
     "- minimum_safe_balance (number): pre-calculated server-side threshold tied to near-term expense pressure.\n"
     "- low_balance_observation_warranted (boolean): pre-calculated server-side flag. True only when a low-balance observation should be "
     "allowed. Do not re-evaluate or override this flag.\n"
-    "- cash_risk_score (object): pre-calculated server-side risk assessment with fields: score (integer 0-100, higher = safer), "
-    "status (string: Safe/Stable/Watch/Risk/Critical), runway_days (number), lowest_balance (number), days_to_lowest (integer), "
-    "avg_daily_expense (number).\n\n"
+    "- cash_risk_score (object): pre-calculated server-side risk assessment. Fields: score (integer 0–100, higher = safer); "
+    "status (string: Safe/Stable/Watch/Risk/Critical); "
+    "min_balance_ratio (number: lowest_projected_balance divided by one month of average expenses — the primary scoring driver; "
+    "≥ 1.5 = very strong, 1.0–1.5 = strong, 0.5–1.0 = moderate, 0–0.5 = weak, < 0 = critical); "
+    "lowest_balance (number); days_to_lowest (integer); avg_daily_expense (number); "
+    "runway_days (number: informational only — not a primary scoring input and should not be cited as a scoring driver).\n\n"
     "Your task is to identify potential cash flow risks, patterns in the schedule, and helpful financial insights.\n\n"
     "Hard rules (must follow):\n"
     "1) Data boundaries\n"
@@ -71,8 +74,10 @@ SYSTEM_PROMPT = (
     "- Insights may all be the same type. Do not force variety across risk, pattern, and observation.\n"
     "- It is acceptable to return an empty insights array.\n\n"
     "Insight type definitions:\n"
-    "- cash_risk: mandatory — always the first insight. Explains the pre-calculated cash_risk_score in 1-2 sentences, "
-    "naming the one or two factors that matter most (e.g. runway, days until lowest balance, volatility).\n"
+    "- cash_risk: mandatory — always the first insight. Explains the pre-calculated cash_risk_score in 1-2 sentences. "
+    "Name the one or two factors that matter most from: minimum balance ratio (min_balance_ratio), "
+    "how long the balance stays below one month of average expenses, recovery speed after the lowest point, "
+    "or the near-term 14-day liquidity buffer. Do not cite runway_days as a scoring driver — it is informational only.\n"
     "- risk: a specific future event/date where projected balance is below zero.\n"
     "- pattern: recurring behavior across multiple transactions that passes the significance rules above.\n"
     "- observation: a noteworthy non-recurring fact that is neither a risk nor a recurring pattern.\n\n"
@@ -178,6 +183,13 @@ def build_payload(current_balance, schedules, holds, skips):
 
     cash_risk = calculate_cash_risk_score(current_balance, run)
 
+    # Compute min_balance_ratio server-side so the AI has a concrete value to cite.
+    # This is the primary scoring driver: lowest_projected_balance / avg_monthly_expense.
+    _avg_monthly = cash_risk['avg_daily_expense'] * 30
+    _min_balance_ratio = (
+        round(cash_risk['lowest_balance'] / _avg_monthly, 2) if _avg_monthly > 0 else None
+    )
+
     return {
         'today': str(todaydate),
         'analysis_horizon_days': 90,
@@ -190,10 +202,11 @@ def build_payload(current_balance, schedules, holds, skips):
         'cash_risk_score': {
             'score': cash_risk['score'],
             'status': cash_risk['status'],
-            'runway_days': cash_risk['runway_days'],
+            'min_balance_ratio': _min_balance_ratio,
             'lowest_balance': cash_risk['lowest_balance'],
             'days_to_lowest': cash_risk['days_to_lowest'],
             'avg_daily_expense': cash_risk['avg_daily_expense'],
+            'runway_days': cash_risk['runway_days'],
         },
     }
 
