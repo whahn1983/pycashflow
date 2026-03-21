@@ -74,9 +74,22 @@
             <i class="fa-solid fa-chart-area"></i>
             90-Day Cash Flow Projection
         </h2>
+        <div class="chart-controls">
+            <button class="refresh-btn" id="chart-lock-btn" onclick="toggleChartLock();" title="Toggle chart interaction">
+                <i class="fa-solid fa-lock" id="chart-lock-icon"></i>
+                <span id="chart-lock-label">Unlock</span>
+            </button>
+        </div>
     </div>
     <div class="chart-body">
-        <div id="chart" class="chart" style="width: 100%; height: 500px;"></div>
+        <div class="chart-lock-wrapper">
+            <div id="chart" class="chart" style="width: 100%; height: 500px;"></div>
+            <div id="chart-lock-overlay" class="chart-lock-overlay" onclick="unlockChart();">
+                <span class="chart-lock-badge">
+                    <i class="fa-solid fa-lock"></i> Tap to interact
+                </span>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -176,7 +189,11 @@
         function cb(selection) {
             $.getJSON({
                 url: "/callback", data: { 'data': selection }, success: function (result) {
-                    Plotly.newPlot('chart', result.data, result.layout, {staticPlot: true, displayModeBar: false});
+                    Plotly.newPlot('chart', result.data, result.layout, {
+                        staticPlot: isPlotLocked,
+                        displayModeBar: !isPlotLocked,
+                        responsive: true
+                    });
                 }
             });
         }
@@ -184,6 +201,9 @@
 </head>
 
 <script>
+    // Chart lock state — true = locked (default), false = interactive
+    var isPlotLocked = true;
+
     // Plot the chart with improved dark theme
     d = {{ graphJSON | safe }};
     d.config={responsive: true};
@@ -203,7 +223,46 @@
         }
     }
 
-    Plotly.newPlot('chart', d.data, d.layout, {displayModeBar: false, responsive: true});
+    function renderChart() {
+        Plotly.newPlot('chart', d.data, d.layout, {
+            staticPlot: isPlotLocked,
+            displayModeBar: !isPlotLocked,
+            responsive: true
+        });
+    }
+
+    function updateChartLockUI() {
+        var overlay = document.getElementById('chart-lock-overlay');
+        var icon = document.getElementById('chart-lock-icon');
+        var label = document.getElementById('chart-lock-label');
+        if (isPlotLocked) {
+            if (overlay) overlay.classList.remove('chart-lock-overlay--hidden');
+            if (icon) icon.className = 'fa-solid fa-lock';
+            if (label) label.textContent = 'Unlock';
+        } else {
+            if (overlay) overlay.classList.add('chart-lock-overlay--hidden');
+            if (icon) icon.className = 'fa-solid fa-lock-open';
+            if (label) label.textContent = 'Lock';
+        }
+    }
+
+    function toggleChartLock() {
+        isPlotLocked = !isPlotLocked;
+        renderChart();
+        updateChartLockUI();
+    }
+
+    function unlockChart() {
+        if (isPlotLocked) {
+            isPlotLocked = false;
+            renderChart();
+            updateChartLockUI();
+        }
+    }
+
+    // Initial render (locked by default)
+    renderChart();
+    updateChartLockUI();
 
     // Redraw the chart when the device rotates so it fills the new viewport width.
     function resizePlotlyChart() {
