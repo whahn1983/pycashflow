@@ -813,7 +813,7 @@ def plot_cash(run, run_scenario=None):
         margin=dict(l=0, r=0, t=0, b=0),
         dragmode='pan',
         clickmode='event',
-        hovermode=False,
+        hovermode='closest',
         showlegend=(run_scenario is not None),
         legend=dict(
             orientation='h',
@@ -834,6 +834,7 @@ def plot_cash(run, run_scenario=None):
                 x=df_s['date'].values.tolist(),
                 y=df_s['amount'].values.tolist(),
                 mode='lines',
+                hoverinfo='none',
                 line=dict(shape='spline', smoothing=0.8, color='#f59e0b', dash='dash')
             )
         )
@@ -844,6 +845,7 @@ def plot_cash(run, run_scenario=None):
             x=df['date'].values.tolist(),
             y=df['amount'].values.tolist(),
             mode='lines',
+            hoverinfo='none',
             line=dict(shape='spline', smoothing=0.8, color='#3b82f6')
         )
     )
