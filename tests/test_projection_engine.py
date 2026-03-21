@@ -20,14 +20,10 @@ from datetime import date, timedelta
 import pandas as pd
 import pytest
 
-# conftest.py imports the real app.cashflow functions before any test module is
-# collected, so the names below are always bound to the real implementations even
-# if test_cash_risk_score.py later replaces sys.modules['app.cashflow'] with a stub.
-from conftest import (
-    _calc_transactions as calc_transactions,
-    _calc_schedule as calc_schedule,
-    _update_cash as update_cash,
-)
+# conftest.py imports _helpers before any test module is collected, so the names
+# below are always bound to the real implementations even if test_cash_risk_score.py
+# later replaces sys.modules['app.cashflow'] with a stub.
+from _helpers import calc_transactions, calc_schedule, update_cash
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
