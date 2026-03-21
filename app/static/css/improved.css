@@ -460,37 +460,6 @@ body::before {
   opacity: 0;
 }
 
-/* Point details tooltip */
-.point-tooltip {
-  position: absolute;
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 0.5rem 0.75rem;
-  pointer-events: none;
-  z-index: 20;
-  min-width: 150px;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  transition: opacity 0.15s ease;
-}
-
-.point-tooltip--hidden {
-  opacity: 0;
-  visibility: hidden;
-}
-
-.point-tooltip-date {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.2rem;
-}
-
-.point-tooltip-amount {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
 
 .chart-lock-badge {
   font-size: 0.875rem;
