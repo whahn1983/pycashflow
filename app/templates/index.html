@@ -87,7 +87,6 @@
                     <i class="fa-solid fa-lock"></i> Locked — use button to interact
                 </span>
             </div>
-            <div id="point-tooltip" class="point-tooltip point-tooltip--hidden"></div>
         </div>
     </div>
 </div>
@@ -331,8 +330,6 @@
     var homeXRange = null;
     var homeYRange = null;
     var isFullView = false;
-    var tooltipDismissAttached = false;
-    var justShownTooltip = false;
     var rangeRestoreTimer = null;
 
     // Plot the chart with improved dark theme
@@ -391,9 +388,7 @@
         chartDiv.on('plotly_click', function(data) {
             if (!data || !data.points || !data.points.length) return;
 
-            showPointTooltip(data.points[0], data.event);
-
-            // Locked mode: tooltip only, no view changes.
+            // Locked mode: no view changes.
             if (isPlotLocked) return;
 
             // Snapshot current axis ranges so we can restore them if Plotly resets the view.
@@ -427,7 +422,6 @@
         chartDiv.on('plotly_doubleclick', function() {
             if (isPlotLocked) return;
             if (rangeRestoreTimer) { clearTimeout(rangeRestoreTimer); rangeRestoreTimer = null; }
-            hidePointTooltip();
             var el = document.getElementById('chart');
             var curLayout = el && el.layout;
             var inFullView = !!(curLayout && curLayout.xaxis && curLayout.xaxis.autorange);
@@ -445,52 +439,6 @@
             }
         });
 
-        // Dismiss tooltip on next click anywhere (registered once on document).
-        // Skip dismiss when a point was just clicked (plotly_click already updated the tooltip).
-        if (!tooltipDismissAttached) {
-            tooltipDismissAttached = true;
-            document.addEventListener('click', function() {
-                if (justShownTooltip) return;
-                setTimeout(hidePointTooltip, 150);
-            });
-        }
-    }
-
-    function showPointTooltip(point, evt) {
-        var tooltip = document.getElementById('point-tooltip');
-        if (!tooltip) return;
-
-        var dateStr = point.x;
-        try {
-            var dt = new Date(point.x);
-            if (!isNaN(dt)) {
-                dateStr = dt.toLocaleDateString([], {month: 'short', day: 'numeric', year: 'numeric'});
-            }
-        } catch(e) {}
-
-        var amount = parseFloat(point.y);
-        var amountStr = isNaN(amount) ? String(point.y) :
-            amount.toLocaleString('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2});
-
-        tooltip.innerHTML = '<div class="point-tooltip-date">' + dateStr + '</div>' +
-                            '<div class="point-tooltip-amount">' + amountStr + '</div>';
-
-        var chartDiv = document.getElementById('chart');
-        var rect = chartDiv.getBoundingClientRect();
-        var cx = evt ? evt.clientX - rect.left + 12 : 12;
-        var cy = evt ? evt.clientY - rect.top - 70 : 12;
-        cx = Math.max(4, Math.min(cx, rect.width - 160));
-        cy = Math.max(4, Math.min(cy, rect.height - 70));
-        tooltip.style.left = cx + 'px';
-        tooltip.style.top  = cy + 'px';
-        justShownTooltip = true;
-        setTimeout(function() { justShownTooltip = false; }, 300);
-        tooltip.classList.remove('point-tooltip--hidden');
-    }
-
-    function hidePointTooltip() {
-        var tooltip = document.getElementById('point-tooltip');
-        if (tooltip) tooltip.classList.add('point-tooltip--hidden');
     }
 
     function updateChartLockUI() {

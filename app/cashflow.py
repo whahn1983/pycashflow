@@ -834,7 +834,7 @@ def plot_cash(run, run_scenario=None):
                 x=df_s['date'].values.tolist(),
                 y=df_s['amount'].values.tolist(),
                 mode='lines',
-                hoverinfo='none',
+                hovertemplate='%{x|%b %d, %Y}<br>$%{y:,.2f}<extra>With Scenarios</extra>',
                 line=dict(shape='spline', smoothing=0.8, color='#f59e0b', dash='dash')
             )
         )
@@ -845,7 +845,7 @@ def plot_cash(run, run_scenario=None):
             x=df['date'].values.tolist(),
             y=df['amount'].values.tolist(),
             mode='lines',
-            hoverinfo='none',
+            hovertemplate='%{x|%b %d, %Y}<br>$%{y:,.2f}<extra>Schedule</extra>',
             line=dict(shape='spline', smoothing=0.8, color='#3b82f6')
         )
     )
