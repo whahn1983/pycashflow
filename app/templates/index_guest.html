@@ -221,6 +221,8 @@
         d.layout.paper_bgcolor = 'transparent';
         d.layout.plot_bgcolor = 'transparent';
         d.layout.font = { family: 'Inter, sans-serif', color: '#cbd5e1' };
+        d.layout.clickmode = 'event';
+        d.layout.hovermode = false;
         if (d.layout.xaxis) {
             d.layout.xaxis.gridcolor = '#475569';
             d.layout.xaxis.titlefont = { color: '#94a3b8' };
@@ -263,7 +265,29 @@
         // Show point details on click (works in both locked and unlocked modes)
         chartDiv.on('plotly_click', function(data) {
             if (!data || !data.points || !data.points.length) return;
+
+            // Snapshot current axis ranges so we can restore them if Plotly resets the view
+            var curLayout = document.getElementById('chart').layout;
+            var xR = (curLayout && curLayout.xaxis && curLayout.xaxis.range) ? curLayout.xaxis.range.slice() : null;
+            var yR = (curLayout && curLayout.yaxis && curLayout.yaxis.range) ? curLayout.yaxis.range.slice() : null;
+
             showPointTooltip(data.points[0], data.event);
+
+            // Restore ranges in case Plotly's click handling altered them
+            setTimeout(function() {
+                if (!xR && !yR) return;
+                var el = document.getElementById('chart');
+                if (!el || !el.layout) return;
+                var nl = el.layout;
+                var xChanged = xR && nl.xaxis && (nl.xaxis.autorange || JSON.stringify(nl.xaxis.range) !== JSON.stringify(xR));
+                var yChanged = yR && nl.yaxis && (nl.yaxis.autorange || JSON.stringify(nl.yaxis.range) !== JSON.stringify(yR));
+                if (xChanged || yChanged) {
+                    var update = {};
+                    if (xR) { update['xaxis.range'] = xR; update['xaxis.autorange'] = false; }
+                    if (yR) { update['yaxis.range'] = yR; update['yaxis.autorange'] = false; }
+                    Plotly.relayout('chart', update);
+                }
+            }, 50);
         });
 
         // Double-click toggles between home zoom (90-day window) and full data view
