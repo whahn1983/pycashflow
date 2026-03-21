@@ -437,6 +437,46 @@ body::before {
   padding: var(--spacing-lg);
 }
 
+/* Chart Lock / Unlock Overlay */
+.chart-lock-wrapper {
+  position: relative;
+}
+
+.chart-lock-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  z-index: 10;
+  touch-action: pan-y;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.chart-lock-overlay--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chart-lock-badge {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid var(--border);
+  padding: 0.5rem 1.1rem;
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  pointer-events: none;
+}
+
 /* Improved Tables */
 .table-card {
   background-color: var(--primary-dark);
