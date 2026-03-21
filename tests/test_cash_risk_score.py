@@ -99,6 +99,7 @@ class TestReturnStructure:
         assert set(result.keys()) == {
             'score', 'status', 'color',
             'runway_days', 'lowest_balance', 'days_to_lowest', 'avg_daily_expense',
+            'days_below_threshold', 'pct_below_threshold', 'recovery_days', 'near_term_buffer',
         }
 
     def test_score_is_int_in_range(self):

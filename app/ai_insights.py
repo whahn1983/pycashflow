@@ -207,6 +207,10 @@ def build_payload(current_balance, schedules, holds, skips):
             'days_to_lowest': cash_risk['days_to_lowest'],
             'avg_daily_expense': cash_risk['avg_daily_expense'],
             'runway_days': cash_risk['runway_days'],
+            'days_below_threshold': cash_risk['days_below_threshold'],
+            'pct_below_threshold': cash_risk['pct_below_threshold'],
+            'recovery_days': cash_risk['recovery_days'],
+            'near_term_buffer': cash_risk['near_term_buffer'],
         },
     }
 
