@@ -482,11 +482,20 @@ def calculate_cash_risk_score(balance, run):
     """
     Calculate a 0-100 cash risk score (higher = safer).
 
+    Evaluates actual projected liquidity risk over the forecast path rather than
+    relying on naive runway math (current_balance / avg_daily_expense). This
+    prevents over-penalising businesses with healthy cyclical cash flows (e.g.
+    monthly income arriving near month-end) that show a short naive runway but
+    never actually dip into a dangerous liquidity position.
+
     Factors and weights:
-        40% runway score        — current_balance / avg_daily_expense
-        25% lowest balance score — lowest_projected_balance / avg_monthly_expense
-        20% days-to-lowest score — days until the lowest balance occurs
-        15% volatility score     — spread of balance over the projection
+        35% min_balance_ratio    — lowest_projected_balance / avg_monthly_expense
+        25% days_below_threshold — % of horizon days where balance < 1 month of expenses
+        20% recovery_speed       — days to recover above threshold after the lowest point
+        20% near_term_buffer     — minimum balance over the next 14 days
+
+    Runway (current_balance / avg_daily_expense) is retained as an informational
+    output field but is no longer a primary scoring input.
 
     Returns a dict with: score, status, color, runway_days,
     lowest_balance, days_to_lowest, avg_daily_expense.
@@ -523,11 +532,15 @@ def calculate_cash_risk_score(balance, run):
     )
     run_copy = run_copy.sort_values('date_val').reset_index(drop=True)
 
-    # Scope all calculations to 90-day window
+    # Scope primary calculations to 90-day window
     horizon = todaydate + timedelta(days=90)
-    run_90 = run_copy[run_copy['date_val'] <= horizon]
+    run_90 = run_copy[run_copy['date_val'] <= horizon].reset_index(drop=True)
     if run_90.empty:
-        run_90 = run_copy
+        run_90 = run_copy.reset_index(drop=True)
+
+    # Near-term window for the 14-day buffer factor
+    near_term_horizon = todaydate + timedelta(days=14)
+    run_14 = run_copy[run_copy['date_val'] <= near_term_horizon]
 
     # Lowest balance and when it occurs (within 90-day window)
     min_idx = run_90['amount'].idxmin()
@@ -535,10 +548,8 @@ def calculate_cash_risk_score(balance, run):
     lowest_date = run_90.loc[min_idx, 'date_val']
     days_to_lowest = max(0, (lowest_date - todaydate).days)
 
-    # Max balance for volatility (within 90-day window)
-    max_balance = float(run_90['amount'].max())
-
-    # Average daily expense from negative balance changes over the 90-day window
+    # Average daily expense: sum of all downward balance moves divided by horizon days.
+    # Only negative changes count so that income events do not distort the expense rate.
     amounts = run_90['amount'].values
     total_days = max(1, (run_90['date_val'].iloc[-1] - run_90['date_val'].iloc[0]).days)
     expense_total = sum(
@@ -551,46 +562,104 @@ def calculate_cash_risk_score(balance, run):
         avg_daily_expense = 1.0
 
     avg_monthly_expense = avg_daily_expense * 30
+
+    # Runway kept as informational output only (not used in scoring below)
     cash_runway_days = current_balance / avg_daily_expense
 
-    # --- Component scores (0-100, higher = safer) ---
+    # Liquidity threshold: one month of average expenses.
+    # A balance above this level is considered adequately liquid.
+    liquidity_threshold = avg_monthly_expense
 
-    # 1. Runway score (40%)
-    if cash_runway_days >= 90:
-        runway_score = 100.0
-    elif cash_runway_days >= 45:
-        runway_score = 40.0 + (cash_runway_days - 45.0) * (60.0 / 45.0)
-    else:
-        runway_score = max(0.0, cash_runway_days * (40.0 / 45.0))
+    # --- Component scores (0–100, higher = safer) ---
 
-    # 2. Lowest balance score (25%)
+    # 1. Minimum balance ratio (35%)
+    # Answers: "Does the balance ever fall dangerously low relative to monthly expenses?"
+    # A ratio >= 1.5 means the worst-case balance covers 1.5 months of expenses — very healthy.
+    # This factor directly fixes the cyclical-income problem: a business whose balance briefly
+    # dips mid-month but whose lowest point still covers >1 month of expenses is rated safely.
     ratio = lowest_balance / avg_monthly_expense if avg_monthly_expense > 0 else 1.0
-    lowest_score = max(0.0, min(100.0, ratio * 100.0))
-
-    # 3. Days-to-lowest score (20%)
-    if days_to_lowest >= 30:
-        days_score = 100.0
-    elif days_to_lowest >= 14:
-        days_score = 40.0 + (days_to_lowest - 14.0) * (60.0 / 16.0)
+    if ratio >= 1.5:
+        min_balance_score = 100.0
+    elif ratio >= 1.0:
+        # Strong: between 1 and 1.5 months of cover
+        min_balance_score = 75.0 + (ratio - 1.0) / 0.5 * 25.0
+    elif ratio >= 0.5:
+        # Moderate: between half and one month of cover
+        min_balance_score = 40.0 + (ratio - 0.5) / 0.5 * 35.0
+    elif ratio >= 0.0:
+        # Weak: less than half a month of cover but still positive
+        min_balance_score = ratio / 0.5 * 40.0
     else:
-        days_score = max(0.0, days_to_lowest * (40.0 / 14.0))
+        # Balance goes negative — critical
+        min_balance_score = 0.0
 
-    # 4. Volatility score (15%)
-    volatility = max_balance - lowest_balance
-    vol_ratio = volatility / current_balance if current_balance > 0 else 1.0
-    if vol_ratio <= 0.5:
-        vol_score = 100.0
-    elif vol_ratio <= 2.0:
-        vol_score = max(0.0, 100.0 - ((vol_ratio - 0.5) / 1.5) * 100.0)
+    # 2. Days below liquidity threshold (25%)
+    # Answers: "How much of the forecast period is spent in a low-cash state?"
+    # A one-day dip (e.g. income arrives the day after expenses) is very different from
+    # spending 30% of the horizon below threshold. This factor captures that distinction.
+    days_below = 0
+    for i in range(len(run_90)):
+        if float(run_90.loc[i, 'amount']) < liquidity_threshold:
+            if i < len(run_90) - 1:
+                seg_days = (run_90.loc[i + 1, 'date_val'] - run_90.loc[i, 'date_val']).days
+            else:
+                seg_days = 1  # last row counts as one day
+            days_below += max(0, seg_days)
+
+    horizon_days = max(1, (run_90['date_val'].iloc[-1] - run_90['date_val'].iloc[0]).days)
+    pct_below = days_below / horizon_days
+    # Linear: 0% of horizon below threshold → 100; 50%+ → 0
+    days_below_score = max(0.0, 100.0 - (pct_below / 0.5) * 100.0)
+
+    # 3. Recovery speed (20%)
+    # Answers: "After the worst-case low, how quickly does cash recover above the threshold?"
+    # Fast recovery (e.g. payroll income arriving soon after month-end) signals a healthy
+    # cyclical pattern. Slow or absent recovery signals sustained structural risk.
+    if lowest_balance >= liquidity_threshold:
+        # Balance never fell below threshold — no recovery needed
+        recovery_score = 100.0
     else:
-        vol_score = 0.0
+        post_low = run_90[run_90['date_val'] >= lowest_date]
+        recovered = post_low[post_low['amount'] >= liquidity_threshold]
+        if not recovered.empty:
+            recovery_date = recovered.iloc[0]['date_val']
+            recovery_days = max(0, (recovery_date - lowest_date).days)
+            if recovery_days <= 7:
+                # Very fast (≤1 week): near-perfect score
+                recovery_score = 90.0 + (7 - recovery_days) / 7.0 * 10.0
+            elif recovery_days <= 30:
+                # Moderate (1 week – 1 month): linear 50–90
+                recovery_score = 50.0 + (30 - recovery_days) / 23.0 * 40.0
+            else:
+                # Slow (>1 month): linear 0–50
+                recovery_score = max(0.0, 50.0 - (recovery_days - 30) / 60.0 * 50.0)
+        else:
+            # No recovery within the 90-day horizon — major risk signal
+            recovery_score = 0.0
+
+    # 4. Near-term liquidity buffer (14 days) (20%)
+    # Answers: "Is there an imminent cash shortfall in the next two weeks?"
+    # Imminent dips should be penalised more heavily than distant ones.
+    # If no transactions fall within 14 days, current_balance is used (no change expected).
+    near_term_min = float(run_14['amount'].min()) if not run_14.empty else current_balance
+    nt_ratio = near_term_min / avg_monthly_expense if avg_monthly_expense > 0 else 1.0
+    if nt_ratio >= 1.5:
+        near_term_score = 100.0
+    elif nt_ratio >= 1.0:
+        near_term_score = 75.0 + (nt_ratio - 1.0) / 0.5 * 25.0
+    elif nt_ratio >= 0.5:
+        near_term_score = 40.0 + (nt_ratio - 0.5) / 0.5 * 35.0
+    elif nt_ratio >= 0.0:
+        near_term_score = nt_ratio / 0.5 * 40.0
+    else:
+        near_term_score = 0.0
 
     # Weighted composite
     score = (
-        runway_score * 0.40 +
-        lowest_score * 0.25 +
-        days_score * 0.20 +
-        vol_score * 0.15
+        min_balance_score * 0.35 +
+        days_below_score  * 0.25 +
+        recovery_score    * 0.20 +
+        near_term_score   * 0.20
     )
     score = int(max(0, min(100, round(score))))
 
