@@ -332,6 +332,8 @@
     var homeYRange = null;
     var isFullView = false;
     var tooltipDismissAttached = false;
+    var justShownTooltip = false;
+    var rangeRestoreTimer = null;
 
     // Plot the chart with improved dark theme
     d = {{ graphJSON | safe }};
@@ -394,8 +396,11 @@
 
             showPointTooltip(data.points[0], data.event);
 
-            // Restore ranges in case Plotly's click handling altered them
-            setTimeout(function() {
+            // Restore ranges in case Plotly's click handling altered them.
+            // Store the timer ID so plotly_doubleclick can cancel it before it undoes a zoom toggle.
+            if (rangeRestoreTimer) clearTimeout(rangeRestoreTimer);
+            rangeRestoreTimer = setTimeout(function() {
+                rangeRestoreTimer = null;
                 if (!xR && !yR) return;
                 var el = document.getElementById('chart');
                 if (!el || !el.layout) return;
@@ -411,8 +416,10 @@
             }, 50);
         });
 
-        // Double-click toggles between home zoom (90-day window) and full data view
+        // Double-click toggles between home zoom (90-day window) and full data view.
+        // Cancel any pending single-click range restore so it doesn't undo the zoom toggle.
         chartDiv.on('plotly_doubleclick', function() {
+            if (rangeRestoreTimer) { clearTimeout(rangeRestoreTimer); rangeRestoreTimer = null; }
             hidePointTooltip();
             isFullView = !isFullView;
             if (isFullView) {
@@ -425,11 +432,12 @@
             }
         });
 
-        // Dismiss tooltip on next click anywhere (registered once on document)
+        // Dismiss tooltip on next click anywhere (registered once on document).
+        // Skip dismiss when a point was just clicked (plotly_click already updated the tooltip).
         if (!tooltipDismissAttached) {
             tooltipDismissAttached = true;
             document.addEventListener('click', function() {
-                // Small delay so the plotly_click handler runs first and can re-show the tooltip
+                if (justShownTooltip) return;
                 setTimeout(hidePointTooltip, 150);
             });
         }
@@ -462,6 +470,8 @@
         cy = Math.max(4, Math.min(cy, rect.height - 70));
         tooltip.style.left = cx + 'px';
         tooltip.style.top  = cy + 'px';
+        justShownTooltip = true;
+        setTimeout(function() { justShownTooltip = false; }, 300);
         tooltip.classList.remove('point-tooltip--hidden');
     }
 
