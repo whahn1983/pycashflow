@@ -812,6 +812,8 @@ def plot_cash(run, run_scenario=None):
         xaxis=dict(range=[start_date, end_date]),
         margin=dict(l=0, r=0, t=0, b=0),
         dragmode='pan',
+        clickmode='event',
+        hovermode=False,
         showlegend=(run_scenario is not None),
         legend=dict(
             orientation='h',
