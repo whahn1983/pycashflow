@@ -29,6 +29,11 @@ os.environ.setdefault("APP_SECRET", "pytest-app-secret-for-crypto-utils-32!")
 # real modules.  Stubs installed later do NOT affect already-bound names.
 from app import create_app as _create_app, db as _db               # noqa: E402
 from app.models import User as _User, Balance as _Balance           # noqa: E402
+from app.cashflow import (                                          # noqa: E402
+    calc_transactions as _calc_transactions,
+    calc_schedule as _calc_schedule,
+    update_cash as _update_cash,
+)
 from werkzeug.security import generate_password_hash                # noqa: E402
 
 # ── Create the test Flask app eagerly (before stubs) ─────────────────────────

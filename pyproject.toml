@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+# Add the project root to sys.path so that `pytest` (not just `python -m pytest`)
+# can import the `app` package without requiring PYTHONPATH to be set manually.
+pythonpath = ["."]
