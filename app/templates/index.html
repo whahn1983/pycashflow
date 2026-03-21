@@ -82,11 +82,12 @@
     <div class="chart-body">
         <div class="chart-lock-wrapper">
             <div id="chart" class="chart" style="width: 100%; height: 500px;"></div>
-            <div id="chart-lock-overlay" class="chart-lock-overlay" onclick="unlockChart();">
+            <div id="chart-lock-overlay" class="chart-lock-overlay">
                 <span class="chart-lock-badge">
-                    <i class="fa-solid fa-lock"></i> Tap to interact
+                    <i class="fa-solid fa-lock"></i> Locked — use button to interact
                 </span>
             </div>
+            <div id="point-tooltip" class="point-tooltip point-tooltip--hidden"></div>
         </div>
     </div>
 </div>
@@ -326,6 +327,12 @@
     // Chart lock state — locked by default on touch/coarse-pointer devices only
     var isPlotLocked = window.matchMedia('(any-pointer: coarse)').matches;
 
+    // Zoom toggle state
+    var homeXRange = null;
+    var homeYRange = null;
+    var isFullView = false;
+    var tooltipDismissAttached = false;
+
     // Plot the chart with improved dark theme
     d = {{ graphJSON | safe }};
     d.config={responsive: true};
@@ -345,13 +352,98 @@
         }
     }
 
+    // Save initial (home) ranges once from the Python-generated layout
+    if (d.layout && d.layout.xaxis && d.layout.xaxis.range) {
+        homeXRange = d.layout.xaxis.range.slice();
+    }
+    if (d.layout && d.layout.yaxis && d.layout.yaxis.range) {
+        homeYRange = d.layout.yaxis.range.slice();
+    }
+
     function renderChart() {
+        // Use dragmode to control interactivity instead of staticPlot,
+        // so plotly_click still fires in locked mode.
+        if (d.layout) {
+            d.layout.dragmode = isPlotLocked ? false : 'pan';
+        }
+        isFullView = false;
         Plotly.newPlot('chart', d.data, d.layout, {
-            staticPlot: isPlotLocked,
+            staticPlot: false,
             displayModeBar: false,
             scrollZoom: !isPlotLocked,
-            responsive: true
+            responsive: true,
+            doubleClick: false
         });
+        attachChartHandlers();
+    }
+
+    function attachChartHandlers() {
+        var chartDiv = document.getElementById('chart');
+        if (!chartDiv) return;
+
+        // Show point details on click (works in both locked and unlocked modes)
+        chartDiv.on('plotly_click', function(data) {
+            if (!data || !data.points || !data.points.length) return;
+            showPointTooltip(data.points[0], data.event);
+        });
+
+        // Double-click toggles between home zoom (90-day window) and full data view
+        chartDiv.on('plotly_doubleclick', function() {
+            hidePointTooltip();
+            isFullView = !isFullView;
+            if (isFullView) {
+                Plotly.relayout('chart', {'xaxis.autorange': true, 'yaxis.autorange': true});
+            } else {
+                var update = {};
+                if (homeXRange) { update['xaxis.range'] = homeXRange; update['xaxis.autorange'] = false; }
+                if (homeYRange) { update['yaxis.range'] = homeYRange; update['yaxis.autorange'] = false; }
+                if (Object.keys(update).length) Plotly.relayout('chart', update);
+            }
+        });
+
+        // Dismiss tooltip on next click anywhere (registered once on document)
+        if (!tooltipDismissAttached) {
+            tooltipDismissAttached = true;
+            document.addEventListener('click', function() {
+                // Small delay so the plotly_click handler runs first and can re-show the tooltip
+                setTimeout(hidePointTooltip, 150);
+            });
+        }
+    }
+
+    function showPointTooltip(point, evt) {
+        var tooltip = document.getElementById('point-tooltip');
+        if (!tooltip) return;
+
+        var dateStr = point.x;
+        try {
+            var dt = new Date(point.x);
+            if (!isNaN(dt)) {
+                dateStr = dt.toLocaleDateString([], {month: 'short', day: 'numeric', year: 'numeric'});
+            }
+        } catch(e) {}
+
+        var amount = parseFloat(point.y);
+        var amountStr = isNaN(amount) ? String(point.y) :
+            amount.toLocaleString('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2});
+
+        tooltip.innerHTML = '<div class="point-tooltip-date">' + dateStr + '</div>' +
+                            '<div class="point-tooltip-amount">' + amountStr + '</div>';
+
+        var chartDiv = document.getElementById('chart');
+        var rect = chartDiv.getBoundingClientRect();
+        var cx = evt ? evt.clientX - rect.left + 12 : 12;
+        var cy = evt ? evt.clientY - rect.top - 70 : 12;
+        cx = Math.max(4, Math.min(cx, rect.width - 160));
+        cy = Math.max(4, Math.min(cy, rect.height - 70));
+        tooltip.style.left = cx + 'px';
+        tooltip.style.top  = cy + 'px';
+        tooltip.classList.remove('point-tooltip--hidden');
+    }
+
+    function hidePointTooltip() {
+        var tooltip = document.getElementById('point-tooltip');
+        if (tooltip) tooltip.classList.add('point-tooltip--hidden');
     }
 
     function updateChartLockUI() {
@@ -383,7 +475,7 @@
         }
     }
 
-    // Initial render (locked by default)
+    // Initial render (locked by default on touch devices)
     renderChart();
     updateChartLockUI();
 
