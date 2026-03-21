@@ -547,12 +547,17 @@ def calculate_cash_risk_score(balance, run):
         lowest_balance = min(current_balance, single_balance)
         days_to_lowest = days_to_row if single_balance < current_balance else 0
 
-        # near_term_buffer: use the projected balance when it falls within 14 days
-        near_term_buffer = single_balance if days_to_row <= 14 else current_balance
+        # near_term_buffer: minimum balance over the 14-day window.
+        # For a row within 14 days the account stays at current_balance until that date,
+        # so use the minimum of the two to avoid overstating short-term liquidity.
+        near_term_buffer = min(current_balance, single_balance) if days_to_row <= 14 else current_balance
 
-        # Rough daily expense from balance delta; guard against income-only rows
+        # Rough daily expense from balance delta.
+        # When balance_delta <= 0 (income-only or flat row) there are no observable
+        # expenses, so use 0.  This causes ai_insights to emit min_balance_ratio=None
+        # rather than a fabricated large value.
         balance_delta = current_balance - single_balance
-        avg_daily_expense = balance_delta / max(1, days_to_row) if balance_delta > 0 else 1.0
+        avg_daily_expense = balance_delta / max(1, days_to_row) if balance_delta > 0 else 0
         cash_runway_days = current_balance / avg_daily_expense if avg_daily_expense > 0 else 0
 
         # days_below_threshold: count remaining horizon days when balance goes negative
