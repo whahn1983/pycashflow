@@ -512,6 +512,10 @@ def calculate_cash_risk_score(balance, run):
             'lowest_balance': current_balance,
             'days_to_lowest': 0,
             'avg_daily_expense': 0,
+            'days_below_threshold': 0,
+            'pct_below_threshold': 0.0,
+            'recovery_days': None,
+            'near_term_buffer': current_balance,
         }
 
     if run.empty or len(run) < 2:
@@ -523,6 +527,10 @@ def calculate_cash_risk_score(balance, run):
             'lowest_balance': current_balance,
             'days_to_lowest': 0,
             'avg_daily_expense': 0,
+            'days_below_threshold': 0,
+            'pct_below_threshold': 0.0,
+            'recovery_days': None,
+            'near_term_buffer': current_balance,
         }
 
     run_copy = run.copy()

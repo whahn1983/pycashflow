@@ -322,8 +322,8 @@
 </head>
 
 <script>
-    // Chart lock state — true = locked (default), false = interactive
-    var isPlotLocked = true;
+    // Chart lock state — locked by default on touch/coarse-pointer devices only
+    var isPlotLocked = window.matchMedia('(pointer: coarse)').matches;
 
     // Plot the chart with improved dark theme
     d = {{ graphJSON | safe }};
