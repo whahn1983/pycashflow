@@ -1,6 +1,6 @@
 // sw.js - PyCashFlow Service Worker
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE = `pycashflow-static-${CACHE_VERSION}`;
 const PAGE_CACHE = `pycashflow-pages-${CACHE_VERSION}`;
 
@@ -56,8 +56,23 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache-first for local static assets
+  // Static assets:
+  // - CSS/JS use network-first so installed PWAs pick up updates quickly when online
+  // - other static assets keep cache-first for resilience/perf
   if (url.origin === self.location.origin && url.pathname.startsWith('/static/')) {
+    const isHotAsset = url.pathname.endsWith('.css') || url.pathname.endsWith('.js');
+    if (isHotAsset) {
+      event.respondWith(
+        caches.open(STATIC_CACHE).then(cache =>
+          fetch(request).then(response => {
+            if (response.ok) cache.put(request, response.clone());
+            return response;
+          }).catch(() => cache.match(request))
+        )
+      );
+      return;
+    }
+
     event.respondWith(
       caches.open(STATIC_CACHE).then(cache =>
         cache.match(request).then(cached =>
@@ -95,7 +110,7 @@ self.addEventListener('fetch', event => {
   const acceptsHtml = request.headers.get('Accept') && request.headers.get('Accept').includes('text/html');
   if (request.mode === 'navigate' || acceptsHtml) {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/offline.html'))
+      fetch(request, { cache: 'no-store' }).catch(() => caches.match('/offline.html'))
     );
     return;
   }
