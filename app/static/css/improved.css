@@ -439,25 +439,23 @@ body::before {
 
 /* Chart Lock / Unlock Overlay */
 .chart-lock-wrapper {
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .chart-lock-overlay {
-  position: absolute;
-  inset: 0;
+  position: static;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-md);
   cursor: default;
-  z-index: 10;
   pointer-events: none;
-  opacity: 1;
-  transition: opacity 0.2s ease;
 }
 
 .chart-lock-overlay--hidden {
-  opacity: 0;
+  display: none;
 }
 
 
