@@ -491,6 +491,8 @@ body::before {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   padding: var(--spacing-lg);
   border-bottom: 1px solid var(--border);
   background-color: var(--surface);
@@ -505,6 +507,7 @@ body::before {
 
 .table-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-sm);
 }
 
@@ -1017,7 +1020,7 @@ body.modal-open {
 
 .row-list {
   width: 100%;
-  padding: 0.5rem;
+  padding: 0.75rem;
 }
 
 /* Column header bar — desktop only */
@@ -1042,9 +1045,11 @@ body.modal-open {
   display: grid;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background-color: rgba(255, 255, 255, 0.015);
-  border: 1px solid var(--border);
+  width: 100%;
+  padding: 1rem;
+  background-color: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-left: 4px solid var(--accent);
   border-radius: var(--radius-md);
   margin-bottom: 0.5rem;
   transition: background-color 0.15s ease;
@@ -1055,15 +1060,15 @@ body.modal-open {
 }
 
 .row-card:hover {
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: rgba(59, 130, 246, 0.12);
 }
 
 /* Generic cell */
 .rc-cell {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
 }
 
 .rc-cell.rc-primary {
@@ -1114,8 +1119,10 @@ body.modal-open {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  background-color: rgba(255, 255, 255, 0.025);
+  padding: 0.75rem 0.85rem;
+  background-color: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-left: 4px solid #6366f1;
   border-radius: var(--radius-sm);
   margin-bottom: 0.375rem;
 }
@@ -1180,6 +1187,12 @@ body.modal-open {
   grid-template-columns: 1.5fr 130px 110px 110px auto;
 }
 
+/* Scenarios: Name | Amount | Type | Frequency | Next Date | Actions */
+.row-list--scenario .row-list-header,
+.row-list--scenario .row-card {
+  grid-template-columns: 1.5fr 100px 110px 120px 130px auto;
+}
+
 /* Holds: Name | Amount | Type | Actions */
 .row-list--holds .row-list-header,
 .row-list--holds .row-card {
@@ -1202,6 +1215,43 @@ body.modal-open {
 .row-list--admin-users .row-list-header,
 .row-list--admin-users .row-card {
   grid-template-columns: 1fr 1.5fr 130px 100px auto;
+}
+
+.row-list--schedule .row-card {
+  background-color: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.2);
+  border-left-color: var(--warning);
+}
+
+.row-list--transactions .row-card {
+  background-color: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.2);
+  border-left-color: var(--success);
+}
+
+.row-list--holds .row-card,
+.row-list--skips .row-card {
+  background-color: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+  border-left-color: var(--danger);
+}
+
+.row-list--scenario .row-card {
+  background-color: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.2);
+  border-left-color: #8b5cf6;
+}
+
+.row-list--guests .row-card {
+  background-color: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.2);
+  border-left-color: var(--success);
+}
+
+.row-list--admin-users .row-card {
+  background-color: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.2);
+  border-left-color: #8b5cf6;
 }
 
 /* ── Additional badge variants (shared across views) ── */
