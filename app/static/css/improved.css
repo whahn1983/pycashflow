@@ -1008,3 +1008,320 @@ body.modal-open {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ============================================================
+   Responsive Row-Card List
+   Desktop: compact grid rows (table-like density)
+   Mobile:  stacked cards with data-label field prefixes
+   ============================================================ */
+
+.row-list {
+  width: 100%;
+}
+
+/* Column header bar — desktop only */
+.row-list-header {
+  display: grid;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  background-color: var(--surface);
+  border-bottom: 2px solid var(--border);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Individual row card */
+.row-card {
+  display: grid;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.15s ease;
+}
+
+.row-card:last-child {
+  border-bottom: none;
+}
+
+.row-card:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Generic cell */
+.rc-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rc-cell.rc-primary {
+  font-weight: 600;
+}
+
+/* Actions cell: right-aligned, wrappable */
+.rc-cell.rc-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  overflow: visible;
+  white-space: normal;
+}
+
+/* Empty-state message */
+.rc-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Small button variant for compact row actions */
+.btn-sm-modern {
+  font-size: 0.8rem !important;
+  padding: 0.35rem 0.7rem !important;
+}
+
+/* ── Nested sub-rows (e.g. guest users under a parent in global admin) ── */
+.row-nested {
+  padding: 0.625rem 1rem 0.625rem 2.5rem;
+  background-color: rgba(255, 255, 255, 0.015);
+  border-bottom: 1px solid var(--border);
+}
+
+.row-nested-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.row-nested-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background-color: rgba(255, 255, 255, 0.025);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.375rem;
+}
+
+.row-nested-card:last-of-type {
+  margin-bottom: 0;
+}
+
+.row-nested-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.row-nested-name {
+  font-weight: 500;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-nested-email {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-nested-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.row-nested-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+/* ── Per-view column grid definitions (desktop) ── */
+
+/* Schedule: Name | Amount | Type | Frequency | Next Date | Actions */
+.row-list--schedule .row-list-header,
+.row-list--schedule .row-card {
+  grid-template-columns: 1.5fr 100px 110px 120px 130px auto;
+}
+
+/* Transactions: Name | Date | Type | Amount | Actions */
+.row-list--transactions .row-list-header,
+.row-list--transactions .row-card {
+  grid-template-columns: 1.5fr 130px 110px 110px auto;
+}
+
+/* Holds: Name | Amount | Type | Actions */
+.row-list--holds .row-list-header,
+.row-list--holds .row-card {
+  grid-template-columns: 1.5fr 110px 110px auto;
+}
+
+/* Skips: Name | Amount | Date | Actions */
+.row-list--skips .row-list-header,
+.row-list--skips .row-card {
+  grid-template-columns: 1.5fr 110px 130px auto;
+}
+
+/* Guest users: Name | Email | Access | Status | Actions */
+.row-list--guests .row-list-header,
+.row-list--guests .row-card {
+  grid-template-columns: 1fr 1.5fr 110px 100px auto;
+}
+
+/* Admin panel users: Name | Email | Role | Status | Actions */
+.row-list--admin-users .row-list-header,
+.row-list--admin-users .row-card {
+  grid-template-columns: 1fr 1.5fr 130px 100px auto;
+}
+
+/* ── Additional badge variants (shared across views) ── */
+.badge-active {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-inactive {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge-guest {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-owner {
+  background-color: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.badge-global-admin {
+  background-color: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+/* ── Mobile: stacked card layout (≤640px) ── */
+@media (max-width: 640px) {
+  /* Add bottom breathing room inside overflow:hidden table-card */
+  .row-list {
+    padding-bottom: 0.5rem;
+  }
+
+  /* Hide column headers — field labels appear via data-label::before */
+  .row-list-header {
+    display: none;
+  }
+
+  /* Each row becomes a standalone bordered card */
+  .row-card {
+    display: block;
+    margin: 0.5rem;
+    padding: 0.875rem 1rem;
+    background-color: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .row-card:last-child {
+    border: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+  }
+
+  /* Every cell becomes a flex row */
+  .rc-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.2rem 0;
+    overflow: visible;
+    white-space: normal;
+    text-overflow: unset;
+  }
+
+  /* Cells with data-label get a muted uppercase label prefix */
+  .rc-cell[data-label]::before {
+    content: attr(data-label);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    min-width: 5rem;
+    flex-shrink: 0;
+  }
+
+  /* Primary cell: no label, larger, separator below */
+  .rc-cell.rc-primary {
+    font-size: 1rem;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.375rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  /* Actions: no label, left-aligned, touch-friendly */
+  .rc-cell.rc-actions {
+    padding-top: 0.625rem;
+    margin-top: 0.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* Ensure touch-friendly button size on mobile */
+  .rc-cell.rc-actions .btn-sm-modern,
+  .rc-cell.rc-actions .btn-modern {
+    padding: 0.5rem 0.875rem !important;
+    font-size: 0.85rem !important;
+    min-height: 2.25rem;
+  }
+
+  /* Nested rows: standalone card below parent row */
+  .row-nested {
+    margin: 0 0.5rem 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background-color: rgba(255, 255, 255, 0.01);
+  }
+
+  .row-nested-card {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .row-nested-info {
+    flex: 1 1 100%;
+  }
+
+  .row-nested-badges {
+    flex-wrap: wrap;
+  }
+
+  .row-nested-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+}
