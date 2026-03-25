@@ -1393,3 +1393,101 @@ body.modal-open {
     width: 100%;
   }
 }
+
+/* AI-insight style data cards for management pages */
+.insight-card-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.insight-data-card {
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  border-left: 4px solid #6366f1;
+  background-color: rgba(99, 102, 241, 0.1);
+}
+
+.insight-data-card--schedule {
+  background-color: rgba(245, 158, 11, 0.1);
+  border-left-color: var(--warning);
+}
+
+.insight-data-card--scenario,
+.insight-data-card--admin {
+  background-color: rgba(139, 92, 246, 0.12);
+  border-left-color: #8b5cf6;
+}
+
+.insight-data-card--transactions,
+.insight-data-card--guests {
+  background-color: rgba(16, 185, 129, 0.1);
+  border-left-color: var(--success);
+}
+
+.insight-data-card--holds {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-left-color: var(--danger);
+}
+
+.insight-data-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.insight-data-title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.insight-data-meta {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.insight-data-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.8rem;
+}
+
+.insight-data-card .rc-cell {
+  display: inline-flex;
+  margin-right: 1rem;
+  margin-bottom: 0.45rem;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-secondary);
+}
+
+.insight-data-card .rc-cell.rc-primary {
+  display: block;
+  margin-right: 0;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.insight-data-card .rc-cell.rc-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-right: 0;
+  margin-bottom: 0;
+  margin-top: 0.6rem;
+}
+
+@media (max-width: 640px) {
+  .insight-data-actions,
+  .insight-data-card .rc-cell.rc-actions {
+    justify-content: flex-start;
+  }
+}
