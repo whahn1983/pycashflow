@@ -1403,30 +1403,30 @@ body.modal-open {
 .insight-data-card {
   padding: 1rem;
   border-radius: var(--radius-md);
-  border-left: 4px solid #6366f1;
-  background-color: rgba(99, 102, 241, 0.1);
+  border-left: 4px solid var(--accent);
+  background-color: rgba(59, 130, 246, 0.1);
 }
 
 .insight-data-card--schedule {
-  background-color: rgba(245, 158, 11, 0.1);
-  border-left-color: var(--warning);
+  background-color: rgba(59, 130, 246, 0.1);
+  border-left-color: var(--accent);
 }
 
 .insight-data-card--scenario,
 .insight-data-card--admin {
-  background-color: rgba(139, 92, 246, 0.12);
-  border-left-color: #8b5cf6;
+  background-color: rgba(59, 130, 246, 0.1);
+  border-left-color: var(--accent);
 }
 
 .insight-data-card--transactions,
 .insight-data-card--guests {
-  background-color: rgba(16, 185, 129, 0.1);
-  border-left-color: var(--success);
+  background-color: rgba(59, 130, 246, 0.1);
+  border-left-color: var(--accent);
 }
 
 .insight-data-card--holds {
-  background-color: rgba(239, 68, 68, 0.1);
-  border-left-color: var(--danger);
+  background-color: rgba(59, 130, 246, 0.1);
+  border-left-color: var(--accent);
 }
 
 .insight-data-top {

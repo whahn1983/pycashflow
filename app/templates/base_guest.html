@@ -43,6 +43,11 @@
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register("/sw.js").then(function(registration) {
                     console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    registration.update();
+                    window.addEventListener('online', function() { registration.update(); });
+                    document.addEventListener('visibilitychange', function() {
+                        if (document.visibilityState === 'visible') registration.update();
+                    });
                 }, function(err) {
                     console.log('ServiceWorker registration failed: ', err);
                 });
