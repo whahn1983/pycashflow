@@ -56,16 +56,9 @@
             </button>
         </div>
     </div>
-    <div class="row-list row-list--admin-users">
-        <div class="row-list-header">
-            <div>Name</div>
-            <div>Email</div>
-            <div>Role</div>
-            <div>Status</div>
-            <div style="text-align: right;">Actions</div>
-        </div>
+    <div class="insight-card-list">
         {% for user in global_admins %}
-        <div class="row-card">
+        <div class="insight-data-card insight-data-card--admin">
             <div class="rc-cell rc-primary">{{user.name}}</div>
             <div class="rc-cell" data-label="Email">
                 <i class="fa-solid fa-envelope"></i> {{user.email}}
@@ -237,16 +230,9 @@
             Account Owners & Guests
         </h2>
     </div>
-    <div class="row-list row-list--admin-users">
-        <div class="row-list-header">
-            <div>Name</div>
-            <div>Email</div>
-            <div>Role</div>
-            <div>Status</div>
-            <div style="text-align: right;">Actions</div>
-        </div>
+    <div class="insight-card-list">
         {% for owner in account_owners %}
-        <div class="row-card">
+        <div class="insight-data-card insight-data-card--admin">
             <div class="rc-cell rc-primary">{{owner.name}}</div>
             <div class="rc-cell" data-label="Email">
                 <i class="fa-solid fa-envelope"></i> {{owner.email}}

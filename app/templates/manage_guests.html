@@ -39,61 +39,43 @@
         </div>
     </div>
 
-    <div class="row-list row-list--guests">
-        <div class="row-list-header">
-            <div>Name</div>
-            <div>Email</div>
-            <div>Access</div>
-            <div>Status</div>
-            <div style="text-align: right;">Actions</div>
-        </div>
+    <div class="insight-card-list">
         {% if guests %}
         {% for guest in guests %}
-        <div class="row-card">
-            <div class="rc-cell rc-primary">{{guest.name}}</div>
-            <div class="rc-cell" data-label="Email">
-                <i class="fa-solid fa-envelope"></i> {{guest.email}}
-            </div>
-            <div class="rc-cell" data-label="Access">
-                <span class="badge-modern badge-guest"><i class="fa-solid fa-eye"></i> View Only</span>
-            </div>
-            <div class="rc-cell" data-label="Status">
+        <div class="insight-data-card insight-data-card--guests">
+            <div class="insight-data-top">
+                <p class="insight-data-title">{{ guest.name }}</p>
                 {% if guest.is_active %}
                 <span class="badge-modern badge-active"><i class="fa-solid fa-circle-check"></i> Active</span>
                 {% else %}
                 <span class="badge-modern badge-inactive"><i class="fa-solid fa-circle-xmark"></i> Inactive</span>
                 {% endif %}
             </div>
-            <div class="rc-cell rc-actions">
+            <div class="insight-data-meta">
+                <span><i class="fa-solid fa-envelope"></i> {{ guest.email }}</span>
+                <span><span class="badge-modern badge-guest"><i class="fa-solid fa-eye"></i> View Only</span></span>
+            </div>
+            <div class="insight-data-actions">
                 {% if not guest.is_active %}
                 <form action="/activate_user/{{guest.id}}" method="POST" style="display:inline;">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn-success-modern btn-modern btn-sm-modern">
-                        <i class="fa-solid fa-check"></i> Activate
-                    </button>
+                    <button type="submit" class="btn-success-modern btn-modern btn-sm-modern"><i class="fa-solid fa-check"></i> Activate</button>
                 </form>
                 {% else %}
                 <form action="/deactivate_user/{{guest.id}}" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to deactivate this user?')">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn-warning-modern btn-modern btn-sm-modern">
-                        <i class="fa-solid fa-ban"></i> Deactivate
-                    </button>
+                    <button type="submit" class="btn-warning-modern btn-modern btn-sm-modern"><i class="fa-solid fa-ban"></i> Deactivate</button>
                 </form>
                 {% endif %}
                 <form action="{{url_for('main.remove_guest', guest_id=guest.id)}}" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to remove this guest user?')">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn-danger-modern btn-modern btn-sm-modern">
-                        <i class="fa-solid fa-trash"></i> Remove
-                    </button>
+                    <button type="submit" class="btn-danger-modern btn-modern btn-sm-modern"><i class="fa-solid fa-trash"></i> Remove</button>
                 </form>
             </div>
         </div>
         {% endfor %}
         {% else %}
-        <div class="rc-empty">
-            <i class="fa-solid fa-user-group" style="font-size: 2rem; opacity: 0.3; display: block; margin-bottom: 0.75rem;"></i>
-            No guest users yet. Click "Add Guest" to invite someone to view your account.
-        </div>
+        <div class="rc-empty"><i class="fa-solid fa-user-group" style="font-size: 2rem; opacity: 0.3; display: block; margin-bottom: 0.75rem;"></i>No guest users yet. Click "Add Guest" to invite someone to view your account.</div>
         {% endif %}
     </div>
 </div>

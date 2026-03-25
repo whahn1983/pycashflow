@@ -33,48 +33,31 @@
         </h2>
     </div>
 
-    <div class="row-list row-list--transactions">
-        <div class="row-list-header">
-            <div>Name</div>
-            <div>Date</div>
-            <div>Type</div>
-            <div>Amount</div>
-            <div style="text-align: right;">Actions</div>
-        </div>
+    <div class="insight-card-list">
         {% for row in total %}
-        <div class="row-card">
-            <div class="rc-cell rc-primary">{{row.name}}</div>
-            <div class="rc-cell" data-label="Date">
-                <i class="fa-regular fa-calendar"></i> {{row.date}}
-            </div>
-            <div class="rc-cell" data-label="Type">
+        <div class="insight-data-card insight-data-card--transactions">
+            <div class="insight-data-top">
+                <p class="insight-data-title">{{ row.name }}</p>
                 {% if row.type == 'Income' %}
                 <span class="badge-modern badge-income"><i class="fa-solid fa-arrow-trend-up"></i> Income</span>
                 {% else %}
                 <span class="badge-modern badge-expense"><i class="fa-solid fa-arrow-trend-down"></i> Expense</span>
                 {% endif %}
             </div>
-            <div class="rc-cell" data-label="Amount">
-                {% if row.type == 'Income' %}
-                <span style="color: var(--success); font-weight: 600;">+${{row.amount}}</span>
-                {% else %}
-                <span style="color: var(--danger); font-weight: 600;">-${{row.amount}}</span>
-                {% endif %}
+            <div class="insight-data-meta">
+                <span><i class="fa-regular fa-calendar"></i> {{ row.date }}</span>
+                <span><i class="fa-solid fa-dollar-sign"></i> {% if row.type == 'Income' %}<strong style="color: var(--success);">+${{ row.amount }}</strong>{% else %}<strong style="color: var(--danger);">-${{ row.amount }}</strong>{% endif %}</span>
             </div>
-            <div class="rc-cell rc-actions">
+            <div class="insight-data-actions">
                 <form action="/addskip/{{loop.index0}}" method="POST" style="display:inline;">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn-warning-modern btn-modern btn-sm-modern">
-                        <i class="fa-solid fa-forward"></i> Skip
-                    </button>
+                    <button type="submit" class="btn-warning-modern btn-modern btn-sm-modern"><i class="fa-solid fa-forward"></i> Skip</button>
                 </form>
             </div>
         </div>
         {% endfor %}
         {% if not total %}
-        <div class="rc-empty">
-            <i class="fa-solid fa-circle-info"></i> No upcoming transactions in the next 90 days.
-        </div>
+        <div class="rc-empty"><i class="fa-solid fa-circle-info"></i> No upcoming transactions in the next 90 days.</div>
         {% endif %}
     </div>
 </div>
