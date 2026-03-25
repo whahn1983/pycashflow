@@ -1161,6 +1161,13 @@ body.modal-open {
 
 /* ── Per-view column grid definitions (desktop) ── */
 
+
+/* Explicit schedule grid class used by template to prevent fallback to single-column */
+.schedule-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.5fr) 100px 110px 120px 130px auto;
+}
+
 /* Schedule: Name | Amount | Type | Frequency | Next Date | Actions */
 .row-list--schedule .row-list-header,
 .row-list--schedule .row-card {
@@ -1238,6 +1245,11 @@ body.modal-open {
   /* Hide column headers — field labels appear via data-label::before */
   .row-list-header {
     display: none;
+  }
+
+  .schedule-grid {
+    display: block;
+    grid-template-columns: none;
   }
 
   /* Each row becomes a standalone bordered card */
