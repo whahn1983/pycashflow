@@ -48,7 +48,7 @@
     </div>
 
     <div class="row-list row-list--schedule">
-        <div class="row-list-header">
+        <div class="row-list-header schedule-grid">
             <div>Name</div>
             <div>Amount</div>
             <div>Type</div>
@@ -57,7 +57,7 @@
             <div style="text-align: right;">Actions</div>
         </div>
         {% for row in schedule %}
-        <div class="row-card">
+        <div class="row-card schedule-grid">
             <div class="rc-cell rc-primary">{{row.name}}</div>
             <div class="rc-cell" data-label="Amount">
                 {% if row.type == 'Income' %}
