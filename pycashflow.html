@@ -1082,6 +1082,16 @@ flask db init
 flask db migrate -m "Initial migration"
 flask db upgrade
 
+# Create .env from template and edit required values
+cp app/.env_example app/.env
+# Required to keep encrypted values readable across restarts
+# APP_SECRET=<strong-random-value>
+# SECRET_KEY=<strong-random-value>
+# Required to enable passkeys (WebAuthn)
+# PASSKEY_RP_ID=localhost
+# PASSKEY_RP_NAME=PyCashFlow
+# PASSKEY_ORIGIN=http://localhost:5000
+
 # Run the application
 python app.py
 
