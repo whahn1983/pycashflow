@@ -17,8 +17,10 @@ the real objects captured during app creation, before test stubs can replace
 ``sys.modules['app.models']`` or ``sys.modules['app.auth']``.
 """
 
-from flask import request
+from flask import current_app, request
 from werkzeug.security import check_password_hash
+
+from app import limiter
 
 # Module-level imports: bound to real objects at app-creation time.
 from app.models import User
@@ -39,6 +41,7 @@ from app.api.serializers import serialize_user
 # ── POST /api/v1/auth/login ───────────────────────────────────────────────────
 
 @api.route("/auth/login", methods=["POST"])
+@limiter.limit("10 per minute", exempt_when=lambda: current_app.testing)
 def api_login():
     """Authenticate with email + password and receive a bearer token.
 
@@ -77,6 +80,11 @@ def api_login():
 
     if not password_ok or user is None or not user.is_active:
         return unauthorized("Invalid credentials or account is not active")
+
+    # Keep API auth policy aligned with web login flow: accounts with 2FA
+    # enabled must complete a second factor in the browser flow.
+    if user.twofa_enabled:
+        return unauthorized("Two-factor authentication is required for API login")
 
     raw_token, _record = create_token_for_user(user)
 

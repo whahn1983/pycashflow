@@ -1,7 +1,7 @@
 """add user_tokens table
 
 Revision ID: a2b3c4d5e6f7
-Revises: f6a7b8c9d0e1
+Revises: a7b8c9d0e1f2
 Create Date: 2026-04-09 00:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'a2b3c4d5e6f7'
-down_revision = 'f6a7b8c9d0e1'
+down_revision = 'a7b8c9d0e1f2'
 branch_labels = None
 depends_on = None
 
