@@ -42,7 +42,7 @@ No cookies, CSRF tokens, or API keys are required. The entire `/api/v1/` bluepri
 
 ### Two-Factor Authentication (2FA)
 
-Accounts with TOTP 2FA enabled **cannot** obtain API tokens via `/api/v1/auth/login`. The server returns 401 with the message `"Two-factor authentication is required for API login"`. This is a deliberate security constraint — 2FA users must authenticate through the browser flow until a dedicated 2FA API challenge endpoint is added in a future release.
+Accounts with TOTP 2FA enabled **cannot** obtain API tokens via `/api/v1/auth/login`. The server returns the same generic 401 response as any other credential failure, to avoid leaking whether the password was correct. This is a deliberate security constraint — 2FA users must authenticate through the browser flow until a dedicated 2FA API challenge endpoint is added in a future release.
 
 ### Inactive Accounts
 

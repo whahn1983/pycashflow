@@ -78,13 +78,10 @@ def api_login():
     candidate_hash = user.password if user else _DUMMY_HASH
     password_ok = check_password_hash(candidate_hash, password)
 
-    if not password_ok or user is None or not user.is_active:
+    # 2FA check is intentionally in the same condition to avoid leaking
+    # whether the password was correct (credential-validation oracle).
+    if not password_ok or user is None or not user.is_active or user.twofa_enabled:
         return unauthorized("Invalid credentials or account is not active")
-
-    # Keep API auth policy aligned with web login flow: accounts with 2FA
-    # enabled must complete a second factor in the browser flow.
-    if user.twofa_enabled:
-        return unauthorized("Two-factor authentication is required for API login")
 
     raw_token, _record = create_token_for_user(user)
 
