@@ -171,7 +171,7 @@ docker run -d \
 | `/mnt/data:/app/app/data` | Persistent database storage | **Yes** |
 | `/mnt/migrations:/app/migrations` | Database migration files | Recommended |
 | `/etc/localtime:/etc/localtime:ro` | Correct timezone for calculations | Recommended |
-| `/mnt/.env:/app/app/.env` | Environment variables (Corbado, etc.) | Optional |
+| `/mnt/.env:/app/app/.env` | Environment variables (.env settings, passkeys, bootstrap admin, etc.) | Optional |
 
 #### Access the Application
 
@@ -213,8 +213,10 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
 
 4. **Configure Environment Variables**
 
-   Create a `.env` file in `/app/app/.env`:
+   Create a `.env` file in `/app/app/.env` (or copy from `app/.env_example`):
    ```bash
+   cp app/.env_example app/.env
+
    # Required: Encryption key for email passwords, OpenAI API keys, and 2FA secrets
    # Generate with: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
    # WARNING: Changing this value after first run will make all stored encrypted data unreadable.
@@ -230,12 +232,18 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
    BOOTSTRAP_ADMIN_EMAIL=admin@example.com
    BOOTSTRAP_ADMIN_PASSWORD=your_strong_password
 
-   # Optional: For Passkey Authentication (WebAuthn / py_webauthn)
+   # Optional (required to enable passkeys): For Passkey Authentication (WebAuthn / py_webauthn)
    # rp_id should match your effective domain (e.g., app.example.com)
    PASSKEY_RP_ID=localhost
    PASSKEY_RP_NAME=PyCashFlow
    # Must exactly match scheme + host (+port in local dev), e.g. http://localhost:5000
    PASSKEY_ORIGIN=http://localhost:5000
+
+   # Optional: set to false for local HTTP development only
+   SESSION_COOKIE_SECURE=false
+
+   # Optional: configure rate-limit backend (Redis recommended for multi-worker)
+   # RATELIMIT_STORAGE_URI=redis://localhost:6379/0
 
    # Optional: Database URL (defaults to SQLite)
    DATABASE_URL=sqlite:///data/db.sqlite
