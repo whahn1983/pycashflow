@@ -57,7 +57,7 @@
                 Sign In
             </button>
 
-            {% if corbado_enabled %}
+            {% if passkey_enabled %}
             <a href="{{url_for('auth.login_passkey')}}" class="btn-outline-modern btn-modern" style="width: 100%; text-decoration: none; display: flex; align-items: center; justify-content: center;">
                 <i class="fa-solid fa-key"></i>
                 Sign In with Passkey

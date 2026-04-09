@@ -27,18 +27,9 @@ def create_app():
     # Load environment variables from .env file
     load_dotenv()
 
-    PROJECT_ID: str = os.environ.get("PROJECT_ID") or ""
-    API_SECRET: str = os.environ.get("API_SECRET") or ""
-    FRONTEND_URI: str = os.environ.get("FRONTEND_URI") or ""
-
-    # Use the API_SECRET from the environment variables
-    app.config["API_SECRET"] = API_SECRET
-
-    # Pass PROJECT_ID as a context variable to templates
-    app.config["PROJECT_ID"] = PROJECT_ID
-
-    # Pass FRONTEND_URI as a context variable to templates
-    app.config["FRONTEND_URI"] = FRONTEND_URI
+    app.config["PASSKEY_RP_ID"] = os.environ.get("PASSKEY_RP_ID", "")
+    app.config["PASSKEY_RP_NAME"] = os.environ.get("PASSKEY_RP_NAME", "PyCashFlow")
+    app.config["PASSKEY_ORIGIN"] = os.environ.get("PASSKEY_ORIGIN", "")
 
     basedir = os.path.abspath(os.path.dirname(__file__))
 
