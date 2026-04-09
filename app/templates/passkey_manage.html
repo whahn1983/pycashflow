@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="max-width: 720px; margin: 2rem auto;">
+    <div class="metric-card" style="padding: 2rem; margin-bottom: 1rem;">
+        <h2 style="color: var(--text-primary);"><i class="fa-solid fa-key"></i> Passkeys</h2>
+        <p style="color: var(--text-secondary);">Register passkeys for passwordless sign-in with device biometrics or security keys.</p>
+
+        <div class="form-group-modern">
+            <label class="form-label-modern"><i class="fa-solid fa-tag"></i> Label (optional)</label>
+            <input id="passkey-label" class="form-control-modern" type="text" maxlength="120" placeholder="e.g., MacBook Touch ID">
+        </div>
+        <button id="register-passkey-btn" class="btn-primary-modern btn-modern" type="button">
+            <i class="fa-solid fa-plus"></i> Add Passkey
+        </button>
+        <div id="passkey-message" style="margin-top: 1rem;"></div>
+    </div>
+
+    <div class="metric-card" style="padding: 2rem;">
+        <h3 style="color: var(--text-primary);">Registered Passkeys</h3>
+        {% if credentials %}
+            <ul style="list-style: none; padding: 0; margin: 0; display: grid; gap: 0.75rem;">
+                {% for credential in credentials %}
+                <li style="border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>{{ credential.label or "Unnamed passkey" }}</strong><br>
+                        <small style="color: var(--text-secondary);">Added {{ credential.created_at.strftime('%Y-%m-%d %H:%M') if credential.created_at else 'n/a' }}</small>
+                    </div>
+                    <form method="POST" action="{{ url_for('auth.delete_passkey', credential_id=credential.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn-modern" style="background: #ef4444; color: white; border: none;" type="submit">
+                            <i class="fa-solid fa-trash"></i> Remove
+                        </button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p style="color: var(--text-secondary); margin: 0;">No passkeys registered yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function base64urlToUint8Array(base64url) {
+    const padding = '='.repeat((4 - base64url.length % 4) % 4);
+    const base64 = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+function uint8ArrayToBase64url(bytes) {
+    const str = String.fromCharCode(...new Uint8Array(bytes));
+    return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+async function registerPasskey() {
+    const messageEl = document.getElementById('passkey-message');
+    messageEl.style.color = 'var(--text-secondary)';
+    messageEl.textContent = '';
+
+    const optionsResp = await fetch('{{ url_for("auth.passkey_register_options") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}',
+        },
+        body: '{}',
+    });
+    const options = await optionsResp.json();
+    if (!optionsResp.ok) {
+        messageEl.style.color = 'var(--danger)';
+        messageEl.textContent = options.error || 'Could not begin registration.';
+        return;
+    }
+
+    options.challenge = base64urlToUint8Array(options.challenge);
+    options.user.id = base64urlToUint8Array(options.user.id);
+    if (options.excludeCredentials) {
+        options.excludeCredentials = options.excludeCredentials.map((cred) => ({
+            ...cred,
+            id: base64urlToUint8Array(cred.id),
+        }));
+    }
+
+    const credential = await navigator.credentials.create({ publicKey: options });
+
+    const payload = {
+        id: credential.id,
+        rawId: uint8ArrayToBase64url(credential.rawId),
+        type: credential.type,
+        label: document.getElementById('passkey-label').value.trim(),
+        response: {
+            attestationObject: uint8ArrayToBase64url(credential.response.attestationObject),
+            clientDataJSON: uint8ArrayToBase64url(credential.response.clientDataJSON),
+            transports: credential.response.getTransports ? credential.response.getTransports() : [],
+        },
+        clientExtensionResults: credential.getClientExtensionResults(),
+    };
+
+    const verifyResp = await fetch('{{ url_for("auth.passkey_register_verify") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}',
+        },
+        body: JSON.stringify(payload),
+    });
+    const verifyBody = await verifyResp.json();
+    if (!verifyResp.ok) {
+        messageEl.style.color = 'var(--danger)';
+        messageEl.textContent = verifyBody.error || 'Registration failed.';
+        return;
+    }
+
+    messageEl.style.color = 'var(--success)';
+    messageEl.textContent = 'Passkey registered successfully.';
+    window.location.reload();
+}
+
+document.getElementById('register-passkey-btn').addEventListener('click', async () => {
+    try {
+        await registerPasskey();
+    } catch (err) {
+        const messageEl = document.getElementById('passkey-message');
+        messageEl.style.color = 'var(--danger)';
+        messageEl.textContent = err.message || 'Passkey registration failed.';
+    }
+});
+</script>
+{% endblock %}

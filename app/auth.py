@@ -1,15 +1,45 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash, session
+from flask import Blueprint, render_template, redirect, url_for, request, flash, session, jsonify, current_app
 from flask_login import login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from .models import User, Settings
+from .models import User, Settings, PasskeyCredential
 from app import db, limiter
 from .getemail import send_new_user_notification
 from .totp_utils import verify_totp, decrypt_totp_secret, verify_and_consume_backup_code
 import logging
-import os
+from datetime import datetime, timezone
 from functools import wraps
-from werkzeug.exceptions import Unauthorized
-from corbado_python_sdk import Config, CorbadoSDK, UserEntity
+import json
+
+try:
+    from webauthn import (
+        generate_registration_options,
+        verify_registration_response,
+        generate_authentication_options,
+        verify_authentication_response,
+        options_to_json,
+    )
+    from webauthn.helpers.base64url_to_bytes import base64url_to_bytes
+    from webauthn.helpers.bytes_to_base64url import bytes_to_base64url
+    from webauthn.helpers.structs import (
+        PublicKeyCredentialDescriptor,
+        UserVerificationRequirement,
+        AuthenticatorSelectionCriteria,
+        ResidentKeyRequirement,
+    )
+    _WEBAUTHN_AVAILABLE = True
+except Exception:  # pragma: no cover - safe fallback when dependency is missing
+    _WEBAUTHN_AVAILABLE = False
+    generate_registration_options = None
+    verify_registration_response = None
+    generate_authentication_options = None
+    verify_authentication_response = None
+    options_to_json = None
+    base64url_to_bytes = None
+    bytes_to_base64url = None
+    PublicKeyCredentialDescriptor = None
+    UserVerificationRequirement = None
+    AuthenticatorSelectionCriteria = None
+    ResidentKeyRequirement = None
 
 logger = logging.getLogger(__name__)
 
@@ -21,33 +51,21 @@ _DUMMY_HASH = generate_password_hash('__dummy__', method='scrypt')
 auth = Blueprint('auth', __name__)
 
 
-short_session_cookie_name = "cbo_short_session"
+PASSKEY_CHALLENGE_TTL_SECONDS = 300
 
-# Read environment variables safely (returns None if missing)
-API_SECRET = os.getenv("API_SECRET")
-PROJECT_ID = os.getenv("PROJECT_ID")
-FRONTEND_URI = os.getenv("FRONTEND_URI")
 
-corbado_config = None
-corbado_enabled = all([API_SECRET, PROJECT_ID, FRONTEND_URI])
-
-# Config has a default values for 'short_session_cookie_name' and 'BACKEND_API'
-if corbado_enabled:
-    config: Config = Config(
-        api_secret=os.environ['API_SECRET'],
-        project_id=os.environ['PROJECT_ID'],
-        frontend_api=os.environ['FRONTEND_URI'],
-        backend_api="https://backendapi.cloud.corbado.io",
+def _passkey_enabled() -> bool:
+    return bool(
+        _WEBAUTHN_AVAILABLE
+        and current_app.config.get("PASSKEY_RP_ID")
+        and current_app.config.get("PASSKEY_RP_NAME")
+        and current_app.config.get("PASSKEY_ORIGIN")
     )
-    config.frontend_api = os.environ['FRONTEND_URI']
-
-    # Initialize SDK
-    sdk: CorbadoSDK = CorbadoSDK(config=config)
 
 
 @auth.route('/login')
 def login():
-    return render_template('login.html', corbado_enabled=corbado_enabled)
+    return render_template('login.html', passkey_enabled=_passkey_enabled())
 
 
 @auth.route('/login', methods=['POST'])
@@ -257,46 +275,95 @@ def account_owner_required(f):
 
 @auth.route('/passkey_login')
 def login_passkey():
-
-    if corbado_enabled:
-        project_id = os.environ['PROJECT_ID']
-        frontend_uri = os.environ['FRONTEND_URI']
-
-        return render_template('passkey_login.html', project_id=project_id, frontend_uri=frontend_uri)
-    else:
+    if not _passkey_enabled():
         flash('Passkey authentication is not enabled.')
         return redirect(url_for('auth.login'))
+    return render_template('passkey_login.html')
 
 
-@auth.route('/passkey_login_post', methods=['POST'])
+@auth.route('/passkey_login/options', methods=['POST'])
 @limiter.limit("10 per minute")
-def login_passkey_post():
+def passkey_login_options():
+    if not _passkey_enabled():
+        return jsonify({"error": "Passkey authentication is not enabled."}), 400
 
-    if not corbado_enabled:
-        flash('Passkey authentication is not enabled.')
-        return redirect(url_for('auth.login'))
-
-    auth_user = get_authenticated_user_from_cookie()
-    if auth_user:
-        email_identifiers = sdk.identifiers.list_all_emails_by_user_id(user_id=auth_user.user_id)
-        email = email_identifiers[0].value
-    else:
-        # use more sophisticated error handling in production
-        raise Unauthorized()
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get('email') or '').strip().lower()
+    if not email:
+        return jsonify({"error": "Email is required."}), 400
 
     user = User.query.filter_by(email=email).first()
+    if not user or not user.is_active or not user.passkey_credentials:
+        return jsonify({"error": "No passkeys are registered for this account."}), 400
 
-    # check if the user actually exists
-    if not user:
-        flash('Please check your login details and try again.')
+    allow_credentials = [
+        PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
+        for c in user.passkey_credentials
+    ]
+    options = generate_authentication_options(
+        rp_id=current_app.config["PASSKEY_RP_ID"],
+        allow_credentials=allow_credentials,
+        user_verification=UserVerificationRequirement.REQUIRED,
+    )
+    session["passkey_login_challenge"] = bytes_to_base64url(options.challenge)
+    session["passkey_login_user_id"] = user.id
+    session["passkey_login_expires_at"] = int(datetime.now(timezone.utc).timestamp()) + PASSKEY_CHALLENGE_TTL_SECONDS
+
+    return jsonify(json.loads(options_to_json(options)))
+
+
+@auth.route('/passkey_login/verify', methods=['POST'])
+@limiter.limit("10 per minute")
+def login_passkey_post():
+    if not _passkey_enabled():
+        flash('Passkey authentication is not enabled.')
         return redirect(url_for('auth.login'))
 
-    # check if the user account is active
+    challenge = session.get("passkey_login_challenge")
+    user_id = session.get("passkey_login_user_id")
+    expires_at = session.get("passkey_login_expires_at", 0)
+    if not challenge or not user_id or int(datetime.now(timezone.utc).timestamp()) > int(expires_at):
+        flash("Passkey authentication session expired. Please try again.")
+        return redirect(url_for('auth.login_passkey'))
+
+    credential = request.get_json(silent=True) or {}
+    raw_id = credential.get("id")
+    if not raw_id:
+        flash("Invalid passkey response.")
+        return redirect(url_for('auth.login_passkey'))
+
+    user = User.query.get(user_id)
+    stored_credential = PasskeyCredential.query.filter_by(credential_id=raw_id, user_id=user_id).first()
+    if not user or not stored_credential:
+        flash("Passkey not recognized for this account.")
+        return redirect(url_for('auth.login_passkey'))
+
+    try:
+        verification = verify_authentication_response(
+            credential=credential,
+            expected_challenge=challenge,
+            expected_origin=current_app.config["PASSKEY_ORIGIN"],
+            expected_rp_id=current_app.config["PASSKEY_RP_ID"],
+            credential_public_key=base64url_to_bytes(stored_credential.public_key),
+            credential_current_sign_count=stored_credential.sign_count,
+            require_user_verification=True,
+        )
+    except Exception as exc:
+        logger.warning("Passkey login verification failed: %s", exc)
+        flash("Passkey verification failed. Please try again.")
+        return redirect(url_for('auth.login'))
+
     if not user.is_active:
         flash('Your account is pending approval. Please contact an administrator.')
         return redirect(url_for('auth.login'))
 
-    # if the above check passes, then we know the user has the right credentials
+    stored_credential.sign_count = verification.new_sign_count
+    stored_credential.last_used_at = datetime.now(timezone.utc)
+    db.session.commit()
+    session.pop("passkey_login_challenge", None)
+    session.pop("passkey_login_user_id", None)
+    session.pop("passkey_login_expires_at", None)
+
     login_user(user, remember=True)
     session['name'] = user.name
     session['email'] = user.email
@@ -304,15 +371,98 @@ def login_passkey_post():
     return redirect(url_for('main.index'))
 
 
-def get_authenticated_user_from_cookie() -> UserEntity | None:
-    if not corbado_enabled:
-        return None
+@auth.route('/passkeys')
+@login_required
+def manage_passkeys():
+    if not _passkey_enabled():
+        flash('Passkey authentication is not enabled.')
+        return redirect(url_for('main.settings'))
+    return render_template('passkey_manage.html', credentials=current_user.passkey_credentials)
 
-    session_token = request.cookies.get('cbo_session_token')
-    if not session_token:
-        return None
+
+@auth.route('/passkeys/register/options', methods=['POST'])
+@login_required
+@limiter.limit("10 per minute")
+def passkey_register_options():
+    if not _passkey_enabled():
+        return jsonify({"error": "Passkey authentication is not enabled."}), 400
+
+    exclude_credentials = [
+        PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
+        for c in current_user.passkey_credentials
+    ]
+    options = generate_registration_options(
+        rp_id=current_app.config["PASSKEY_RP_ID"],
+        rp_name=current_app.config["PASSKEY_RP_NAME"],
+        user_id=str(current_user.id).encode("utf-8"),
+        user_name=current_user.email,
+        user_display_name=current_user.name or current_user.email,
+        exclude_credentials=exclude_credentials,
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            resident_key=ResidentKeyRequirement.PREFERRED
+        ),
+        user_verification=UserVerificationRequirement.REQUIRED,
+    )
+    session["passkey_register_challenge"] = bytes_to_base64url(options.challenge)
+    session["passkey_register_expires_at"] = int(datetime.now(timezone.utc).timestamp()) + PASSKEY_CHALLENGE_TTL_SECONDS
+    return jsonify(json.loads(options_to_json(options)))
+
+
+@auth.route('/passkeys/register/verify', methods=['POST'])
+@login_required
+@limiter.limit("10 per minute")
+def passkey_register_verify():
+    if not _passkey_enabled():
+        return jsonify({"error": "Passkey authentication is not enabled."}), 400
+
+    challenge = session.get("passkey_register_challenge")
+    expires_at = session.get("passkey_register_expires_at", 0)
+    if not challenge or int(datetime.now(timezone.utc).timestamp()) > int(expires_at):
+        return jsonify({"error": "Passkey registration session expired."}), 400
+
+    credential = request.get_json(silent=True) or {}
+    label = (credential.pop("label", "") or "").strip()[:120] or None
     try:
-        return sdk.sessions.validate_token(session_token)
+        verification = verify_registration_response(
+            credential=credential,
+            expected_challenge=challenge,
+            expected_origin=current_app.config["PASSKEY_ORIGIN"],
+            expected_rp_id=current_app.config["PASSKEY_RP_ID"],
+            require_user_verification=True,
+        )
     except Exception as exc:
-        logger.warning("Passkey session token validation failed: %s", exc)
-        raise Unauthorized()
+        logger.warning("Passkey registration verification failed: %s", exc)
+        return jsonify({"error": "Passkey registration verification failed."}), 400
+
+    credential_id = bytes_to_base64url(verification.credential_id)
+    existing = PasskeyCredential.query.filter_by(credential_id=credential_id).first()
+    if existing:
+        return jsonify({"error": "This passkey is already registered."}), 400
+
+    new_credential = PasskeyCredential(
+        user_id=current_user.id,
+        credential_id=credential_id,
+        public_key=bytes_to_base64url(verification.credential_public_key),
+        sign_count=verification.sign_count,
+        transports=None,
+        label=label,
+        last_used_at=datetime.now(timezone.utc),
+    )
+    db.session.add(new_credential)
+    db.session.commit()
+    session.pop("passkey_register_challenge", None)
+    session.pop("passkey_register_expires_at", None)
+    return jsonify({"ok": True})
+
+
+@auth.route('/passkeys/<int:credential_id>/delete', methods=['POST'])
+@login_required
+def delete_passkey(credential_id: int):
+    credential = PasskeyCredential.query.filter_by(id=credential_id, user_id=current_user.id).first()
+    if not credential:
+        flash('Passkey not found.')
+        return redirect(url_for('auth.manage_passkeys'))
+    db.session.delete(credential)
+    db.session.commit()
+    flash('Passkey removed.')
+    return redirect(url_for('auth.manage_passkeys'))

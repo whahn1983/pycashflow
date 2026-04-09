@@ -1,5 +1,6 @@
 from flask_login import UserMixin
 from app import db
+from datetime import datetime, timezone
 
 
 class User(UserMixin, db.Model):
@@ -148,3 +149,17 @@ class AISettings(db.Model):
         db.UniqueConstraint('user_id', name='_ai_settings_user_uc'),
     )
 
+
+class PasskeyCredential(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    credential_id = db.Column(db.String(512), nullable=False, unique=True, index=True)
+    public_key = db.Column(db.Text, nullable=False)
+    sign_count = db.Column(db.Integer, nullable=False, default=0)
+    transports = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    last_used_at = db.Column(db.DateTime, nullable=True)
+    label = db.Column(db.String(120), nullable=True)
+
+    # Relationships
+    user = db.relationship('User', backref='passkey_credentials')

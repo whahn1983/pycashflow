@@ -230,10 +230,12 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
    BOOTSTRAP_ADMIN_EMAIL=admin@example.com
    BOOTSTRAP_ADMIN_PASSWORD=your_strong_password
 
-   # Optional: For Passkey Authentication
-   PROJECT_ID=your_corbado_project_id
-   API_SECRET=your_corbado_api_secret
-   FRONTEND_URI=https://your-domain.com
+   # Optional: For Passkey Authentication (WebAuthn / py_webauthn)
+   # rp_id should match your effective domain (e.g., app.example.com)
+   PASSKEY_RP_ID=localhost
+   PASSKEY_RP_NAME=PyCashFlow
+   # Must exactly match scheme + host (+port in local dev), e.g. http://localhost:5000
+   PASSKEY_ORIGIN=http://localhost:5000
 
    # Optional: Database URL (defaults to SQLite)
    DATABASE_URL=sqlite:///data/db.sqlite

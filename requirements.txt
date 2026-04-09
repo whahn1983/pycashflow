@@ -10,7 +10,7 @@ natsort
 Flask-Migrate
 waitress
 werkzeug
-passkeys
+webauthn
 python-dotenv
 cryptography
 openai
