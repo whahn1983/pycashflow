@@ -76,13 +76,13 @@ def register_error_handlers(blueprint):
         from flask import request
         if request.path.startswith("/api/"):
             return not_found()
-        # Let Flask's default handler render the HTML 404 page.
-        from werkzeug.exceptions import NotFound
-        raise NotFound()
+        # Preserve Flask's normal non-API 404 response.
+        return exc
 
     @blueprint.app_errorhandler(405)
     def handle_405(exc):
         from flask import request
         if request.path.startswith("/api/"):
             return api_error("Method not allowed", "method_not_allowed", 405)
-        raise exc
+        # Preserve Flask's normal non-API 405 response.
+        return exc
