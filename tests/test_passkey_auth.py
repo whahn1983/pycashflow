@@ -44,7 +44,7 @@ def test_passkey_register_verify_creates_credential(client, app_ctx, monkeypatch
     _login_session(client, user.id)
 
     with client.session_transaction() as sess:
-        sess["passkey_register_challenge"] = "reg-challenge"
+        sess["passkey_register_challenge"] = "cmVnLWNoYWxsZW5nZQ"
         sess["passkey_register_expires_at"] = int((datetime.now(timezone.utc) + timedelta(minutes=2)).timestamp())
 
     monkeypatch.setattr(

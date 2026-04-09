@@ -341,7 +341,7 @@ def login_passkey_post():
     try:
         verification = verify_authentication_response(
             credential=credential,
-            expected_challenge=challenge,
+            expected_challenge=base64url_to_bytes(challenge),
             expected_origin=current_app.config["PASSKEY_ORIGIN"],
             expected_rp_id=current_app.config["PASSKEY_RP_ID"],
             credential_public_key=base64url_to_bytes(stored_credential.public_key),
@@ -425,7 +425,7 @@ def passkey_register_verify():
     try:
         verification = verify_registration_response(
             credential=credential,
-            expected_challenge=challenge,
+            expected_challenge=base64url_to_bytes(challenge),
             expected_origin=current_app.config["PASSKEY_ORIGIN"],
             expected_rp_id=current_app.config["PASSKEY_RP_ID"],
             require_user_verification=True,
