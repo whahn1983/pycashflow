@@ -399,9 +399,9 @@ def passkey_register_options():
         user_display_name=current_user.name or current_user.email,
         exclude_credentials=exclude_credentials,
         authenticator_selection=AuthenticatorSelectionCriteria(
-            resident_key=ResidentKeyRequirement.PREFERRED
+            resident_key=ResidentKeyRequirement.PREFERRED,
+            user_verification=UserVerificationRequirement.REQUIRED,
         ),
-        user_verification=UserVerificationRequirement.REQUIRED,
     )
     session["passkey_register_challenge"] = bytes_to_base64url(options.challenge)
     session["passkey_register_expires_at"] = int(datetime.now(timezone.utc).timestamp()) + PASSKEY_CHALLENGE_TTL_SECONDS
