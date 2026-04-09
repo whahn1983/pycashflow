@@ -80,7 +80,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 ### Modern Authentication
 - **Traditional Login**: Email/password authentication with Scrypt password hashing
 - **Two-Factor Authentication (2FA)**: TOTP-based 2FA with QR code setup and backup codes
-- **Passkey Support**: Modern passwordless authentication via Corbado integration
+- **Passkey Support**: Modern passwordless authentication via built-in WebAuthn (py_webauthn) support
 - **Session Management**: Secure session handling with "remember me" functionality
 
 ### Progressive Web App (PWA)
@@ -117,7 +117,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - **Werkzeug**: Scrypt password hashing
 - **pyotp**: TOTP-based two-factor authentication
 - **qrcode**: QR code generation for authenticator app setup
-- **Corbado SDK**: Passkey authentication (optional)
+- **webauthn (py_webauthn)**: Passkey authentication (optional)
 - **python-dotenv**: Secure environment variable management
 
 ### AI
