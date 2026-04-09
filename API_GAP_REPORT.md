@@ -115,6 +115,7 @@ These routes are tightly coupled to Jinja2 templates and WTForms. Extracting the
 | `GET /signup` | GET/POST | Signup form |
 | `GET /passkey_login` | GET | Passkey login form |
 | `GET /passkeys` | GET | Manage passkeys |
+| `POST /passkey_login/verify` | POST | Passkey auth — returns redirects + flash messages on both success and failure (HTML/session flow, not JSON) |
 
 ### 3b. Already Returning JSON (Partial API Surface)
 
@@ -124,7 +125,6 @@ These exist today and can be referenced/adapted:
 |-------|--------|---------|
 | `POST /ai_insights` | POST | JSON array of insight objects |
 | `POST /passkey_login/options` | POST | WebAuthn challenge JSON |
-| `POST /passkey_login/verify` | POST | JSON result + sets session |
 | `POST /passkeys/register/options` | POST | WebAuthn registration JSON |
 | `POST /passkeys/register/verify` | POST | JSON result |
 | `GET /manifest.json` | GET | PWA manifest JSON |
@@ -229,7 +229,8 @@ This single endpoint can power the entire iOS home screen by calling `update_cas
 | # | Method | Path | Purpose |
 |---|--------|------|---------|
 | 11 | GET | `/api/v1/projections` | 90-day time-series (date, balance, transactions) |
-| 12 | POST | `/api/v1/insights` | Trigger AI insights (proxy to ai_insights.py) |
+| 12 | GET | `/api/v1/insights` | Return cached AI insights from `AISettings.last_insights` |
+| 13 | POST | `/api/v1/insights/refresh` | Trigger fresh AI insights generation, update cache, return new insights |
 
 ---
 
@@ -240,9 +241,9 @@ The goal is to add APIs **without touching any existing route** so the web app k
 ### Step 0 — Preparation (no behavior change)
 - [ ] Create `app/api/__init__.py` — register a new `api` blueprint with `url_prefix="/api/v1"`
 - [ ] Create `app/api/errors.py` — standardize JSON error responses (`{"error": "...", "code": 400}`)
-- [ ] Create `app/api/auth_utils.py` — token extraction middleware (check `Authorization: Bearer <token>` header, fall back to Flask-Login session for backwards compatibility)
+- [ ] Create `app/api/auth_utils.py` — token extraction middleware (check `Authorization: Bearer <token>` header; session-cookie fallback is **read-only** — mutating methods POST/PUT/DELETE via session auth must still pass a CSRF token)
 - [ ] Create `UserToken` model (`id`, `user_id`, `token_hash`, `created_at`, `expires_at`) and generate Alembic migration
-- [ ] Exempt the `/api/v1/*` prefix from Flask-WTF CSRF in `create_app()`
+- [ ] Exempt the `/api/v1/*` prefix from Flask-WTF CSRF **only for requests that present a valid Bearer token**; requests authenticated via session cookie retain full CSRF enforcement to prevent CSRF attacks on browser-originated mutations
 
 ### Step 1 — Auth endpoints
 - [ ] `POST /api/v1/auth/login` — validate credentials, create token, return `{"token": "...", "user": {...}}`
@@ -289,7 +290,7 @@ The goal is to add APIs **without touching any existing route** so the web app k
 |------|----------|------------|
 | Token auth coexisting with session auth breaks existing tests | Medium | Use `@api_login_required` decorator that checks both; don't touch `@login_required` |
 | pandas DataFrames are slow to serialize for every API call | Medium | Cache `update_cash()` result in Redis/memory per user with short TTL (30s) |
-| CSRF exemption on `/api/v1/*` creates CSRF gap if web app ever calls those URLs | Low | Ensure web app never uses the API URLs; keep using Flask-WTF on all existing routes |
+| CSRF exemption on `/api/v1/*` combined with session-cookie fallback removes CSRF protection for browser-originated mutations | Medium | Exempt CSRF only when a valid Bearer token is present; session-authenticated requests to POST/PUT/DELETE must still supply a CSRF token; keep Flask-WTF enforcement on all existing web routes |
 | OpenAI API latency (2–10s) makes `/api/v1/insights/refresh` slow for mobile | Medium | Make insights async; return cached `last_insights` immediately and refresh in background |
 | SQLite concurrency under concurrent API + web requests | Medium | Migrate to PostgreSQL for production; SQLite WAL mode is acceptable for single-user |
 | Token storage on iOS (Keychain) — token must have a reasonable expiry | Low | Set token TTL (e.g., 30 days); implement refresh tokens if needed later |
