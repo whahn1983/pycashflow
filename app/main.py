@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import (
     Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip,
-    GlobalEmailSettings, AISettings, PasskeyCredential,
+    GlobalEmailSettings, AISettings, PasskeyCredential, UserToken,
 )
 from app import db, limiter
 from datetime import datetime, timezone
@@ -824,6 +824,9 @@ def delete_user(id):
 
             # Delete all passkey credentials for this user
             db.session.query(PasskeyCredential).filter_by(user_id=user_id).delete()
+
+            # Delete all API tokens for this user
+            db.session.query(UserToken).filter_by(user_id=user_id).delete()
 
             # Now delete the user
             db.session.delete(user)
