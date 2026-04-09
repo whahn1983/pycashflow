@@ -1,7 +1,10 @@
 from flask import request, redirect, url_for, send_from_directory, flash, send_file, Response, session
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
-from .models import Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip, GlobalEmailSettings, AISettings
+from .models import (
+    Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip,
+    GlobalEmailSettings, AISettings, PasskeyCredential,
+)
 from app import db, limiter
 from datetime import datetime, timezone
 import os
@@ -818,6 +821,9 @@ def delete_user(id):
 
             # Delete all email configs for this user
             db.session.query(Email).filter_by(user_id=user_id).delete()
+
+            # Delete all passkey credentials for this user
+            db.session.query(PasskeyCredential).filter_by(user_id=user_id).delete()
 
             # Now delete the user
             db.session.delete(user)

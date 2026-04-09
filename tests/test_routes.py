@@ -15,6 +15,10 @@ status codes, redirects, and flash messages where they are easy to assert.
 """
 
 import pytest
+from werkzeug.security import generate_password_hash
+
+from app import db
+from app.models import User, PasskeyCredential
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -179,3 +183,34 @@ class TestCreateScenario:
         resp = self._post_create_scenario(auth_client, type="Transfer")
         assert resp.status_code == 200
         assert _flashed(resp.data, "invalid") or _flashed(resp.data, "type")
+
+
+def test_delete_user_removes_passkey_credentials(auth_client, app_ctx):
+    owner = User.query.filter_by(email="admin@test.local").first()
+    guest = User(
+        email="guest-passkey-delete@test.local",
+        password=generate_password_hash("testpass123", method="scrypt"),
+        name="Guest To Delete",
+        admin=False,
+        is_active=True,
+        account_owner_id=owner.id,
+        is_global_admin=False,
+    )
+    db.session.add(guest)
+    db.session.flush()
+
+    credential = PasskeyCredential(
+        user_id=guest.id,
+        credential_id="guest-credential-to-delete",
+        public_key="pk",
+        sign_count=0,
+        label="Guest Key",
+    )
+    db.session.add(credential)
+    db.session.commit()
+
+    resp = auth_client.post(f"/delete_user/{guest.id}", follow_redirects=False)
+
+    assert resp.status_code in (301, 302)
+    assert User.query.filter_by(id=guest.id).first() is None
+    assert PasskeyCredential.query.filter_by(credential_id="guest-credential-to-delete").first() is None
