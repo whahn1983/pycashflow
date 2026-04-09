@@ -87,6 +87,11 @@ def create_app():
     from .main import main as main_blueprint
     app.register_blueprint(main_blueprint)
 
+    # API v1 blueprint — CSRF-exempt; uses Bearer token auth
+    from .api import api as api_blueprint
+    app.register_blueprint(api_blueprint, url_prefix="/api/v1")
+    csrf.exempt(api_blueprint)
+
     # Don't use db.create_all() - use flask db upgrade instead
     # with app.app_context():
     #     db.create_all()

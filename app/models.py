@@ -163,3 +163,23 @@ class PasskeyCredential(db.Model):
 
     # Relationships
     user = db.relationship('User', backref='passkey_credentials')
+
+
+class UserToken(db.Model):
+    """Opaque bearer tokens for stateless API authentication.
+
+    The raw token is returned to the client exactly once (at creation).
+    Only its SHA-256 hash is stored server-side, so a database breach cannot
+    be used to impersonate users directly.
+    """
+    __tablename__ = 'user_tokens'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    # SHA-256 hex digest of the raw token
+    token_hash = db.Column(db.String(64), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    expires_at = db.Column(db.DateTime, nullable=False)
+
+    # Relationships
+    user = db.relationship('User', backref='api_tokens')
