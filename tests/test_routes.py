@@ -17,8 +17,6 @@ status codes, redirects, and flash messages where they are easy to assert.
 import pytest
 from werkzeug.security import generate_password_hash
 
-from app import db
-from app.models import User, PasskeyCredential
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -185,9 +183,25 @@ class TestCreateScenario:
         assert _flashed(resp.data, "invalid") or _flashed(resp.data, "type")
 
 
-def test_delete_user_removes_passkey_credentials(auth_client, app_ctx):
-    owner = User.query.filter_by(email="admin@test.local").first()
-    guest = User(
+def test_delete_user_removes_passkey_credentials(
+    auth_client, app_ctx, user_model, passkey_credential_model
+):
+    db = app_ctx
+    owner = user_model.query.filter_by(email="admin@test.local").first()
+    if owner is None:
+        owner = user_model(
+            email="admin@test.local",
+            password=generate_password_hash("testpass123", method="scrypt"),
+            name="Test Admin",
+            admin=True,
+            is_active=True,
+            account_owner_id=None,
+            is_global_admin=False,
+        )
+        db.session.add(owner)
+        db.session.flush()
+
+    guest = user_model(
         email="guest-passkey-delete@test.local",
         password=generate_password_hash("testpass123", method="scrypt"),
         name="Guest To Delete",
@@ -199,7 +213,7 @@ def test_delete_user_removes_passkey_credentials(auth_client, app_ctx):
     db.session.add(guest)
     db.session.flush()
 
-    credential = PasskeyCredential(
+    credential = passkey_credential_model(
         user_id=guest.id,
         credential_id="guest-credential-to-delete",
         public_key="pk",
@@ -212,5 +226,7 @@ def test_delete_user_removes_passkey_credentials(auth_client, app_ctx):
     resp = auth_client.post(f"/delete_user/{guest.id}", follow_redirects=False)
 
     assert resp.status_code in (301, 302)
-    assert User.query.filter_by(id=guest.id).first() is None
-    assert PasskeyCredential.query.filter_by(credential_id="guest-credential-to-delete").first() is None
+    assert user_model.query.filter_by(id=guest.id).first() is None
+    assert passkey_credential_model.query.filter_by(
+        credential_id="guest-credential-to-delete"
+    ).first() is None

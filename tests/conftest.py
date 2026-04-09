@@ -31,7 +31,11 @@ os.environ.setdefault("PASSKEY_ORIGIN", "http://localhost")
 # conftest.py is loaded before test_*.py files, so all imports here use the
 # real modules.  Stubs installed later do NOT affect already-bound names.
 from app import create_app as _create_app, db as _db               # noqa: E402
-from app.models import User as _User, Balance as _Balance           # noqa: E402
+from app.models import (
+    User as _User,
+    Balance as _Balance,
+    PasskeyCredential as _PasskeyCredential,
+)  # noqa: E402
 import _helpers  # noqa: F401  – pre-load real cashflow refs before any test-module stubs
 from werkzeug.security import generate_password_hash                # noqa: E402
 
@@ -103,3 +107,15 @@ def app_ctx(flask_app):
     """Push an application context; useful for tests that query the DB directly."""
     with flask_app.app_context():
         yield _db
+
+
+@pytest.fixture(scope="session")
+def user_model():
+    """Return the real User model captured before any module stubs are installed."""
+    return _User
+
+
+@pytest.fixture(scope="session")
+def passkey_credential_model():
+    """Return the real PasskeyCredential model captured before stubs are installed."""
+    return _PasskeyCredential
