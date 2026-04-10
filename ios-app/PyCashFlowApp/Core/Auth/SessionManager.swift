@@ -12,6 +12,8 @@ final class SessionManager: ObservableObject {
         self.user = user
         if TokenKeychainStore.saveToken(token) {
             UserDefaults.standard.removeObject(forKey: "api_token")
+        } else {
+            UserDefaults.standard.set(token, forKey: "api_token")
         }
     }
 
