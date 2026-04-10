@@ -90,7 +90,11 @@ struct SettingsView: View {
                 body: Payload(current_password: currentPassword, new_password: newPassword),
                 as: APIEnvelope<[String: String]>.self
             )
-            await MainActor.run { currentPassword = ""; newPassword = "" }
+            await MainActor.run {
+                currentPassword = ""
+                newPassword = ""
+                session.clear()
+            }
         } catch {
             await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to change password" }
         }

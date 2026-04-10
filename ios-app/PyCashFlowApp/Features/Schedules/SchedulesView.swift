@@ -59,7 +59,15 @@ struct SchedulesView: View {
     private func load() async {
         guard let token = session.token else { return }
         do {
-            let response: APIListEnvelope<ScheduleDTO> = try await APIClient.shared.request("schedules?limit=100&offset=0", token: token, as: APIListEnvelope<ScheduleDTO>.self)
+            let response: APIListEnvelope<ScheduleDTO> = try await APIClient.shared.request(
+                "schedules",
+                queryItems: [
+                    URLQueryItem(name: "limit", value: "100"),
+                    URLQueryItem(name: "offset", value: "0")
+                ],
+                token: token,
+                as: APIListEnvelope<ScheduleDTO>.self
+            )
             await MainActor.run { schedules = response.data }
         } catch {
             await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to load schedules" }
