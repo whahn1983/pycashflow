@@ -7,11 +7,26 @@ final class APIClient {
     func request<T: Decodable>(
         _ path: String,
         method: String = "GET",
+        queryItems: [URLQueryItem] = [],
         token: String? = nil,
         body: Encodable? = nil,
         as: T.Type
     ) async throws -> T {
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        let endpoint = baseURL.appendingPathComponent(path)
+        var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)
+        if !queryItems.isEmpty {
+            components?.queryItems = queryItems
+        }
+        guard let requestURL = components?.url else {
+            throw APIErrorEnvelope(
+                error: "Invalid request URL",
+                code: "invalid_request_url",
+                status: 500,
+                fields: nil
+            )
+        }
+
+        var request = URLRequest(url: requestURL)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let token {

@@ -53,7 +53,15 @@ struct AccountsView: View {
         guard let token = session.token else { return }
         do {
             async let current: APIEnvelope<BalanceDTO> = APIClient.shared.request("balance", token: token, as: APIEnvelope<BalanceDTO>.self)
-            async let list: APIListEnvelope<BalanceDTO> = APIClient.shared.request("balance/history?limit=20&offset=0", token: token, as: APIListEnvelope<BalanceDTO>.self)
+            async let list: APIListEnvelope<BalanceDTO> = APIClient.shared.request(
+                "balance/history",
+                queryItems: [
+                    URLQueryItem(name: "limit", value: "20"),
+                    URLQueryItem(name: "offset", value: "0")
+                ],
+                token: token,
+                as: APIListEnvelope<BalanceDTO>.self
+            )
             let (currentRes, listRes) = try await (current, list)
             await MainActor.run {
                 balance = currentRes.data
