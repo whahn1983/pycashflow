@@ -11,5 +11,6 @@ struct RootView: View {
                 LoginView()
             }
         }
+        .preferredColorScheme(.dark)
     }
 }
