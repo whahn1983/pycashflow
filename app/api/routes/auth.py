@@ -1,30 +1,15 @@
-"""API v1 authentication routes.
+"""API v1 authentication routes."""
 
-Endpoints
----------
-POST   /api/v1/auth/login    Email + password → bearer token
-POST   /api/v1/auth/logout   Invalidate the current bearer token
-GET    /api/v1/auth/me       Current authenticated user profile
-
-These endpoints are CSRF-exempt (the entire ``api`` blueprint is exempt).
-Bearer tokens must be sent as ``Authorization: Bearer <token>`` on
-subsequent requests.
-
-Import note
------------
-``User`` and ``_DUMMY_HASH`` are imported at module level so they reference
-the real objects captured during app creation, before test stubs can replace
-``sys.modules['app.models']`` or ``sys.modules['app.auth']``.
-"""
+from datetime import datetime, timedelta, timezone
 
 from flask import current_app, request
-from werkzeug.security import check_password_hash
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from werkzeug.security import check_password_hash, generate_password_hash
 
-from app import limiter
-
-# Module-level imports: bound to real objects at app-creation time.
+from app import limiter, db
 from app.models import User
 from app.auth import _DUMMY_HASH
+from app.totp_utils import decrypt_totp_secret, verify_totp, verify_and_consume_backup_code
 
 from app.api import api
 from app.api.auth_utils import (
@@ -32,34 +17,49 @@ from app.api.auth_utils import (
     create_token_for_user,
     delete_token,
     get_api_user,
+    hash_token,
 )
-from app.api.errors import unauthorized, validation_error
+from app.api.errors import unauthorized, validation_error, forbidden
 from app.api.responses import api_ok
 from app.api.serializers import serialize_user
 
 
-# ── POST /api/v1/auth/login ───────────────────────────────────────────────────
+_TWOFA_CHALLENGE_MAX_AGE_SECONDS = 300
+
+
+def _challenge_serializer() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="api-login-2fa")
+
+
+def _build_twofa_challenge(user: User) -> str:
+    payload = {
+        "uid": user.id,
+        "email": user.email,
+        "nonce": hash_token(f"{user.id}:{datetime.now(timezone.utc).isoformat()}"),
+    }
+    return _challenge_serializer().dumps(payload)
+
+
+def _verify_twofa_challenge(challenge: str) -> User | None:
+    try:
+        payload = _challenge_serializer().loads(
+            challenge,
+            max_age=_TWOFA_CHALLENGE_MAX_AGE_SECONDS,
+        )
+    except (BadSignature, SignatureExpired):
+        return None
+
+    user_id = payload.get("uid")
+    if not isinstance(user_id, int):
+        return None
+    return db.session.get(User, user_id)
+
 
 @api.route("/auth/login", methods=["POST"])
 @limiter.limit("10 per minute", exempt_when=lambda: current_app.testing)
 def api_login():
-    """Authenticate with email + password and receive a bearer token.
-
-    Request body (JSON):
-        { "email": "user@example.com", "password": "s3cr3t" }
-
-    Response 200:
-        { "data": { "token": "<raw_token>", "user": { ... } } }
-
-    Response 422:
-        Missing or empty ``email`` / ``password`` field.
-
-    Response 401:
-        Credentials invalid or account inactive.
-    """
     body = request.get_json(silent=True) or {}
 
-    # Validate presence of required fields
     errors: dict = {}
     if not body.get("email", "").strip():
         errors["email"] = "Email is required"
@@ -73,15 +73,18 @@ def api_login():
 
     user = User.query.filter_by(email=email).first()
 
-    # Constant-time check: always run check_password_hash even when the user
-    # is not found, so response time does not reveal whether the email exists.
     candidate_hash = user.password if user else _DUMMY_HASH
     password_ok = check_password_hash(candidate_hash, password)
 
-    # 2FA check is intentionally in the same condition to avoid leaking
-    # whether the password was correct (credential-validation oracle).
-    if not password_ok or user is None or not user.is_active or user.twofa_enabled:
+    if not password_ok or user is None or not user.is_active:
         return unauthorized("Invalid credentials or account is not active")
+
+    if user.twofa_enabled:
+        return api_ok({
+            "twofa_required": True,
+            "challenge": _build_twofa_challenge(user),
+            "user": serialize_user(user),
+        })
 
     raw_token, _record = create_token_for_user(user)
 
@@ -91,20 +94,62 @@ def api_login():
     })
 
 
-# ── POST /api/v1/auth/logout ──────────────────────────────────────────────────
+@api.route("/auth/login/2fa", methods=["POST"])
+@limiter.limit("10 per minute", exempt_when=lambda: current_app.testing)
+def api_login_2fa():
+    body = request.get_json(silent=True) or {}
+    errors: dict = {}
+    if not body.get("challenge", "").strip():
+        errors["challenge"] = "Challenge is required"
+    if not body.get("code", "").strip():
+        errors["code"] = "Code is required"
+    if errors:
+        return validation_error(errors)
+
+    user = _verify_twofa_challenge(body["challenge"].strip())
+    if user is None or not user.is_active or not user.twofa_enabled:
+        return unauthorized("Invalid or expired 2FA challenge")
+
+    submitted = body["code"].strip()
+    twofa_ok = False
+
+    try:
+        secret = decrypt_totp_secret(user.twofa_secret) if user.twofa_secret else ""
+    except Exception:
+        secret = ""
+
+    if secret:
+        twofa_ok = verify_totp(secret, submitted)
+
+    if not twofa_ok:
+        twofa_ok = verify_and_consume_backup_code(user, submitted)
+
+    if not twofa_ok:
+        return unauthorized("Invalid verification code")
+
+    raw_token, _record = create_token_for_user(user)
+    return api_ok({"token": raw_token, "user": serialize_user(user)})
+
+
+@api.route("/auth/refresh", methods=["POST"])
+@api_login_required
+def api_refresh_token():
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return unauthorized("Bearer token required for refresh")
+
+    raw_token = auth_header[7:].strip()
+    if not raw_token:
+        return unauthorized("Bearer token required for refresh")
+
+    delete_token(raw_token)
+    new_raw_token, _record = create_token_for_user(get_api_user())
+    return api_ok({"token": new_raw_token, "user": serialize_user(get_api_user())})
+
 
 @api.route("/auth/logout", methods=["POST"])
 @api_login_required
 def api_logout():
-    """Invalidate the bearer token used in this request.
-
-    If the request was authenticated via session cookie (no Bearer header),
-    the session is not modified — the caller should clear it via the
-    existing ``/logout`` route.
-
-    Response 200:
-        { "data": { "message": "Logged out" } }
-    """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         raw_token = auth_header[7:].strip()
@@ -113,14 +158,33 @@ def api_logout():
     return api_ok({"message": "Logged out"})
 
 
-# ── GET /api/v1/auth/me ───────────────────────────────────────────────────────
+@api.route("/auth/password", methods=["PUT"])
+@api_login_required
+def api_change_password():
+    user = get_api_user()
+    if not user.admin:
+        return forbidden("Guest users cannot change account passwords")
+
+    body = request.get_json(silent=True) or {}
+    errors: dict = {}
+    if not body.get("current_password", ""):
+        errors["current_password"] = "Current password is required"
+    if not body.get("new_password", ""):
+        errors["new_password"] = "New password is required"
+    if body.get("new_password", "") and len(body["new_password"]) < 8:
+        errors["new_password"] = "New password must be at least 8 characters"
+    if errors:
+        return validation_error(errors)
+
+    if not check_password_hash(user.password, body["current_password"]):
+        return unauthorized("Current password is incorrect")
+
+    user.password = generate_password_hash(body["new_password"], method="scrypt")
+    db.session.commit()
+    return api_ok({"message": "Password updated"})
+
 
 @api.route("/auth/me", methods=["GET"])
 @api_login_required
 def api_me():
-    """Return the authenticated user's public profile.
-
-    Response 200:
-        { "data": { "id": 1, "email": "...", "name": "...", ... } }
-    """
     return api_ok(serialize_user(get_api_user()))

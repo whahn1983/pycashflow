@@ -754,3 +754,41 @@ informational scores and ratios, not currency values.
   no balance record exists.
 - `/risk-score` — always returns a valid score object; when no schedules
   exist the score reflects a neutral assessment.
+
+---
+
+## 2026-04-10 Expansion Update
+
+The following endpoints are now implemented and available for mobile clients:
+
+- Auth:
+  - `POST /api/v1/auth/login/2fa`
+  - `POST /api/v1/auth/refresh`
+  - `PUT /api/v1/auth/password`
+- Settings + AI:
+  - `GET /api/v1/settings`
+  - `GET /api/v1/insights`
+  - `POST /api/v1/insights/refresh`
+- Balances:
+  - `POST /api/v1/balance`
+  - `GET /api/v1/balance/history`
+- Schedules CRUD:
+  - `POST /api/v1/schedules`
+  - `PUT /api/v1/schedules/<id>`
+  - `DELETE /api/v1/schedules/<id>`
+- Scenarios CRUD:
+  - `POST /api/v1/scenarios`
+  - `PUT /api/v1/scenarios/<id>`
+  - `DELETE /api/v1/scenarios/<id>`
+- Holds/Skips mutations:
+  - `POST /api/v1/holds`
+  - `DELETE /api/v1/holds/<id>`
+  - `DELETE /api/v1/holds`
+  - `POST /api/v1/skips`
+  - `DELETE /api/v1/skips/<id>`
+  - `DELETE /api/v1/skips`
+
+Additional behavior updates:
+- Pagination query params `limit` / `offset` are now supported on list endpoints.
+- `/dashboard` now includes both legacy `risk` and serialized `risk_v2`; `risk` is deprecated.
+- Guests remain read-only and receive `403 forbidden` on mutation endpoints.
