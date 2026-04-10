@@ -66,4 +66,10 @@ struct PrimaryButtonStyle: ButtonStyle {
 extension View {
     func appBackground() -> some View { modifier(AppBackground()) }
     func surfaceCard() -> some View { modifier(SurfaceCard()) }
+    func fieldStyle() -> some View {
+        self
+            .padding(12)
+            .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+            .foregroundStyle(AppTheme.textPrimary)
+    }
 }
