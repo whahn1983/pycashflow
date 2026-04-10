@@ -10,8 +10,9 @@ final class SessionManager: ObservableObject {
     func setSession(token: String, user: UserDTO) {
         self.token = token
         self.user = user
-        TokenKeychainStore.saveToken(token)
-        UserDefaults.standard.removeObject(forKey: "api_token")
+        if TokenKeychainStore.saveToken(token) {
+            UserDefaults.standard.removeObject(forKey: "api_token")
+        }
     }
 
     func clear() {
@@ -26,9 +27,8 @@ private enum TokenKeychainStore {
     private static let service = "PyCashFlow"
     private static let account = "api_token"
 
-    static func saveToken(_ token: String) {
-        guard let data = token.data(using: .utf8) else { return }
-        deleteToken()
+    static func saveToken(_ token: String) -> Bool {
+        guard let data = token.data(using: .utf8) else { return false }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -36,7 +36,28 @@ private enum TokenKeychainStore {
             kSecAttrAccount as String: account,
             kSecValueData as String: data
         ]
-        SecItemAdd(query as CFDictionary, nil)
+        let addStatus = SecItemAdd(query as CFDictionary, nil)
+        if addStatus == errSecSuccess {
+            return true
+        }
+
+        guard addStatus == errSecDuplicateItem else {
+            return false
+        }
+
+        let matchQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        let attributesToUpdate: [String: Any] = [
+            kSecValueData as String: data
+        ]
+        let updateStatus = SecItemUpdate(
+            matchQuery as CFDictionary,
+            attributesToUpdate as CFDictionary
+        )
+        return updateStatus == errSecSuccess
     }
 
     static func readTokenMigratingLegacy() -> String? {
@@ -49,8 +70,9 @@ private enum TokenKeychainStore {
             return nil
         }
 
-        saveToken(legacyToken)
-        defaults.removeObject(forKey: account)
+        if saveToken(legacyToken) {
+            defaults.removeObject(forKey: account)
+        }
         return legacyToken
     }
 
