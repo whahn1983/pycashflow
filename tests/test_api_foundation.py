@@ -371,6 +371,14 @@ class TestSerializers:
 
 
 class TestAuthEnhancements:
+    def test_twofa_challenge_mark_consumed_is_single_use(self):
+        challenge = "challenge-token"
+        with api_auth_routes._CONSUMED_TWOFA_CHALLENGES_LOCK:
+            api_auth_routes._CONSUMED_TWOFA_CHALLENGES.clear()
+
+        assert api_auth_routes._try_mark_twofa_challenge_consumed(challenge) is True
+        assert api_auth_routes._try_mark_twofa_challenge_consumed(challenge) is False
+
     def test_login_twofa_required_returns_challenge(self, flask_app, client):
         with flask_app.app_context():
             user = User.query.filter_by(email="admin@test.local").first()
