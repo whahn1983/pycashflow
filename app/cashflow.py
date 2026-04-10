@@ -82,7 +82,7 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
 
     months = 13
     weeks = 53
-    years = 1
+    years = 2
     quarters = 4
     biweeks = 27
 
