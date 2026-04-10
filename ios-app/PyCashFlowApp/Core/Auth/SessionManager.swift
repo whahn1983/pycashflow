@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 final class SessionManager: ObservableObject {
-    @Published var token: String? = TokenKeychainStore.readToken()
+    @Published var token: String? = TokenKeychainStore.readTokenMigratingLegacy()
     @Published var user: UserDTO?
 
     var isAuthenticated: Bool { token != nil }
@@ -39,7 +39,22 @@ private enum TokenKeychainStore {
         SecItemAdd(query as CFDictionary, nil)
     }
 
-    static func readToken() -> String? {
+    static func readTokenMigratingLegacy() -> String? {
+        if let token = readToken() {
+            return token
+        }
+
+        let defaults = UserDefaults.standard
+        guard let legacyToken = defaults.string(forKey: account), !legacyToken.isEmpty else {
+            return nil
+        }
+
+        saveToken(legacyToken)
+        defaults.removeObject(forKey: account)
+        return legacyToken
+    }
+
+    private static func readToken() -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
