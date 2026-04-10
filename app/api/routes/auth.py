@@ -7,7 +7,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import limiter, db
-from app.models import User
+from app.models import User, UserToken
 from app.auth import _DUMMY_HASH
 from app.totp_utils import decrypt_totp_secret, verify_totp, verify_and_consume_backup_code
 
@@ -25,10 +25,24 @@ from app.api.serializers import serialize_user
 
 
 _TWOFA_CHALLENGE_MAX_AGE_SECONDS = 300
+_CONSUMED_TWOFA_CHALLENGES: dict[str, datetime] = {}
 
 
 def _challenge_serializer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="api-login-2fa")
+
+
+def _purge_expired_consumed_challenges(now: datetime | None = None) -> None:
+    now = now or datetime.now(timezone.utc)
+    expired = [token for token, expires_at in _CONSUMED_TWOFA_CHALLENGES.items() if expires_at <= now]
+    for token in expired:
+        _CONSUMED_TWOFA_CHALLENGES.pop(token, None)
+
+
+def _mark_twofa_challenge_consumed(challenge: str) -> None:
+    now = datetime.now(timezone.utc)
+    _purge_expired_consumed_challenges(now)
+    _CONSUMED_TWOFA_CHALLENGES[challenge] = now + timedelta(seconds=_TWOFA_CHALLENGE_MAX_AGE_SECONDS)
 
 
 def _build_twofa_challenge(user: User) -> str:
@@ -41,6 +55,10 @@ def _build_twofa_challenge(user: User) -> str:
 
 
 def _verify_twofa_challenge(challenge: str) -> User | None:
+    _purge_expired_consumed_challenges()
+    if challenge in _CONSUMED_TWOFA_CHALLENGES:
+        return None
+
     try:
         payload = _challenge_serializer().loads(
             challenge,
@@ -127,12 +145,13 @@ def api_login_2fa():
     if not twofa_ok:
         return unauthorized("Invalid verification code")
 
+    _mark_twofa_challenge_consumed(body["challenge"].strip())
     raw_token, _record = create_token_for_user(user)
     return api_ok({"token": raw_token, "user": serialize_user(user)})
 
 
 @api.route("/auth/refresh", methods=["POST"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_refresh_token():
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
@@ -148,7 +167,7 @@ def api_refresh_token():
 
 
 @api.route("/auth/logout", methods=["POST"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_logout():
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
@@ -159,7 +178,7 @@ def api_logout():
 
 
 @api.route("/auth/password", methods=["PUT"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_change_password():
     user = get_api_user()
     if not user.admin:
@@ -180,6 +199,7 @@ def api_change_password():
         return unauthorized("Current password is incorrect")
 
     user.password = generate_password_hash(body["new_password"], method="scrypt")
+    UserToken.query.filter_by(user_id=user.id).delete(synchronize_session=False)
     db.session.commit()
     return api_ok({"message": "Password updated"})
 

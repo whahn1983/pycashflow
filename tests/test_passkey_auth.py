@@ -19,7 +19,7 @@ def test_passkey_login_options_requires_email(client, monkeypatch):
     resp = client.post("/passkey_login/options", json={})
 
     assert resp.status_code == 400
-    assert "Email is required" in resp.get_json()["error"]
+    assert "Unable to start passkey login." in resp.get_json()["error"]
 
 
 def test_passkey_login_verify_without_challenge_redirects(client, monkeypatch):

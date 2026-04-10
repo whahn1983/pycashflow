@@ -69,6 +69,21 @@ class TestDataEndpointsRequireAuth:
         body = _json(resp)
         assert body["code"] == "unauthorized"
 
+    def test_mutating_endpoint_requires_bearer_not_session(self, auth_client):
+        resp = auth_client.post(
+            "/api/v1/schedules",
+            json={
+                "name": "Session Write Attempt",
+                "amount": "10.00",
+                "type": "Expense",
+                "frequency": "Onetime",
+                "start_date": "2026-04-10",
+            },
+            content_type="application/json",
+        )
+        assert resp.status_code == 401
+        assert _json(resp)["code"] == "unauthorized"
+
 
 # ── Dashboard endpoint ───────────────────────────────────────────────────────
 

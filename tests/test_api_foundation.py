@@ -29,6 +29,7 @@ from app import db as _db
 from app.models import UserToken, User
 from app.api.serializers import serialize_balance, serialize_user, _amount, _date, _datetime
 from app.api.auth_utils import hash_token
+import app.api.routes.auth as api_auth_routes
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -401,6 +402,43 @@ class TestAuthEnhancements:
         ok = client.get("/api/v1/auth/me", headers=_bearer(new_token))
         assert ok.status_code == 200
 
+    def test_refresh_requires_bearer_even_with_session(self, auth_client):
+        resp = auth_client.post("/api/v1/auth/refresh")
+        assert resp.status_code == 401
+        assert _json(resp)["code"] == "unauthorized"
+
+    def test_logout_requires_bearer_even_with_session(self, auth_client):
+        resp = auth_client.post("/api/v1/auth/logout")
+        assert resp.status_code == 401
+        assert _json(resp)["code"] == "unauthorized"
+
+    def test_twofa_challenge_cannot_be_reused(self, flask_app, client, monkeypatch):
+        with flask_app.app_context():
+            user = User.query.filter_by(email="admin@test.local").first()
+            user.twofa_enabled = True
+            user.twofa_secret = "encrypted"
+            _db.session.commit()
+
+        try:
+            monkeypatch.setattr(api_auth_routes, "verify_totp", lambda _secret, _code: True)
+            monkeypatch.setattr(api_auth_routes, "decrypt_totp_secret", lambda _encrypted: "secret")
+
+            login_resp = _login(client)
+            assert login_resp.status_code == 200
+            challenge = _json(login_resp)["data"]["challenge"]
+
+            first = client.post("/api/v1/auth/login/2fa", json={"challenge": challenge, "code": "123456"})
+            assert first.status_code == 200
+
+            second = client.post("/api/v1/auth/login/2fa", json={"challenge": challenge, "code": "123456"})
+            assert second.status_code == 401
+        finally:
+            with flask_app.app_context():
+                user = User.query.filter_by(email="admin@test.local").first()
+                user.twofa_enabled = False
+                user.twofa_secret = None
+                _db.session.commit()
+
     def test_change_password(self, client):
         token = _json(_login(client))["data"]["token"]
         resp = client.put(
@@ -419,6 +457,32 @@ class TestAuthEnhancements:
         revert = client.put(
             "/api/v1/auth/password",
             headers=_bearer(new_token),
+            json={"current_password": "newpass1234", "new_password": "testpass123"},
+            content_type="application/json",
+        )
+        assert revert.status_code == 200
+
+    def test_change_password_revokes_all_existing_tokens(self, client):
+        token_a = _json(_login(client))["data"]["token"]
+        token_b = _json(_login(client))["data"]["token"]
+
+        change = client.put(
+            "/api/v1/auth/password",
+            headers=_bearer(token_a),
+            json={"current_password": "testpass123", "new_password": "newpass1234"},
+            content_type="application/json",
+        )
+        assert change.status_code == 200
+
+        revoked = client.get("/api/v1/auth/me", headers=_bearer(token_b))
+        assert revoked.status_code == 401
+
+        new_login = _login(client, password="newpass1234")
+        assert new_login.status_code == 200
+        rotate_token = _json(new_login)["data"]["token"]
+        revert = client.put(
+            "/api/v1/auth/password",
+            headers=_bearer(rotate_token),
             json={"current_password": "newpass1234", "new_password": "testpass123"},
             content_type="application/json",
         )
