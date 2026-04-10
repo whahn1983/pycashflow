@@ -313,7 +313,7 @@ def api_risk_score():
             "score": 85,
             "status": "Safe",
             "color": "green",
-            "runway_days": 120.0,
+            "runway_days": 120.0,  // null when no expense drain (stable balance)
             "lowest_balance": "2500.00",
             "days_to_lowest": 15,
             "avg_daily_expense": "45.50",

@@ -368,7 +368,7 @@ Dashboard summary for a mobile home screen.
 | `risk.score` | integer | 0–100 (higher is safer) |
 | `risk.status` | string | `"Safe"` / `"Stable"` / `"Watch"` / `"Risk"` / `"Critical"` |
 | `risk.color` | string | CSS color name for UI |
-| `risk.runway_days` | number | Days until funds run out at current burn rate |
+| `risk.runway_days` | number or `null` | Days until funds run out at current burn rate; `null` when no expense drain is observed (stable/improving balance) |
 | `risk.lowest_balance` | number | **Caution: Python float, not decimal string** |
 | `risk.days_to_lowest` | number | Days until projected lowest point |
 | `risk.avg_daily_expense` | number | **Caution: Python float** |
@@ -659,7 +659,7 @@ inside `/dashboard`, which passes through raw Python floats).
 | `score` | integer | 0–100 (higher is safer) |
 | `status` | string | `"Safe"` / `"Stable"` / `"Watch"` / `"Risk"` / `"Critical"` |
 | `color` | string | CSS color name for UI theming |
-| `runway_days` | number | Days until funds run out at current burn rate |
+| `runway_days` | number or `null` | Days until funds run out at current burn rate; `null` when no expense drain is observed (stable/improving balance) |
 | `lowest_balance` | string (decimal) | Lowest projected balance (decimal string) |
 | `days_to_lowest` | integer | Days until projected lowest point |
 | `avg_daily_expense` | string (decimal) | Average daily expense (decimal string) |
