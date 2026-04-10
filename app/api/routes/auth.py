@@ -1,6 +1,7 @@
 """API v1 authentication routes."""
 
 from datetime import datetime, timedelta, timezone
+from threading import Lock
 
 from flask import current_app, request
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
@@ -26,6 +27,7 @@ from app.api.serializers import serialize_user
 
 _TWOFA_CHALLENGE_MAX_AGE_SECONDS = 300
 _CONSUMED_TWOFA_CHALLENGES: dict[str, datetime] = {}
+_CONSUMED_TWOFA_CHALLENGES_LOCK = Lock()
 
 
 def _challenge_serializer() -> URLSafeTimedSerializer:
@@ -34,15 +36,31 @@ def _challenge_serializer() -> URLSafeTimedSerializer:
 
 def _purge_expired_consumed_challenges(now: datetime | None = None) -> None:
     now = now or datetime.now(timezone.utc)
-    expired = [token for token, expires_at in _CONSUMED_TWOFA_CHALLENGES.items() if expires_at <= now]
+    expired = [
+        token
+        for token, expires_at in _CONSUMED_TWOFA_CHALLENGES.items()
+        if expires_at <= now
+    ]
     for token in expired:
         _CONSUMED_TWOFA_CHALLENGES.pop(token, None)
 
 
-def _mark_twofa_challenge_consumed(challenge: str) -> None:
+def _is_twofa_challenge_consumed(challenge: str) -> bool:
+    with _CONSUMED_TWOFA_CHALLENGES_LOCK:
+        _purge_expired_consumed_challenges()
+        return challenge in _CONSUMED_TWOFA_CHALLENGES
+
+
+def _try_mark_twofa_challenge_consumed(challenge: str) -> bool:
     now = datetime.now(timezone.utc)
-    _purge_expired_consumed_challenges(now)
-    _CONSUMED_TWOFA_CHALLENGES[challenge] = now + timedelta(seconds=_TWOFA_CHALLENGE_MAX_AGE_SECONDS)
+    with _CONSUMED_TWOFA_CHALLENGES_LOCK:
+        _purge_expired_consumed_challenges(now)
+        if challenge in _CONSUMED_TWOFA_CHALLENGES:
+            return False
+        _CONSUMED_TWOFA_CHALLENGES[challenge] = now + timedelta(
+            seconds=_TWOFA_CHALLENGE_MAX_AGE_SECONDS
+        )
+        return True
 
 
 def _build_twofa_challenge(user: User) -> str:
@@ -55,8 +73,7 @@ def _build_twofa_challenge(user: User) -> str:
 
 
 def _verify_twofa_challenge(challenge: str) -> User | None:
-    _purge_expired_consumed_challenges()
-    if challenge in _CONSUMED_TWOFA_CHALLENGES:
+    if _is_twofa_challenge_consumed(challenge):
         return None
 
     try:
@@ -149,7 +166,8 @@ def api_login_2fa():
     if not twofa_ok:
         return unauthorized("Invalid verification code")
 
-    _mark_twofa_challenge_consumed(challenge)
+    if not _try_mark_twofa_challenge_consumed(challenge):
+        return unauthorized("Invalid or expired 2FA challenge")
     raw_token, _record = create_token_for_user(user)
     return api_ok({"token": raw_token, "user": serialize_user(user)})
 
