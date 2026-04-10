@@ -126,7 +126,7 @@ def calculate_minimum_safe_balance(run_90, min_amount, lowest_balance_date):
 
 def build_payload(current_balance, schedules, holds, skips):
     """Build the JSON payload sent to OpenAI from the user's cash flow data."""
-    _, run, _ = update_cash(current_balance, schedules, holds, skips, [])
+    _, run, _ = update_cash(current_balance, schedules, holds, skips, [], commit=False)
 
     todaydate = datetime.today().date()
     horizon = todaydate + relativedelta(days=90)

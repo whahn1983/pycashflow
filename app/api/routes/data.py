@@ -86,7 +86,7 @@ def api_dashboard():
     skips = Skip.query.filter_by(user_id=user_id).all()
     scenarios = Scenario.query.filter_by(user_id=user_id).all()
 
-    trans, run, run_scenario = update_cash(balance_amount, schedules, holds, skips, scenarios)
+    trans, run, run_scenario = update_cash(balance_amount, schedules, holds, skips, scenarios, commit=False)
 
     # Risk score
     cash_risk = calculate_cash_risk_score(balance_amount, run)
@@ -180,7 +180,7 @@ def api_projections():
     skips = Skip.query.filter_by(user_id=user_id).all()
     scenarios = Scenario.query.filter_by(user_id=user_id).all()
 
-    _trans, run, run_scenario = update_cash(balance_amount, schedules, holds, skips, scenarios)
+    _trans, run, run_scenario = update_cash(balance_amount, schedules, holds, skips, scenarios, commit=False)
 
     def _series(df):
         if df is None or df.empty:
@@ -279,7 +279,7 @@ def api_transactions():
     scenarios = Scenario.query.filter_by(user_id=user_id).all()
 
     trans, _run, _run_scenario = update_cash(
-        balance_amount, schedules, holds, skips, scenarios
+        balance_amount, schedules, holds, skips, scenarios, commit=False
     )
 
     items = []
@@ -341,7 +341,7 @@ def api_risk_score():
     scenarios = Scenario.query.filter_by(user_id=user_id).all()
 
     _trans, run, _run_scenario = update_cash(
-        balance_amount, schedules, holds, skips, scenarios
+        balance_amount, schedules, holds, skips, scenarios, commit=False
     )
 
     raw = calculate_cash_risk_score(balance_amount, run)
