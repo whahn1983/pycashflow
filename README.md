@@ -6,7 +6,7 @@
 ![Docker Pulls](https://img.shields.io/docker/pulls/whahn1983/pycashflow)
 ![GitHub License](https://img.shields.io/github/license/whahn1983/pycashflow)
 
-**A comprehensive Python Flask application for cash flow forecasting, transaction management, AI-powered insights, and financial planning.**
+**A comprehensive Python Flask application for cash flow forecasting, transaction management, AI-powered insights, financial planning, and a REST API for mobile integration.**
 
 PyCashFlow is a powerful, multi-user web application designed to help individuals, families, and small-medium businesses manage their finances through intelligent cash flow forecasting, recurring transaction scheduling, and automated balance tracking. With support for up to one year of cash flow projections, interactive visualizations, AI-generated insights via OpenAI, and automatic email-based balance updates, PyCashFlow provides a complete solution for financial planning and management.
 
@@ -24,6 +24,10 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - [Configuration](#configuration)
 - [User Roles & Access Control](#user-roles--access-control)
 - [Core Capabilities](#core-capabilities)
+- [REST API](#rest-api)
+  - [Authentication](#authentication-1)
+  - [Data Endpoints](#data-endpoints)
+  - [Response Format](#response-format)
 - [AI Insights](#ai-insights)
   - [Cash Risk Score](#cash-risk-score)
 - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
@@ -83,6 +87,13 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - **Passkey Support**: Modern passwordless authentication via built-in WebAuthn (py_webauthn) support
 - **Session Management**: Secure session handling with "remember me" functionality
 
+### REST API (v1)
+- **Bearer Token Authentication**: Secure token-based auth for programmatic access
+- **Read-Only Data Endpoints**: Access dashboard, schedules, projections, scenarios, and more
+- **Mobile-Ready**: JSON responses designed for mobile app integration
+- **Guest-Aware**: Automatically resolves guest users to their account owner's data
+- **Rate-Limited**: Login endpoint rate-limited to prevent brute-force attacks
+
 ### Progressive Web App (PWA)
 - **Installable**: Add to home screen on mobile and desktop devices
 - **Offline Support**: Service worker caches pages and static assets so previously visited views remain accessible without a network connection
@@ -102,6 +113,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - **Flask-Migrate**: Database migration management
 - **Waitress**: Production-ready WSGI server
 - **Flask-Login**: User session management
+- **Flask-Limiter**: Rate limiting for API and auth endpoints
 
 ### Data Processing
 - **Pandas**: Data manipulation and transaction calculations
@@ -374,6 +386,121 @@ Multiple methods for keeping your balance current:
 - **Manual Entry**: Set balance for any specific date
 - **Email Import**: Automatic extraction from bank notification emails
 - **Historical Tracking**: View balance history over time
+
+---
+
+## REST API
+
+PyCashFlow provides a RESTful JSON API under `/api/v1/` for programmatic access and mobile app integration. All API routes are CSRF-exempt and require Bearer token authentication.
+
+### Authentication
+
+#### Login
+
+Obtain a bearer token by posting credentials to the login endpoint:
+
+```bash
+curl -X POST https://your-server/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "s3cr3t"}'
+```
+
+Response:
+```json
+{
+  "data": {
+    "token": "<bearer_token>",
+    "user": {
+      "id": 1,
+      "email": "user@example.com",
+      "name": "Jane Doe",
+      "is_admin": false,
+      "is_global_admin": false,
+      "twofa_enabled": false,
+      "is_guest": false
+    }
+  }
+}
+```
+
+> **Note**: Accounts with two-factor authentication (2FA) enabled cannot authenticate via the API at this time.
+
+#### Using the Token
+
+Include the token in the `Authorization` header on all subsequent requests:
+
+```bash
+curl https://your-server/api/v1/dashboard \
+  -H "Authorization: Bearer <bearer_token>"
+```
+
+Tokens are valid for **30 days**. Only the SHA-256 hash of each token is stored; the raw token is returned once at login and cannot be recovered.
+
+#### Logout
+
+Invalidate the current token:
+
+```bash
+curl -X POST https://your-server/api/v1/auth/logout \
+  -H "Authorization: Bearer <bearer_token>"
+```
+
+#### Current User
+
+Retrieve the authenticated user's profile:
+
+```
+GET /api/v1/auth/me
+```
+
+### Data Endpoints
+
+All data endpoints are read-only (`GET`) and require authentication. Guest users automatically see their account owner's data.
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/dashboard` | Dashboard summary — current balance, risk score, upcoming transactions, and 90-day minimum balance |
+| `GET /api/v1/balance` | Current balance snapshot (lightweight, no projection engine) |
+| `GET /api/v1/schedules` | All recurring scheduled transactions |
+| `GET /api/v1/transactions` | Expanded upcoming transactions for the next 90 days (with holds and skips applied) |
+| `GET /api/v1/projections` | Running-balance projection data points for both schedule-only and schedule+scenario series |
+| `GET /api/v1/scenarios` | All what-if scenario items |
+| `GET /api/v1/holds` | All held (paused) schedule items |
+| `GET /api/v1/skips` | All skipped transaction instances |
+| `GET /api/v1/risk-score` | Detailed cash-flow risk assessment with full score breakdown |
+
+### Response Format
+
+**Success — single resource:**
+```json
+{ "data": { ... } }
+```
+
+**Success — collection:**
+```json
+{ "data": [ ... ], "meta": { "total": 5 } }
+```
+
+**Error:**
+```json
+{
+  "error": "Human-readable message",
+  "code": "machine_slug",
+  "status": 401
+}
+```
+
+**Validation error (422):**
+```json
+{
+  "error": "Validation failed",
+  "code": "validation_error",
+  "status": 422,
+  "fields": { "email": "Email is required" }
+}
+```
+
+All monetary values are returned as **decimal strings** (e.g. `"1234.56"`) to avoid floating-point precision issues. Dates use **ISO 8601** format (`YYYY-MM-DD`).
 
 ---
 
