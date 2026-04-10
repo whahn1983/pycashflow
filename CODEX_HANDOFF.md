@@ -21,7 +21,7 @@ exemption and Bearer-token authentication.
 | POST | `/api/v1/auth/logout` | Revoke current Bearer token |
 | GET | `/api/v1/auth/me` | Current user profile |
 
-**Read-only data endpoints (6):**
+**Read-only data endpoints (9):**
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -31,6 +31,9 @@ exemption and Bearer-token authentication.
 | GET | `/api/v1/scenarios` | List what-if scenario items |
 | GET | `/api/v1/holds` | List held (paused) schedule items |
 | GET | `/api/v1/skips` | List skipped transaction instances |
+| GET | `/api/v1/transactions` | Upcoming transactions expanded from schedules (90 days) |
+| GET | `/api/v1/risk-score` | Detailed risk assessment with decimal-string amounts |
+| GET | `/api/v1/balance` | Current balance snapshot (lightweight, no projections) |
 
 **Supporting infrastructure:**
 
@@ -89,8 +92,9 @@ web routes. No API equivalent exists.
 
 ### Balance history
 
-Only the latest balance is exposed (via `/dashboard`). There is no endpoint to
-list historical balances or create a new balance entry.
+The latest balance is now exposed via both `/dashboard` and the dedicated
+`/balance` endpoint. There is no endpoint to list historical balances or
+create a new balance entry.
 
 ### AI Insights
 
@@ -113,7 +117,9 @@ No API for reading or updating IMAP email configuration.
    The risk dict keys (`score`, `status`, `color`, `runway_days`,
    `lowest_balance`, etc.) are not formally serialized through a dedicated
    serializer — they pass through as-is from the engine, including Python
-   floats rather than decimal strings.
+   floats rather than decimal strings. **Mitigation:** The new `/risk-score`
+   endpoint properly serializes monetary values as decimal strings. The
+   `/dashboard` `risk` object is kept as-is for backward compatibility.
 
 3. **`upcoming_transactions` in `/dashboard`** uses `_amount()` and `_date()`
    for serialization but does not go through a named serializer function. The
@@ -169,12 +175,12 @@ No API for reading or updating IMAP email configuration.
 
 ## 5. Test Status
 
-**173 tests, all passing** (as of this snapshot).
+**197 tests, all passing** (as of this snapshot).
 
 | Test file | Count | Scope |
 |-----------|-------|-------|
 | `test_api_foundation.py` | ~35 | Token auth lifecycle, response/error shapes, serialization |
-| `test_api_data.py` | ~50 | All 6 data endpoints, guest isolation |
+| `test_api_data.py` | ~55 | All 9 data endpoints, guest isolation, response shapes |
 | `test_routes.py` | ~45 | Web routes, form validation, authorization |
 | `test_projection_engine.py` | ~50 | Business-day adjustments, frequency expansion, 90-day window |
 | `test_scenarios.py` | ~20 | Scenario projections, baseline immutability |
@@ -244,8 +250,9 @@ No API for reading or updating IMAP email configuration.
 6. **Extract validation logic** — pull form-validation rules from `main.py`
    into a shared module usable by both web and API routes.
 
-7. **Add a risk-score serializer** — formalize the dict shape with decimal
-   strings and document it in `API_CONVENTIONS.md`.
+7. ~~**Add a risk-score serializer**~~ — done via `GET /api/v1/risk-score`
+   endpoint which serializes monetary values as decimal strings. The
+   `/dashboard` `risk` object still passes through raw floats.
 
 8. **Fix `Query.get()` deprecation** — migrate to `Session.get()` across
    the codebase.

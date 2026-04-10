@@ -7,6 +7,9 @@ Covers:
   - Schedules list endpoint
   - Projections endpoint returns schedule (and scenario) series
   - Scenarios, holds, skips list endpoints
+  - Transactions list endpoint
+  - Risk-score detailed assessment endpoint
+  - Balance snapshot endpoint
   - Response shapes follow API conventions (data key, meta key for lists)
 """
 
@@ -56,6 +59,9 @@ class TestDataEndpointsRequireAuth:
         "/api/v1/scenarios",
         "/api/v1/holds",
         "/api/v1/skips",
+        "/api/v1/transactions",
+        "/api/v1/risk-score",
+        "/api/v1/balance",
     ])
     def test_unauthenticated_returns_401(self, client, path):
         resp = client.get(path)
@@ -449,4 +455,273 @@ class TestGuestUserDataAccess:
         with flask_app.app_context():
             Schedule.query.filter_by(name="_test_owner_sched").delete()
             User.query.filter_by(email="_guest_api@test.local").delete()
+            _db.session.commit()
+
+
+# ── Transactions endpoint ──────────────────────────────────────────────────
+
+
+class TestTransactions:
+    """GET /api/v1/transactions returns upcoming expanded transactions."""
+
+    def test_transactions_returns_200(self, client):
+        token = _login(client)
+        resp = client.get("/api/v1/transactions", headers=_bearer(token))
+        assert resp.status_code == 200
+
+    def test_transactions_response_shape(self, client):
+        token = _login(client)
+        body = _json(client.get("/api/v1/transactions", headers=_bearer(token)))
+        assert "data" in body
+        assert isinstance(body["data"], list)
+        assert "meta" in body
+        assert "total" in body["meta"]
+
+    def test_transactions_reflects_schedule(self, flask_app, client):
+        """Upcoming transactions should include expanded schedule occurrences."""
+        with flask_app.app_context():
+            user = User.query.filter_by(email="admin@test.local").first()
+            future = date.today() + timedelta(days=7)
+            sched = Schedule(
+                user_id=user.id,
+                name="_test_txn_rent",
+                amount="1500.00",
+                frequency="Monthly",
+                startdate=future,
+                firstdate=future,
+                type="Expense",
+            )
+            _db.session.add(sched)
+            _db.session.commit()
+
+        token = _login(client)
+        body = _json(client.get("/api/v1/transactions", headers=_bearer(token)))
+        names = [t["name"] for t in body["data"]]
+        assert "_test_txn_rent" in names
+
+        # Verify each transaction has the expected fields
+        item = next(t for t in body["data"] if t["name"] == "_test_txn_rent")
+        assert item["amount"] == "1500.00"
+        assert item["type"] == "Expense"
+        assert "date" in item
+
+        # Clean up
+        with flask_app.app_context():
+            Schedule.query.filter_by(name="_test_txn_rent").delete()
+            _db.session.commit()
+
+    def test_transactions_empty_when_no_schedules(self, flask_app, client):
+        """With no schedules, the transaction list should be empty."""
+        with flask_app.app_context():
+            user = User.query.filter_by(email="admin@test.local").first()
+            # Temporarily clear all schedules
+            existing = Schedule.query.filter_by(user_id=user.id).all()
+            saved = [(s.name, s.amount, s.frequency, s.startdate, s.firstdate, s.type)
+                     for s in existing]
+            Schedule.query.filter_by(user_id=user.id).delete()
+            _db.session.commit()
+
+        token = _login(client)
+        body = _json(client.get("/api/v1/transactions", headers=_bearer(token)))
+        assert body["data"] == []
+        assert body["meta"]["total"] == 0
+
+        # Restore schedules
+        with flask_app.app_context():
+            user = User.query.filter_by(email="admin@test.local").first()
+            for name, amount, freq, start, first, typ in saved:
+                _db.session.add(Schedule(
+                    user_id=user.id, name=name, amount=amount,
+                    frequency=freq, startdate=start, firstdate=first, type=typ,
+                ))
+            _db.session.commit()
+
+    def test_transactions_via_session_auth(self, auth_client):
+        """Session-authenticated requests should also work."""
+        resp = auth_client.get("/api/v1/transactions")
+        assert resp.status_code == 200
+        body = _json(resp)
+        assert "data" in body
+        assert isinstance(body["data"], list)
+
+
+# ── Risk-score endpoint ────────────────────────────────────────────────────
+
+
+class TestRiskScore:
+    """GET /api/v1/risk-score returns a detailed risk assessment."""
+
+    def test_risk_score_returns_200(self, client):
+        token = _login(client)
+        resp = client.get("/api/v1/risk-score", headers=_bearer(token))
+        assert resp.status_code == 200
+
+    def test_risk_score_has_data_key(self, client):
+        token = _login(client)
+        body = _json(client.get("/api/v1/risk-score", headers=_bearer(token)))
+        assert "data" in body
+
+    def test_risk_score_contains_all_fields(self, client):
+        token = _login(client)
+        body = _json(client.get("/api/v1/risk-score", headers=_bearer(token)))
+        data = body["data"]
+        expected_keys = [
+            "score", "status", "color", "runway_days",
+            "lowest_balance", "days_to_lowest", "avg_daily_expense",
+            "days_below_threshold", "pct_below_threshold",
+            "recovery_days", "near_term_buffer",
+        ]
+        for key in expected_keys:
+            assert key in data, f"Missing key: {key}"
+
+    def test_risk_score_field_types(self, client):
+        token = _login(client)
+        body = _json(client.get("/api/v1/risk-score", headers=_bearer(token)))
+        data = body["data"]
+        # Integer fields
+        assert isinstance(data["score"], int)
+        assert isinstance(data["days_to_lowest"], int)
+        assert isinstance(data["days_below_threshold"], int)
+        # String fields
+        assert isinstance(data["status"], str)
+        assert isinstance(data["color"], str)
+        # Monetary values are decimal strings
+        assert isinstance(data["lowest_balance"], str)
+        assert "." in data["lowest_balance"]
+        assert isinstance(data["avg_daily_expense"], str)
+        assert "." in data["avg_daily_expense"]
+        assert isinstance(data["near_term_buffer"], str)
+        assert "." in data["near_term_buffer"]
+
+    def test_risk_score_valid_status(self, client):
+        token = _login(client)
+        body = _json(client.get("/api/v1/risk-score", headers=_bearer(token)))
+        assert body["data"]["status"] in ("Safe", "Stable", "Watch", "Risk", "Critical")
+
+    def test_risk_score_valid_range(self, client):
+        token = _login(client)
+        body = _json(client.get("/api/v1/risk-score", headers=_bearer(token)))
+        score = body["data"]["score"]
+        assert 0 <= score <= 100
+
+    def test_risk_score_via_session_auth(self, auth_client):
+        """Session-authenticated requests should also work."""
+        resp = auth_client.get("/api/v1/risk-score")
+        assert resp.status_code == 200
+        body = _json(resp)
+        assert "data" in body
+        assert "score" in body["data"]
+
+    def test_risk_score_with_expense(self, flask_app, client):
+        """Adding an expense schedule should affect the risk score."""
+        token = _login(client)
+
+        # Get baseline score
+        body_before = _json(client.get("/api/v1/risk-score", headers=_bearer(token)))
+        score_before = body_before["data"]["score"]
+
+        with flask_app.app_context():
+            user = User.query.filter_by(email="admin@test.local").first()
+            future = date.today() + timedelta(days=3)
+            sched = Schedule(
+                user_id=user.id,
+                name="_test_risk_expense",
+                amount="4000.00",
+                frequency="Monthly",
+                startdate=future,
+                firstdate=future,
+                type="Expense",
+            )
+            _db.session.add(sched)
+            _db.session.commit()
+
+        body_after = _json(client.get("/api/v1/risk-score", headers=_bearer(token)))
+        score_after = body_after["data"]["score"]
+
+        # A large expense relative to the balance should lower the risk score
+        assert score_after <= score_before
+
+        # Clean up
+        with flask_app.app_context():
+            Schedule.query.filter_by(name="_test_risk_expense").delete()
+            _db.session.commit()
+
+
+# ── Balance endpoint ───────────────────────────────────────────────────────
+
+
+class TestBalance:
+    """GET /api/v1/balance returns the current balance snapshot."""
+
+    def test_balance_returns_200(self, client):
+        token = _login(client)
+        resp = client.get("/api/v1/balance", headers=_bearer(token))
+        assert resp.status_code == 200
+
+    def test_balance_has_data_key(self, client):
+        token = _login(client)
+        body = _json(client.get("/api/v1/balance", headers=_bearer(token)))
+        assert "data" in body
+
+    def test_balance_contains_expected_fields(self, client):
+        token = _login(client)
+        body = _json(client.get("/api/v1/balance", headers=_bearer(token)))
+        data = body["data"]
+        assert "id" in data
+        assert "amount" in data
+        assert "date" in data
+
+    def test_balance_amount_is_decimal_string(self, client):
+        token = _login(client)
+        body = _json(client.get("/api/v1/balance", headers=_bearer(token)))
+        amount = body["data"]["amount"]
+        assert isinstance(amount, str)
+        assert "." in amount
+        # Should have exactly 2 decimal places
+        assert len(amount.split(".")[1]) == 2
+
+    def test_balance_reflects_seeded_data(self, client):
+        """The seeded balance from conftest should be 5000.00."""
+        token = _login(client)
+        body = _json(client.get("/api/v1/balance", headers=_bearer(token)))
+        assert body["data"]["amount"] == "5000.00"
+
+    def test_balance_no_meta_key(self, client):
+        """Balance is a single resource, not a collection — no meta key."""
+        token = _login(client)
+        body = _json(client.get("/api/v1/balance", headers=_bearer(token)))
+        assert "meta" not in body
+
+    def test_balance_via_session_auth(self, auth_client):
+        """Session-authenticated requests should also work."""
+        resp = auth_client.get("/api/v1/balance")
+        assert resp.status_code == 200
+        body = _json(resp)
+        assert "data" in body
+        assert "amount" in body["data"]
+
+    def test_balance_default_when_none(self, flask_app, client):
+        """When no balance record exists, return a sensible default."""
+        with flask_app.app_context():
+            # Create a user with no balance records
+            user2 = User(
+                email="_nobal@test.local",
+                password=generate_password_hash("nobalpass", method="scrypt"),
+                name="No Balance User",
+                admin=True,
+                is_active=True,
+            )
+            _db.session.add(user2)
+            _db.session.commit()
+
+        token = _login(client, email="_nobal@test.local", password="nobalpass")
+        body = _json(client.get("/api/v1/balance", headers=_bearer(token)))
+        data = body["data"]
+        assert data["id"] is None
+        assert data["amount"] == "0.00"
+        assert data["date"] is not None  # Should be today's date
+
+        # Clean up
+        with flask_app.app_context():
+            User.query.filter_by(email="_nobal@test.local").delete()
             _db.session.commit()

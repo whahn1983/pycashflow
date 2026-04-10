@@ -381,6 +381,141 @@ curl https://your-server/api/v1/skips \
 
 ---
 
+### GET /api/v1/transactions
+
+Returns upcoming transactions expanded from recurring schedules (next 90 days), with holds and skips applied.
+
+**Request:**
+```bash
+curl https://your-server/api/v1/transactions \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response 200:**
+```json
+{
+  "data": [
+    {
+      "name": "Payroll",
+      "type": "Income",
+      "amount": "3500.00",
+      "date": "2026-04-15"
+    },
+    {
+      "name": "Rent",
+      "type": "Expense",
+      "amount": "1800.00",
+      "date": "2026-05-01"
+    },
+    {
+      "name": "Internet",
+      "type": "Expense",
+      "amount": "89.99",
+      "date": "2026-05-03"
+    }
+  ],
+  "meta": {
+    "total": 3
+  }
+}
+```
+
+**Response 200 (empty):**
+```json
+{
+  "data": [],
+  "meta": {
+    "total": 0
+  }
+}
+```
+
+---
+
+### GET /api/v1/risk-score
+
+Returns a detailed cash-flow risk assessment with monetary values as decimal strings.
+
+**Request:**
+```bash
+curl https://your-server/api/v1/risk-score \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response 200:**
+```json
+{
+  "data": {
+    "score": 82,
+    "status": "Safe",
+    "color": "green",
+    "runway_days": 45.3,
+    "lowest_balance": "2150.50",
+    "days_to_lowest": 28,
+    "avg_daily_expense": "110.75",
+    "days_below_threshold": 0,
+    "pct_below_threshold": 0.0,
+    "recovery_days": 0,
+    "near_term_buffer": "4200.00"
+  }
+}
+```
+
+**Response 200 (no schedules / fresh account):**
+```json
+{
+  "data": {
+    "score": 50,
+    "status": "Watch",
+    "color": "yellow",
+    "runway_days": 0,
+    "lowest_balance": "5000.00",
+    "days_to_lowest": 0,
+    "avg_daily_expense": "0.00",
+    "days_below_threshold": 0,
+    "pct_below_threshold": 0.0,
+    "recovery_days": null,
+    "near_term_buffer": "5000.00"
+  }
+}
+```
+
+---
+
+### GET /api/v1/balance
+
+Returns the current balance snapshot without running the projection engine.
+
+**Request:**
+```bash
+curl https://your-server/api/v1/balance \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response 200:**
+```json
+{
+  "data": {
+    "id": 1,
+    "amount": "5000.00",
+    "date": "2026-04-09"
+  }
+}
+```
+
+**Response 200 (no balance record):**
+```json
+{
+  "data": {
+    "id": null,
+    "amount": "0.00",
+    "date": "2026-04-10"
+  }
+}
+```
+
+---
+
 ## Endpoint Summary
 
 | Method | Path | Auth | Description |
@@ -394,6 +529,9 @@ curl https://your-server/api/v1/skips \
 | GET | `/api/v1/scenarios` | Bearer | List what-if scenarios |
 | GET | `/api/v1/holds` | Bearer | List paused schedule items |
 | GET | `/api/v1/skips` | Bearer | List skipped transaction instances |
+| GET | `/api/v1/transactions` | Bearer | Upcoming transactions (next 90 days) |
+| GET | `/api/v1/risk-score` | Bearer | Detailed cash-flow risk assessment |
+| GET | `/api/v1/balance` | Bearer | Current balance snapshot |
 
 ## Notes for SwiftUI Clients
 
