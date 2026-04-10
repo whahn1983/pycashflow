@@ -1,6 +1,10 @@
 import SwiftUI
 
 struct DashboardView: View {
+    @EnvironmentObject var session: SessionManager
+    @State private var dashboard: DashboardDTO?
+    @State private var errorText: String?
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -8,8 +12,38 @@ struct DashboardView: View {
                     .font(.largeTitle.bold())
                     .foregroundStyle(AppTheme.textPrimary)
 
-                Text("Use the same workflow as the web app sections below.")
-                    .foregroundStyle(AppTheme.textSecondary)
+                if let dashboard {
+                    HStack {
+                        statCard(title: "Balance", value: "$\(dashboard.balance)")
+                        statCard(title: "Min (90d)", value: "$\(dashboard.min_balance)")
+                    }
+                    if let risk = dashboard.risk_v2 {
+                        HStack {
+                            statCard(title: "Risk", value: "\(risk.score) · \(risk.status)")
+                            statCard(title: "Runway", value: "\(risk.runway_days) days")
+                        }
+                    }
+
+                    Text("Upcoming")
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.textPrimary)
+                    ForEach(dashboard.upcoming_transactions.prefix(5)) { tx in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(tx.name).foregroundStyle(AppTheme.textPrimary)
+                                Text(tx.date).font(.caption).foregroundStyle(AppTheme.textMuted)
+                            }
+                            Spacer()
+                            Text("$\(tx.amount)")
+                                .foregroundStyle(tx.type == "Expense" ? AppTheme.danger : AppTheme.success)
+                        }
+                        .surfaceCard()
+                    }
+                }
+
+                if let errorText {
+                    Text(errorText).foregroundStyle(AppTheme.danger)
+                }
 
                 VStack(spacing: 10) {
                     navRow("Accounts", systemImage: "creditcard", destination: AccountsView())
@@ -21,10 +55,32 @@ struct DashboardView: View {
             }
             .padding(20)
         }
+        .task { await loadDashboard() }
+        .refreshable { await loadDashboard() }
         .appBackground()
         .navigationTitle("Dashboard")
-        .toolbarBackground(AppTheme.secondaryDark, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+    }
+
+    private func statCard(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption).foregroundStyle(AppTheme.textMuted)
+            Text(value).font(.headline).foregroundStyle(AppTheme.textPrimary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .surfaceCard()
+    }
+
+    private func loadDashboard() async {
+        guard let token = session.token else { return }
+        do {
+            let response: APIEnvelope<DashboardDTO> = try await APIClient.shared.request("dashboard", token: token, as: APIEnvelope<DashboardDTO>.self)
+            await MainActor.run {
+                dashboard = response.data
+                errorText = nil
+            }
+        } catch {
+            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to load dashboard" }
+        }
     }
 
     private func navRow<Destination: View>(
