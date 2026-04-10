@@ -2,7 +2,6 @@
 
 # PyCashFlow
 
-[![Build Status](https://scrutinizer-ci.com/g/whahn1983/pycashflow/badges/build.png?b=master)](https://scrutinizer-ci.com/g/whahn1983/pycashflow/build-status/master)
 ![Docker Pulls](https://img.shields.io/docker/pulls/whahn1983/pycashflow)
 ![GitHub License](https://img.shields.io/github/license/whahn1983/pycashflow)
 
