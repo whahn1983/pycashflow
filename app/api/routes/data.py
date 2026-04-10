@@ -8,6 +8,9 @@ GET   /api/v1/projections   Running-balance projection data points
 GET   /api/v1/scenarios     List what-if scenario items
 GET   /api/v1/holds         List held (paused) schedule items
 GET   /api/v1/skips         List skipped transaction instances
+GET   /api/v1/transactions  Upcoming transactions list (next 90 days)
+GET   /api/v1/risk-score    Detailed cash-flow risk assessment
+GET   /api/v1/balance       Current balance snapshot
 
 All endpoints require authentication via Bearer token or active session.
 """
@@ -236,3 +239,166 @@ def api_skips():
         [serialize_skip(s) for s in items],
         total=len(items),
     )
+
+
+# ── GET /api/v1/transactions ────────────────────────────────────────────────
+
+@api.route("/transactions", methods=["GET"])
+@api_login_required
+def api_transactions():
+    """Return upcoming transactions for the next 90 days.
+
+    Each transaction is an individual occurrence expanded from the user's
+    recurring schedules, with holds and skips applied.  This is the same
+    data shown on the web app's ``/transactions`` page.
+
+    Response 200::
+
+        {
+          "data": [
+            { "name": "Rent", "type": "Expense", "amount": "1200.00", "date": "2026-04-15" },
+            ...
+          ],
+          "meta": { "total": N }
+        }
+    """
+    user_id = _effective_user_id()
+
+    balance = Balance.query.filter_by(user_id=user_id).order_by(
+        desc(Balance.date), desc(Balance.id)
+    ).first()
+
+    try:
+        balance_amount = float(balance.amount)
+    except (ValueError, TypeError, AttributeError):
+        balance_amount = 0.0
+
+    schedules = Schedule.query.filter_by(user_id=user_id).all()
+    holds = Hold.query.filter_by(user_id=user_id).all()
+    skips = Skip.query.filter_by(user_id=user_id).all()
+    scenarios = Scenario.query.filter_by(user_id=user_id).all()
+
+    trans, _run, _run_scenario = update_cash(
+        balance_amount, schedules, holds, skips, scenarios
+    )
+
+    items = []
+    if not trans.empty:
+        for row in trans.itertuples(index=False):
+            items.append({
+                "name": row.name,
+                "type": row.type,
+                "amount": _amount(row.amount),
+                "date": _date(row.date),
+            })
+
+    return api_list(items, total=len(items))
+
+
+# ── GET /api/v1/risk-score ──────────────────────────────────────────────────
+
+@api.route("/risk-score", methods=["GET"])
+@api_login_required
+def api_risk_score():
+    """Return a detailed cash-flow risk assessment.
+
+    Provides the full risk-score breakdown computed by
+    ``calculate_cash_risk_score()``, with monetary values serialized as
+    decimal strings for consistency with the rest of the API.
+
+    Response 200::
+
+        {
+          "data": {
+            "score": 85,
+            "status": "Safe",
+            "color": "green",
+            "runway_days": 120.0,
+            "lowest_balance": "2500.00",
+            "days_to_lowest": 15,
+            "avg_daily_expense": "45.50",
+            "days_below_threshold": 0,
+            "pct_below_threshold": 0.0,
+            "recovery_days": 0,
+            "near_term_buffer": "3200.00"
+          }
+        }
+    """
+    user_id = _effective_user_id()
+
+    balance = Balance.query.filter_by(user_id=user_id).order_by(
+        desc(Balance.date), desc(Balance.id)
+    ).first()
+
+    try:
+        balance_amount = float(balance.amount)
+    except (ValueError, TypeError, AttributeError):
+        balance_amount = 0.0
+
+    schedules = Schedule.query.filter_by(user_id=user_id).all()
+    holds = Hold.query.filter_by(user_id=user_id).all()
+    skips = Skip.query.filter_by(user_id=user_id).all()
+    scenarios = Scenario.query.filter_by(user_id=user_id).all()
+
+    _trans, run, _run_scenario = update_cash(
+        balance_amount, schedules, holds, skips, scenarios
+    )
+
+    raw = calculate_cash_risk_score(balance_amount, run)
+
+    # Re-serialize monetary/float values as decimal strings for API consistency.
+    return api_ok({
+        "score": raw["score"],
+        "status": raw["status"],
+        "color": raw["color"],
+        "runway_days": raw["runway_days"],
+        "lowest_balance": _amount(raw["lowest_balance"]),
+        "days_to_lowest": raw["days_to_lowest"],
+        "avg_daily_expense": _amount(raw["avg_daily_expense"]),
+        "days_below_threshold": raw["days_below_threshold"],
+        "pct_below_threshold": raw["pct_below_threshold"],
+        "recovery_days": raw["recovery_days"],
+        "near_term_buffer": _amount(raw["near_term_buffer"]),
+    })
+
+
+# ── GET /api/v1/balance ─────────────────────────────────────────────────────
+
+@api.route("/balance", methods=["GET"])
+@api_login_required
+def api_balance():
+    """Return the current balance snapshot.
+
+    A lightweight endpoint that returns only the latest balance record
+    without running the projection engine.  Ideal for widgets and quick
+    balance checks.
+
+    Response 200::
+
+        {
+          "data": {
+            "id": 1,
+            "amount": "5000.00",
+            "date": "2026-04-09"
+          }
+        }
+
+    If no balance record exists, ``amount`` defaults to ``"0.00"`` and
+    ``date`` defaults to today.
+    """
+    user_id = _effective_user_id()
+
+    balance = Balance.query.filter_by(user_id=user_id).order_by(
+        desc(Balance.date), desc(Balance.id)
+    ).first()
+
+    if balance:
+        return api_ok(serialize_balance(balance))
+
+    # No balance record — return a sensible default.
+    todaydate = datetime.today().date()
+    return api_ok({
+        "id": None,
+        "amount": _amount(0),
+        "date": _date(todaydate),
+    })

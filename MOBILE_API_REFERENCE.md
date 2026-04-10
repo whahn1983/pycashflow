@@ -576,6 +576,149 @@ List all skipped transaction instances.
 
 ---
 
+### GET /api/v1/transactions
+
+List all upcoming transactions for the next 90 days. Each transaction is an
+individual occurrence expanded from the user's recurring schedules, with holds
+and skips applied. This is the dedicated equivalent of the
+`upcoming_transactions` array inside `/dashboard`, but as a standalone
+collection endpoint.
+
+**Auth required:** Yes (Bearer or session)
+
+**Response `200 OK`:**
+
+```json
+{
+  "data": [
+    {
+      "name": "Rent",
+      "type": "Expense",
+      "amount": "1200.00",
+      "date": "2026-04-15"
+    },
+    {
+      "name": "Salary",
+      "type": "Income",
+      "amount": "5000.00",
+      "date": "2026-04-30"
+    }
+  ],
+  "meta": {
+    "total": 2
+  }
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `name` | string | Transaction name (from schedule) |
+| `type` | string | `"Income"` or `"Expense"` |
+| `amount` | string (decimal) | Serialized with 2 decimal places |
+| `date` | string (date) | ISO 8601 date of this occurrence |
+
+**Note:** Transactions do not have `id`, `frequency`, or `start_date` fields —
+they are expanded instances of schedules, not the schedule definitions
+themselves. Use `/schedules` to get the schedule records.
+
+**Empty state:** `data` will be `[]` with `meta.total` of `0` when no
+upcoming transactions exist.
+
+---
+
+### GET /api/v1/risk-score
+
+Detailed cash-flow risk assessment. Returns the full risk-score breakdown
+with monetary values serialized as decimal strings (unlike the `risk` object
+inside `/dashboard`, which passes through raw Python floats).
+
+**Auth required:** Yes (Bearer or session)
+
+**Response `200 OK`:**
+
+```json
+{
+  "data": {
+    "score": 85,
+    "status": "Safe",
+    "color": "green",
+    "runway_days": 120.0,
+    "lowest_balance": "2500.00",
+    "days_to_lowest": 15,
+    "avg_daily_expense": "45.50",
+    "days_below_threshold": 0,
+    "pct_below_threshold": 0.0,
+    "recovery_days": 0,
+    "near_term_buffer": "3200.00"
+  }
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `score` | integer | 0–100 (higher is safer) |
+| `status` | string | `"Safe"` / `"Stable"` / `"Watch"` / `"Risk"` / `"Critical"` |
+| `color` | string | CSS color name for UI theming |
+| `runway_days` | number | Days until funds run out at current burn rate |
+| `lowest_balance` | string (decimal) | Lowest projected balance (decimal string) |
+| `days_to_lowest` | integer | Days until projected lowest point |
+| `avg_daily_expense` | string (decimal) | Average daily expense (decimal string) |
+| `days_below_threshold` | integer | Days projected below 1-month expense reserve |
+| `pct_below_threshold` | number | Fraction of horizon below threshold (0.0–1.0) |
+| `recovery_days` | integer or `null` | Days from lowest back to threshold; `null` if never recovers; `0` if threshold never breached |
+| `near_term_buffer` | string (decimal) | Minimum balance over next 14 days (decimal string) |
+
+**Difference from `/dashboard`:** The `/risk-score` endpoint serializes
+`lowest_balance`, `avg_daily_expense`, and `near_term_buffer` as decimal
+strings, consistent with the API's amount conventions. The `risk` object in
+`/dashboard` returns these as raw JSON numbers for backward compatibility.
+
+**Status thresholds:**
+
+| Score | Status | Color |
+|-------|--------|-------|
+| 80–100 | Safe | green |
+| 60–79 | Stable | blue |
+| 40–59 | Watch | yellow |
+| 20–39 | Risk | orange |
+| 0–19 | Critical | red |
+
+---
+
+### GET /api/v1/balance
+
+Current balance snapshot. A lightweight endpoint that returns only the
+latest balance record without running the projection engine. Ideal for
+widgets, notifications, and quick balance checks.
+
+**Auth required:** Yes (Bearer or session)
+
+**Response `200 OK`:**
+
+```json
+{
+  "data": {
+    "id": 1,
+    "amount": "5000.00",
+    "date": "2026-04-09"
+  }
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | integer or `null` | Balance record ID; `null` if no balance exists |
+| `amount` | string (decimal) | Current balance, 2 decimal places |
+| `date` | string (date) | Date of the balance record |
+
+**No balance record:** When no balance has been set, the response returns
+`id: null`, `amount: "0.00"`, and `date` set to today's date.
+
+**Note:** This is a single-resource response (`"data": { ... }`) — there is
+no `meta` key. Use `/dashboard` if you also need risk score and projections.
+
+---
+
 ## Client Implementation Notes
 
 ### Token Storage
@@ -602,8 +745,12 @@ informational scores and ratios, not currency values.
 
 ### Empty States
 
-- `/schedules`, `/scenarios`, `/holds`, `/skips` — `data` will be `[]` with
-  `meta.total` of `0` when the user has no items.
+- `/schedules`, `/scenarios`, `/holds`, `/skips`, `/transactions` — `data`
+  will be `[]` with `meta.total` of `0` when the user has no items.
 - `/projections` — `schedule` will be `[]`; `scenario` will be `null`.
 - `/dashboard` — `upcoming_transactions` will be `[]`; `balance` defaults to
   `"0.00"` if no balance record exists.
+- `/balance` — returns `id: null`, `amount: "0.00"`, `date: "<today>"` when
+  no balance record exists.
+- `/risk-score` — always returns a valid score object; when no schedules
+  exist the score reflects a neutral assessment.
