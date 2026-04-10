@@ -290,11 +290,11 @@ def passkey_login_options():
     payload = request.get_json(silent=True) or {}
     email = (payload.get('email') or '').strip().lower()
     if not email:
-        return jsonify({"error": "Email is required."}), 400
+        return jsonify({"error": "Unable to start passkey login."}), 400
 
     user = User.query.filter_by(email=email).first()
     if not user or not user.is_active or not user.passkey_credentials:
-        return jsonify({"error": "No passkeys are registered for this account."}), 400
+        return jsonify({"error": "Unable to start passkey login."}), 400
 
     allow_credentials = [
         PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))

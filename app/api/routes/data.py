@@ -215,7 +215,7 @@ def api_schedules():
 
 
 @api.route("/schedules", methods=["POST"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_create_schedule():
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -246,7 +246,7 @@ def api_create_schedule():
 
 
 @api.route("/schedules/<int:schedule_id>", methods=["PUT"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_update_schedule(schedule_id: int):
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -279,7 +279,7 @@ def api_update_schedule(schedule_id: int):
 
 
 @api.route("/schedules/<int:schedule_id>", methods=["DELETE"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_delete_schedule(schedule_id: int):
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -323,7 +323,7 @@ def api_scenarios():
 
 
 @api.route("/scenarios", methods=["POST"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_create_scenario():
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -353,7 +353,7 @@ def api_create_scenario():
 
 
 @api.route("/scenarios/<int:scenario_id>", methods=["PUT"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_update_scenario(scenario_id: int):
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -386,7 +386,7 @@ def api_update_scenario(scenario_id: int):
 
 
 @api.route("/scenarios/<int:scenario_id>", methods=["DELETE"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_delete_scenario(scenario_id: int):
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -416,7 +416,7 @@ def api_holds():
 
 
 @api.route("/holds", methods=["POST"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_create_hold():
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -438,7 +438,7 @@ def api_create_hold():
 
 
 @api.route("/holds/<int:hold_id>", methods=["DELETE"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_delete_hold(hold_id: int):
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -453,7 +453,7 @@ def api_delete_hold(hold_id: int):
 
 
 @api.route("/holds", methods=["DELETE"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_clear_holds():
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -481,7 +481,7 @@ def api_skips():
 
 
 @api.route("/skips", methods=["POST"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_create_skip():
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -517,7 +517,7 @@ def api_create_skip():
 
 
 @api.route("/skips/<int:skip_id>", methods=["DELETE"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_delete_skip(skip_id: int):
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -532,7 +532,7 @@ def api_delete_skip(skip_id: int):
 
 
 @api.route("/skips", methods=["DELETE"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_clear_skips():
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -600,7 +600,7 @@ def api_balance():
 
 
 @api.route("/balance", methods=["POST"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_set_balance():
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -695,7 +695,7 @@ def api_insights():
 
 
 @api.route("/insights/refresh", methods=["POST"])
-@api_login_required
+@api_login_required(require_bearer=True)
 def api_insights_refresh():
     if (resp := _forbid_guest_writes()) is not None:
         return resp

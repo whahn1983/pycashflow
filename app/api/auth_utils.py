@@ -131,25 +131,33 @@ def get_api_user():
 
 # ── Decorator ─────────────────────────────────────────────────────────────────
 
-def api_login_required(f):
+def api_login_required(f=None, *, require_bearer: bool = False):
     """Require authentication via Bearer token or active Flask-Login session.
 
     On success, the authenticated user is available via ``get_api_user()``.
     On failure, returns a 401 JSON error.
     """
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        # 1. Bearer token takes precedence
-        user = _load_user_from_bearer()
-        if user is not None:
-            g.api_user = user
-            return f(*args, **kwargs)
+    def _decorate(func):
+        @wraps(func)
+        def decorated(*args, **kwargs):
+            # 1. Bearer token takes precedence
+            user = _load_user_from_bearer()
+            if user is not None:
+                g.api_user = user
+                return func(*args, **kwargs)
 
-        # 2. Session cookie fallback (Flask-Login)
-        if current_user.is_authenticated:
-            g.api_user = current_user._get_current_object()
-            return f(*args, **kwargs)
+            # 2. Optional session cookie fallback (Flask-Login)
+            if not require_bearer and current_user.is_authenticated:
+                g.api_user = current_user._get_current_object()
+                return func(*args, **kwargs)
 
-        return unauthorized()
+            if require_bearer:
+                return unauthorized("Bearer token required")
+            return unauthorized()
 
-    return decorated
+        return decorated
+
+    # Supports both @api_login_required and @api_login_required(require_bearer=True)
+    if f is None:
+        return _decorate
+    return _decorate(f)
