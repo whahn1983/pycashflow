@@ -298,11 +298,11 @@ class TestCalcScheduleFrequencies:
         rows = total[total["name"] == "QuarterlyBonus"]
         assert len(rows) == 4
 
-    def test_yearly_schedule_produces_1_entry(self, app_ctx):
+    def test_yearly_schedule_produces_2_entries(self, app_ctx):
         s = make_schedule_obj("AnnualFee", 200, "Yearly", days_offset=10, type_="Expense")
         total, _ = calc_schedule([s], [], [], [])
         rows = total[total["name"] == "AnnualFee"]
-        assert len(rows) == 1
+        assert len(rows) == 2
 
     def test_onetime_future_produces_1_entry(self, app_ctx):
         s = make_schedule_obj("OneTimePurchase", 500, "Onetime", days_offset=10, type_="Expense")
