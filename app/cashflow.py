@@ -43,6 +43,23 @@ def update_cash(balance, schedules, holds, skips, scenarios=None, commit=True):
     return trans, run, run_scenario
 
 
+def _fast_forward_start(startdate_str, window_delta, step_delta, todaydate,
+                        fmt='%Y-%m-%d'):
+    """Advance *startdate_str* by whole *step_delta* increments until the
+    projection window (*start + window_delta*) extends past *todaydate*.
+
+    Returns the (possibly advanced) start-date string.  This ensures that
+    ``commit=False`` callers still produce future projection points even when
+    the persisted start date has not been advanced in a long time.
+    """
+    start = datetime.strptime(startdate_str, fmt).date()
+    for _ in range(5000):                  # generous upper bound (~400 years monthly)
+        if start + window_delta > todaydate:
+            return start.strftime(fmt)
+        start += step_delta
+    return start.strftime(fmt)
+
+
 def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
     """
     Process schedules, holds, and skips into projected transactions.
@@ -123,6 +140,9 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 db.session.commit()
             firstdate = firstdate_val.strftime(format)
         if frequency == 'Monthly':
+            startdate = _fast_forward_start(
+                startdate, relativedelta(months=months - 1),
+                relativedelta(months=1), todaydate)
             for k in range(months):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
                 futuredateday = futuredate.day
@@ -168,6 +188,9 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                     total_dict[len(total_dict)] = new_row
                     total_dict_scenario[len(total_dict_scenario)] = new_row
         elif frequency == 'Weekly':
+            startdate = _fast_forward_start(
+                startdate, relativedelta(weeks=weeks - 1),
+                relativedelta(weeks=1), todaydate)
             for k in range(weeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
                 if futuredate <= todaydate and datetime.today().weekday() < 5:
@@ -182,6 +205,9 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 total_dict[len(total_dict)] = new_row
                 total_dict_scenario[len(total_dict_scenario)] = new_row
         elif frequency == 'Yearly':
+            startdate = _fast_forward_start(
+                startdate, relativedelta(years=years - 1),
+                relativedelta(years=1), todaydate)
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
                 if futuredate <= todaydate and datetime.today().weekday() < 5:
@@ -196,6 +222,9 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 total_dict[len(total_dict)] = new_row
                 total_dict_scenario[len(total_dict_scenario)] = new_row
         elif frequency == 'Quarterly':
+            startdate = _fast_forward_start(
+                startdate, relativedelta(months=3 * (quarters - 1)),
+                relativedelta(months=3), todaydate)
             for k in range(quarters):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=3 * k)
                 futuredateday = futuredate.day
@@ -230,6 +259,9 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 total_dict[len(total_dict)] = new_row
                 total_dict_scenario[len(total_dict_scenario)] = new_row
         elif frequency == 'BiWeekly':
+            startdate = _fast_forward_start(
+                startdate, relativedelta(weeks=2 * (biweeks - 1)),
+                relativedelta(weeks=2), todaydate)
             for k in range(biweeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
                 if futuredate <= todaydate and datetime.today().weekday() < 5:
@@ -280,6 +312,9 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 db.session.commit()
             firstdate = firstdate_val.strftime(format)
         if frequency == 'Monthly':
+            startdate = _fast_forward_start(
+                startdate, relativedelta(months=months - 1),
+                relativedelta(months=1), todaydate)
             for k in range(months):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=k)
                 futuredateday = futuredate.day
@@ -323,6 +358,9 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                     }
                     total_dict_scenario[len(total_dict_scenario)] = new_row
         elif frequency == 'Weekly':
+            startdate = _fast_forward_start(
+                startdate, relativedelta(weeks=weeks - 1),
+                relativedelta(weeks=1), todaydate)
             for k in range(weeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
                 if futuredate <= todaydate and datetime.today().weekday() < 5:
@@ -336,6 +374,9 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 }
                 total_dict_scenario[len(total_dict_scenario)] = new_row
         elif frequency == 'Yearly':
+            startdate = _fast_forward_start(
+                startdate, relativedelta(years=years - 1),
+                relativedelta(years=1), todaydate)
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
                 if futuredate <= todaydate and datetime.today().weekday() < 5:
@@ -349,6 +390,9 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 }
                 total_dict_scenario[len(total_dict_scenario)] = new_row
         elif frequency == 'Quarterly':
+            startdate = _fast_forward_start(
+                startdate, relativedelta(months=3 * (quarters - 1)),
+                relativedelta(months=3), todaydate)
             for k in range(quarters):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(months=3 * k)
                 futuredateday = futuredate.day
@@ -382,6 +426,9 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 }
                 total_dict_scenario[len(total_dict_scenario)] = new_row
         elif frequency == 'BiWeekly':
+            startdate = _fast_forward_start(
+                startdate, relativedelta(weeks=2 * (biweeks - 1)),
+                relativedelta(weeks=2), todaydate)
             for k in range(biweeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
                 if futuredate <= todaydate and datetime.today().weekday() < 5:

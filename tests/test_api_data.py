@@ -646,6 +646,14 @@ class TestRiskScore:
             Schedule.query.filter_by(name="_test_risk_expense").delete()
             _db.session.commit()
 
+    def test_risk_score_runway_days_null_when_no_expenses(self, client):
+        """runway_days is null when no expense drain is observed (balance-only user)."""
+        token = _login(client)
+        body = _json(client.get("/api/v1/risk-score", headers=_bearer(token)))
+        # The seeded user has a balance but no schedules, so there is no
+        # observable expense drain and runway_days should be null.
+        assert body["data"]["runway_days"] is None
+
 
 # ── Balance endpoint ───────────────────────────────────────────────────────
 

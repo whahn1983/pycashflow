@@ -330,6 +330,36 @@ class TestCalcScheduleFrequencies:
         assert len(total) == len(total_scenario)
         assert len(total[total["name"] == "Salary"]) == 13
 
+    def test_old_monthly_schedule_still_produces_future_dates(self, app_ctx):
+        """A monthly schedule whose startdate is >13 months old must still
+        produce at least one future projection point (fast-forward fix)."""
+        old_start = date.today() - timedelta(days=500)  # ~16 months ago
+        s = types.SimpleNamespace(
+            name="OldRent", amount=1200, frequency="Monthly",
+            startdate=old_start, firstdate=old_start, type="Expense",
+        )
+        total, _ = calc_schedule([s], [], [], [], commit=False)
+        rows = total[total["name"] == "OldRent"]
+        future_rows = rows[rows["date"] > date.today()]
+        assert len(future_rows) > 0, (
+            "Old schedule produced no future dates; fast-forward failed"
+        )
+
+    def test_old_weekly_schedule_still_produces_future_dates(self, app_ctx):
+        """A weekly schedule whose startdate is >53 weeks old must still
+        produce at least one future projection point."""
+        old_start = date.today() - timedelta(days=400)  # ~57 weeks ago
+        s = types.SimpleNamespace(
+            name="OldWeekly", amount=50, frequency="Weekly",
+            startdate=old_start, firstdate=old_start, type="Expense",
+        )
+        total, _ = calc_schedule([s], [], [], [], commit=False)
+        rows = total[total["name"] == "OldWeekly"]
+        future_rows = rows[rows["date"] > date.today()]
+        assert len(future_rows) > 0, (
+            "Old weekly schedule produced no future dates; fast-forward failed"
+        )
+
 
 # ── Tests: 90-day projection end-to-end ─────────────────────────────────────
 
