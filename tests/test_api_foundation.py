@@ -367,3 +367,59 @@ class TestSerializers:
         dt = datetime(2026, 4, 9, 14, 30, 0, tzinfo=timezone.utc)
         assert _datetime(dt) == "2026-04-09T14:30:00Z"
         assert _datetime(None) is None
+
+
+class TestAuthEnhancements:
+    def test_login_twofa_required_returns_challenge(self, flask_app, client):
+        with flask_app.app_context():
+            user = User.query.filter_by(email="admin@test.local").first()
+            user.twofa_enabled = True
+            _db.session.commit()
+
+        resp = _login(client)
+        assert resp.status_code == 200
+        body = _json(resp)["data"]
+        assert body["twofa_required"] is True
+        assert "challenge" in body
+        assert "token" not in body
+
+        with flask_app.app_context():
+            user = User.query.filter_by(email="admin@test.local").first()
+            user.twofa_enabled = False
+            _db.session.commit()
+
+    def test_refresh_rotates_token(self, client):
+        old_token = _json(_login(client))["data"]["token"]
+        resp = client.post("/api/v1/auth/refresh", headers=_bearer(old_token))
+        assert resp.status_code == 200
+        new_token = _json(resp)["data"]["token"]
+        assert new_token != old_token
+
+        denied = client.get("/api/v1/auth/me", headers=_bearer(old_token))
+        assert denied.status_code == 401
+
+        ok = client.get("/api/v1/auth/me", headers=_bearer(new_token))
+        assert ok.status_code == 200
+
+    def test_change_password(self, client):
+        token = _json(_login(client))["data"]["token"]
+        resp = client.put(
+            "/api/v1/auth/password",
+            headers=_bearer(token),
+            json={"current_password": "testpass123", "new_password": "newpass1234"},
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+
+        old_login = _login(client, password="testpass123")
+        assert old_login.status_code == 401
+        new_login = _login(client, password="newpass1234")
+        assert new_login.status_code == 200
+        new_token = _json(new_login)["data"]["token"]
+        revert = client.put(
+            "/api/v1/auth/password",
+            headers=_bearer(new_token),
+            json={"current_password": "newpass1234", "new_password": "testpass123"},
+            content_type="application/json",
+        )
+        assert revert.status_code == 200

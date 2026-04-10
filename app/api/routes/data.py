@@ -1,31 +1,22 @@
-"""API v1 read-only data endpoints for mobile clients.
+"""API v1 data endpoints for mobile clients (read + write)."""
 
-Endpoints
----------
-GET   /api/v1/dashboard     Dashboard summary (balance, risk score, projections overview)
-GET   /api/v1/schedules     List recurring scheduled transactions
-GET   /api/v1/projections   Running-balance projection data points
-GET   /api/v1/scenarios     List what-if scenario items
-GET   /api/v1/holds         List held (paused) schedule items
-GET   /api/v1/skips         List skipped transaction instances
-GET   /api/v1/transactions  Upcoming transactions list (next 90 days)
-GET   /api/v1/risk-score    Detailed cash-flow risk assessment
-GET   /api/v1/balance       Current balance snapshot
-
-All endpoints require authentication via Bearer token or active session.
-"""
-
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+import json
 
 from sqlalchemy import desc
 
+from flask import request
+
 from app import db
-from app.models import Schedule, Scenario, Balance, Hold, Skip
+from app.models import Schedule, Scenario, Balance, Hold, Skip, AISettings
 from app.cashflow import update_cash, calculate_cash_risk_score
+from app.ai_insights import fetch_insights
+from app.files import version
 
 from app.api import api
 from app.api.auth_utils import api_login_required, get_api_user
-from app.api.responses import api_ok, api_list
+from app.api.errors import validation_error, not_found, forbidden
+from app.api.responses import api_ok, api_list, api_created, api_no_content
 from app.api.serializers import (
     serialize_schedule,
     serialize_scenario,
@@ -34,319 +25,552 @@ from app.api.serializers import (
     serialize_skip,
     _amount,
     _date,
+    _datetime,
 )
 
 
-def _effective_user_id():
-    """Return the data-owning user ID for the current API request.
+_VALID_TYPES = {"Income", "Expense"}
+_VALID_FREQUENCIES = {"Monthly", "Quarterly", "Yearly", "Weekly", "BiWeekly", "Onetime"}
+_MAX_NAME_LEN = 100
 
-    Guest users see their account owner's data; everyone else sees their own.
-    Mirrors ``main.get_effective_user_id()`` but uses the API auth context.
-    """
+
+def _effective_user_id() -> int:
     user = get_api_user()
-    if user.account_owner_id:
-        return user.account_owner_id
-    return user.id
+    return user.account_owner_id or user.id
 
 
-# ── GET /api/v1/dashboard ────────────────────────────────────────────────────
+def _forbid_guest_writes():
+    user = get_api_user()
+    if not user.admin:
+        return forbidden("Guest users are read-only")
+    return None
 
-@api.route("/dashboard", methods=["GET"])
-@api_login_required
-def api_dashboard():
-    """Return a dashboard summary suitable for a mobile home screen.
 
-    Response 200::
+def _latest_balance(user_id: int):
+    return Balance.query.filter_by(user_id=user_id).order_by(desc(Balance.date), desc(Balance.id)).first()
 
-        {
-          "data": {
-            "balance": "5000.00",
-            "balance_date": "2026-04-09",
-            "risk": { "score": 85, "status": "Safe", "color": "green", ... },
-            "upcoming_transactions": [ ... ],
-            "min_balance": "3200.00"
-          }
-        }
-    """
-    user_id = _effective_user_id()
 
-    # Latest balance — mirrors the index route logic in main.py
-    balance = Balance.query.filter_by(user_id=user_id).order_by(
-        desc(Balance.date), desc(Balance.id)
-    ).first()
+def _parse_limit_offset():
+    limit_raw = request.args.get("limit")
+    offset_raw = request.args.get("offset")
+    if limit_raw is None and offset_raw is None:
+        return None, None, None
 
+    errors = {}
+    try:
+        limit = int(limit_raw) if limit_raw is not None else 50
+        if limit <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        errors["limit"] = "limit must be a positive integer"
+        limit = None
+
+    try:
+        offset = int(offset_raw) if offset_raw is not None else 0
+        if offset < 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        errors["offset"] = "offset must be an integer >= 0"
+        offset = None
+
+    if errors:
+        return errors, None, None
+    return None, limit, offset
+
+
+def _validate_schedule_payload(body: dict) -> dict:
+    errors = {}
+    name = (body.get("name") or "").strip()
+    if not name or len(name) > _MAX_NAME_LEN:
+        errors["name"] = f"Name must be between 1 and {_MAX_NAME_LEN} characters"
+
+    try:
+        float(body.get("amount"))
+    except (TypeError, ValueError):
+        errors["amount"] = "Amount must be a number"
+
+    if body.get("type") not in _VALID_TYPES:
+        errors["type"] = "Invalid type"
+    if body.get("frequency") not in _VALID_FREQUENCIES:
+        errors["frequency"] = "Invalid frequency"
+
+    start_date = body.get("start_date")
+    if not start_date:
+        errors["start_date"] = "start_date is required"
+    else:
+        try:
+            datetime.strptime(start_date, "%Y-%m-%d")
+        except ValueError:
+            errors["start_date"] = "start_date must be YYYY-MM-DD"
+    return errors
+
+
+def _validate_balance_payload(body: dict) -> dict:
+    errors = {}
+    try:
+        float(body.get("amount"))
+    except (TypeError, ValueError):
+        errors["amount"] = "Amount must be a number"
+
+    date_val = body.get("date")
+    if date_val:
+        try:
+            datetime.strptime(date_val, "%Y-%m-%d")
+        except ValueError:
+            errors["date"] = "date must be YYYY-MM-DD"
+    return errors
+
+
+def _project_data(user_id: int):
+    balance = _latest_balance(user_id)
     try:
         balance_amount = float(balance.amount)
     except (ValueError, TypeError, AttributeError):
         balance_amount = 0.0
 
-    # Fetch user data for projection engine
     schedules = Schedule.query.filter_by(user_id=user_id).all()
     holds = Hold.query.filter_by(user_id=user_id).all()
     skips = Skip.query.filter_by(user_id=user_id).all()
     scenarios = Scenario.query.filter_by(user_id=user_id).all()
 
     trans, run, run_scenario = update_cash(balance_amount, schedules, holds, skips, scenarios, commit=False)
+    return balance, balance_amount, trans, run, run_scenario
 
-    # Risk score
+
+@api.route("/dashboard", methods=["GET"])
+@api_login_required
+def api_dashboard():
+    user_id = _effective_user_id()
+    balance, balance_amount, trans, run, _run_scenario = _project_data(user_id)
+
     cash_risk = calculate_cash_risk_score(balance_amount, run)
+    risk_v2 = {
+        "score": cash_risk["score"],
+        "status": cash_risk["status"],
+        "color": cash_risk["color"],
+        "runway_days": cash_risk["runway_days"],
+        "lowest_balance": _amount(cash_risk["lowest_balance"]),
+        "days_to_lowest": cash_risk["days_to_lowest"],
+        "avg_daily_expense": _amount(cash_risk["avg_daily_expense"]),
+        "days_below_threshold": cash_risk["days_below_threshold"],
+        "pct_below_threshold": cash_risk["pct_below_threshold"],
+        "recovery_days": cash_risk["recovery_days"],
+        "near_term_buffer": _amount(cash_risk["near_term_buffer"]),
+    }
 
-    # Min balance within 90-day window (same as plot_cash)
-    from datetime import timedelta
     todaydate = datetime.today().date()
     horizon_90 = todaydate + timedelta(days=90)
     if not run.empty:
         run_copy = run.copy()
-        run_copy['amount'] = run_copy['amount'].astype(float)
-        run_90 = run_copy[run_copy['date'] <= horizon_90]
-        min_balance = float(run_90['amount'].min()) if not run_90.empty else float(run_copy['amount'].min())
+        run_copy["amount"] = run_copy["amount"].astype(float)
+        run_90 = run_copy[run_copy["date"] <= horizon_90]
+        min_balance = float(run_90["amount"].min()) if not run_90.empty else float(run_copy["amount"].min())
     else:
         min_balance = balance_amount
 
-    # Upcoming transactions (next 90 days) — trans DataFrame from update_cash
     upcoming = []
     if not trans.empty:
         for row in trans.itertuples(index=False):
-            upcoming.append({
-                "name": row.name,
-                "type": row.type,
-                "amount": _amount(row.amount),
-                "date": _date(row.date),
-            })
+            upcoming.append({"name": row.name, "type": row.type, "amount": _amount(row.amount), "date": _date(row.date)})
+
+    ai_config = AISettings.query.filter_by(user_id=user_id).first()
+    ai_insights = None
+    ai_last_updated = None
+    if ai_config and ai_config.last_insights:
+        try:
+            ai_insights = json.loads(ai_config.last_insights)
+            ai_last_updated = _datetime(ai_config.last_updated)
+        except (json.JSONDecodeError, ValueError, TypeError):
+            ai_insights = None
 
     balance_date = balance.date if balance else todaydate
-
     return api_ok({
         "balance": _amount(balance_amount),
         "balance_date": _date(balance_date),
         "risk": cash_risk,
+        "risk_deprecated": True,
+        "risk_v2": risk_v2,
         "upcoming_transactions": upcoming,
         "min_balance": _amount(min_balance),
+        "ai_insights": ai_insights,
+        "ai_last_updated": ai_last_updated,
     })
 
-
-# ── GET /api/v1/schedules ────────────────────────────────────────────────────
 
 @api.route("/schedules", methods=["GET"])
 @api_login_required
 def api_schedules():
-    """Return all recurring scheduled items for the authenticated user.
-
-    Response 200::
-
-        { "data": [ { "id": 1, "name": "Rent", ... }, ... ], "meta": { "total": N } }
-    """
     user_id = _effective_user_id()
-    items = Schedule.query.filter_by(user_id=user_id).all()
-    return api_list(
-        [serialize_schedule(s) for s in items],
-        total=len(items),
+    errors, limit, offset = _parse_limit_offset()
+    if errors:
+        return validation_error(errors)
+
+    query = Schedule.query.filter_by(user_id=user_id).order_by(Schedule.id.asc())
+    total = query.count()
+    if limit is not None:
+        query = query.limit(limit).offset(offset)
+
+    items = [serialize_schedule(s) for s in query.all()]
+    return api_list(items, total=total, limit=limit, offset=offset)
+
+
+@api.route("/schedules", methods=["POST"])
+@api_login_required
+def api_create_schedule():
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+    user_id = _effective_user_id()
+    body = request.get_json(silent=True) or {}
+
+    errors = _validate_schedule_payload(body)
+    if errors:
+        return validation_error(errors)
+
+    name = body["name"].strip()
+    if Schedule.query.filter_by(user_id=user_id, name=name).first():
+        return validation_error({"name": "Schedule already exists"})
+
+    start = datetime.strptime(body["start_date"], "%Y-%m-%d").date()
+    record = Schedule(
+        user_id=user_id,
+        name=name,
+        amount=body["amount"],
+        type=body["type"],
+        frequency=body["frequency"],
+        startdate=start,
+        firstdate=start,
     )
+    db.session.add(record)
+    db.session.commit()
+    return api_created(serialize_schedule(record))
 
 
-# ── GET /api/v1/projections ──────────────────────────────────────────────────
+@api.route("/schedules/<int:schedule_id>", methods=["PUT"])
+@api_login_required
+def api_update_schedule(schedule_id: int):
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+    user_id = _effective_user_id()
+    record = Schedule.query.filter_by(user_id=user_id, id=schedule_id).first()
+    if not record:
+        return not_found("Schedule not found")
+
+    body = request.get_json(silent=True) or {}
+    errors = _validate_schedule_payload(body)
+    if errors:
+        return validation_error(errors)
+
+    new_name = body["name"].strip()
+    existing = Schedule.query.filter_by(user_id=user_id, name=new_name).first()
+    if existing and existing.id != record.id:
+        return validation_error({"name": "Schedule name already exists"})
+
+    start = datetime.strptime(body["start_date"], "%Y-%m-%d").date()
+    if start != record.startdate and start.day != record.startdate.day:
+        record.firstdate = start
+
+    record.name = new_name
+    record.amount = body["amount"]
+    record.type = body["type"]
+    record.frequency = body["frequency"]
+    record.startdate = start
+    db.session.commit()
+    return api_ok(serialize_schedule(record))
+
+
+@api.route("/schedules/<int:schedule_id>", methods=["DELETE"])
+@api_login_required
+def api_delete_schedule(schedule_id: int):
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+    user_id = _effective_user_id()
+    record = Schedule.query.filter_by(user_id=user_id, id=schedule_id).first()
+    if not record:
+        return not_found("Schedule not found")
+    db.session.delete(record)
+    db.session.commit()
+    return api_no_content()
+
 
 @api.route("/projections", methods=["GET"])
 @api_login_required
 def api_projections():
-    """Return running-balance projection data points.
-
-    Returns the schedule-only projection and, if scenarios exist, the
-    schedule+scenario projection as well.  Each series is a list of
-    ``{ "date": "YYYY-MM-DD", "amount": "1234.56" }`` objects.
-
-    Response 200::
-
-        {
-          "data": {
-            "schedule": [ {"date": "...", "amount": "..."}, ... ],
-            "scenario": [ ... ] | null
-          }
-        }
-    """
     user_id = _effective_user_id()
-
-    balance = Balance.query.filter_by(user_id=user_id).order_by(
-        desc(Balance.date), desc(Balance.id)
-    ).first()
-
-    try:
-        balance_amount = float(balance.amount)
-    except (ValueError, TypeError, AttributeError):
-        balance_amount = 0.0
-
-    schedules = Schedule.query.filter_by(user_id=user_id).all()
-    holds = Hold.query.filter_by(user_id=user_id).all()
-    skips = Skip.query.filter_by(user_id=user_id).all()
-    scenarios = Scenario.query.filter_by(user_id=user_id).all()
-
-    _trans, run, run_scenario = update_cash(balance_amount, schedules, holds, skips, scenarios, commit=False)
+    _balance, _amount_value, _trans, run, run_scenario = _project_data(user_id)
 
     def _series(df):
         if df is None or df.empty:
             return None
-        points = []
-        for row in df.itertuples(index=False):
-            points.append({
-                "date": _date(row.date),
-                "amount": _amount(row.amount),
-            })
-        return points
+        return [{"date": _date(row.date), "amount": _amount(row.amount)} for row in df.itertuples(index=False)]
 
-    return api_ok({
-        "schedule": _series(run) or [],
-        "scenario": _series(run_scenario),
-    })
+    return api_ok({"schedule": _series(run) or [], "scenario": _series(run_scenario)})
 
-
-# ── GET /api/v1/scenarios ────────────────────────────────────────────────────
 
 @api.route("/scenarios", methods=["GET"])
 @api_login_required
 def api_scenarios():
-    """Return all what-if scenario items for the authenticated user."""
     user_id = _effective_user_id()
-    items = Scenario.query.filter_by(user_id=user_id).all()
-    return api_list(
-        [serialize_scenario(s) for s in items],
-        total=len(items),
+    errors, limit, offset = _parse_limit_offset()
+    if errors:
+        return validation_error(errors)
+
+    query = Scenario.query.filter_by(user_id=user_id).order_by(Scenario.id.asc())
+    total = query.count()
+    if limit is not None:
+        query = query.limit(limit).offset(offset)
+
+    return api_list([serialize_scenario(s) for s in query.all()], total=total, limit=limit, offset=offset)
+
+
+@api.route("/scenarios", methods=["POST"])
+@api_login_required
+def api_create_scenario():
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+    user_id = _effective_user_id()
+    body = request.get_json(silent=True) or {}
+    errors = _validate_schedule_payload(body)
+    if errors:
+        return validation_error(errors)
+
+    name = body["name"].strip()
+    if Scenario.query.filter_by(user_id=user_id, name=name).first():
+        return validation_error({"name": "Scenario already exists"})
+
+    start = datetime.strptime(body["start_date"], "%Y-%m-%d").date()
+    record = Scenario(
+        user_id=user_id,
+        name=name,
+        amount=body["amount"],
+        type=body["type"],
+        frequency=body["frequency"],
+        startdate=start,
+        firstdate=start,
     )
+    db.session.add(record)
+    db.session.commit()
+    return api_created(serialize_scenario(record))
 
 
-# ── GET /api/v1/holds ────────────────────────────────────────────────────────
+@api.route("/scenarios/<int:scenario_id>", methods=["PUT"])
+@api_login_required
+def api_update_scenario(scenario_id: int):
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+    user_id = _effective_user_id()
+    record = Scenario.query.filter_by(user_id=user_id, id=scenario_id).first()
+    if not record:
+        return not_found("Scenario not found")
+
+    body = request.get_json(silent=True) or {}
+    errors = _validate_schedule_payload(body)
+    if errors:
+        return validation_error(errors)
+
+    new_name = body["name"].strip()
+    existing = Scenario.query.filter_by(user_id=user_id, name=new_name).first()
+    if existing and existing.id != record.id:
+        return validation_error({"name": "Scenario name already exists"})
+
+    start = datetime.strptime(body["start_date"], "%Y-%m-%d").date()
+    if start != record.startdate and start.day != record.startdate.day:
+        record.firstdate = start
+
+    record.name = new_name
+    record.amount = body["amount"]
+    record.type = body["type"]
+    record.frequency = body["frequency"]
+    record.startdate = start
+    db.session.commit()
+    return api_ok(serialize_scenario(record))
+
+
+@api.route("/scenarios/<int:scenario_id>", methods=["DELETE"])
+@api_login_required
+def api_delete_scenario(scenario_id: int):
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+    user_id = _effective_user_id()
+    record = Scenario.query.filter_by(user_id=user_id, id=scenario_id).first()
+    if not record:
+        return not_found("Scenario not found")
+    db.session.delete(record)
+    db.session.commit()
+    return api_no_content()
+
 
 @api.route("/holds", methods=["GET"])
 @api_login_required
 def api_holds():
-    """Return all held (paused) schedule items."""
     user_id = _effective_user_id()
-    items = Hold.query.filter_by(user_id=user_id).all()
-    return api_list(
-        [serialize_hold(h) for h in items],
-        total=len(items),
-    )
+    errors, limit, offset = _parse_limit_offset()
+    if errors:
+        return validation_error(errors)
+
+    query = Hold.query.filter_by(user_id=user_id).order_by(Hold.id.asc())
+    total = query.count()
+    if limit is not None:
+        query = query.limit(limit).offset(offset)
+
+    return api_list([serialize_hold(h) for h in query.all()], total=total, limit=limit, offset=offset)
 
 
-# ── GET /api/v1/skips ────────────────────────────────────────────────────────
+@api.route("/holds", methods=["POST"])
+@api_login_required
+def api_create_hold():
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+
+    user_id = _effective_user_id()
+    body = request.get_json(silent=True) or {}
+    schedule_id = body.get("schedule_id")
+    if schedule_id is None:
+        return validation_error({"schedule_id": "schedule_id is required"})
+
+    schedule = Schedule.query.filter_by(user_id=user_id, id=schedule_id).first()
+    if not schedule:
+        return not_found("Schedule not found")
+
+    hold = Hold(name=schedule.name, type=schedule.type, amount=schedule.amount, user_id=user_id)
+    db.session.add(hold)
+    db.session.commit()
+    return api_created(serialize_hold(hold))
+
+
+@api.route("/holds/<int:hold_id>", methods=["DELETE"])
+@api_login_required
+def api_delete_hold(hold_id: int):
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+
+    user_id = _effective_user_id()
+    hold = Hold.query.filter_by(user_id=user_id, id=hold_id).first()
+    if not hold:
+        return not_found("Hold not found")
+    db.session.delete(hold)
+    db.session.commit()
+    return api_no_content()
+
+
+@api.route("/holds", methods=["DELETE"])
+@api_login_required
+def api_clear_holds():
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+
+    user_id = _effective_user_id()
+    Hold.query.filter_by(user_id=user_id).delete()
+    db.session.commit()
+    return api_no_content()
+
 
 @api.route("/skips", methods=["GET"])
 @api_login_required
 def api_skips():
-    """Return all skipped transaction instances."""
     user_id = _effective_user_id()
-    items = Skip.query.filter_by(user_id=user_id).all()
-    return api_list(
-        [serialize_skip(s) for s in items],
-        total=len(items),
+    errors, limit, offset = _parse_limit_offset()
+    if errors:
+        return validation_error(errors)
+
+    query = Skip.query.filter_by(user_id=user_id).order_by(Skip.id.asc())
+    total = query.count()
+    if limit is not None:
+        query = query.limit(limit).offset(offset)
+
+    return api_list([serialize_skip(s) for s in query.all()], total=total, limit=limit, offset=offset)
+
+
+@api.route("/skips", methods=["POST"])
+@api_login_required
+def api_create_skip():
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+
+    user_id = _effective_user_id()
+    body = request.get_json(silent=True) or {}
+    transaction_index = body.get("transaction_index")
+    if transaction_index is None:
+        return validation_error({"transaction_index": "transaction_index is required"})
+
+    _balance, balance_amount, _t, _r, _rs = _project_data(user_id)
+    schedules = Schedule.query.filter_by(user_id=user_id).all()
+    holds = Hold.query.filter_by(user_id=user_id).all()
+    skips = Skip.query.filter_by(user_id=user_id).all()
+    trans, _run, _run_scenario = update_cash(balance_amount, schedules, holds, skips, commit=False)
+
+    try:
+        tx = trans.loc[int(transaction_index)]
+    except Exception:
+        return validation_error({"transaction_index": "transaction index not found"})
+
+    trans_type = "Income" if tx["type"] == "Expense" else "Expense"
+    skip = Skip(
+        name=f"{tx['name']} (SKIP)",
+        type=trans_type,
+        amount=tx["amount"],
+        date=tx["date"],
+        user_id=user_id,
     )
+    db.session.add(skip)
+    db.session.commit()
+    return api_created(serialize_skip(skip))
 
 
-# ── GET /api/v1/transactions ────────────────────────────────────────────────
+@api.route("/skips/<int:skip_id>", methods=["DELETE"])
+@api_login_required
+def api_delete_skip(skip_id: int):
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+
+    user_id = _effective_user_id()
+    skip = Skip.query.filter_by(user_id=user_id, id=skip_id).first()
+    if not skip:
+        return not_found("Skip not found")
+    db.session.delete(skip)
+    db.session.commit()
+    return api_no_content()
+
+
+@api.route("/skips", methods=["DELETE"])
+@api_login_required
+def api_clear_skips():
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+
+    user_id = _effective_user_id()
+    Skip.query.filter_by(user_id=user_id).delete()
+    db.session.commit()
+    return api_no_content()
+
 
 @api.route("/transactions", methods=["GET"])
 @api_login_required
 def api_transactions():
-    """Return upcoming transactions for the next 90 days.
-
-    Each transaction is an individual occurrence expanded from the user's
-    recurring schedules, with holds and skips applied.  This is the same
-    data shown on the web app's ``/transactions`` page.
-
-    Response 200::
-
-        {
-          "data": [
-            { "name": "Rent", "type": "Expense", "amount": "1200.00", "date": "2026-04-15" },
-            ...
-          ],
-          "meta": { "total": N }
-        }
-    """
     user_id = _effective_user_id()
-
-    balance = Balance.query.filter_by(user_id=user_id).order_by(
-        desc(Balance.date), desc(Balance.id)
-    ).first()
-
-    try:
-        balance_amount = float(balance.amount)
-    except (ValueError, TypeError, AttributeError):
-        balance_amount = 0.0
-
-    schedules = Schedule.query.filter_by(user_id=user_id).all()
-    holds = Hold.query.filter_by(user_id=user_id).all()
-    skips = Skip.query.filter_by(user_id=user_id).all()
-    scenarios = Scenario.query.filter_by(user_id=user_id).all()
-
-    trans, _run, _run_scenario = update_cash(
-        balance_amount, schedules, holds, skips, scenarios, commit=False
-    )
+    _balance, _balance_amount, trans, _run, _run_scenario = _project_data(user_id)
+    errors, limit, offset = _parse_limit_offset()
+    if errors:
+        return validation_error(errors)
 
     items = []
     if not trans.empty:
         for row in trans.itertuples(index=False):
-            items.append({
-                "name": row.name,
-                "type": row.type,
-                "amount": _amount(row.amount),
-                "date": _date(row.date),
-            })
+            items.append({"name": row.name, "type": row.type, "amount": _amount(row.amount), "date": _date(row.date)})
 
-    return api_list(items, total=len(items))
+    total = len(items)
+    if limit is not None:
+        items = items[offset:offset + limit]
 
+    return api_list(items, total=total, limit=limit, offset=offset)
 
-# ── GET /api/v1/risk-score ──────────────────────────────────────────────────
 
 @api.route("/risk-score", methods=["GET"])
 @api_login_required
 def api_risk_score():
-    """Return a detailed cash-flow risk assessment.
-
-    Provides the full risk-score breakdown computed by
-    ``calculate_cash_risk_score()``, with monetary values serialized as
-    decimal strings for consistency with the rest of the API.
-
-    Response 200::
-
-        {
-          "data": {
-            "score": 85,
-            "status": "Safe",
-            "color": "green",
-            "runway_days": 120.0,  // null when no expense drain (stable balance)
-            "lowest_balance": "2500.00",
-            "days_to_lowest": 15,
-            "avg_daily_expense": "45.50",
-            "days_below_threshold": 0,
-            "pct_below_threshold": 0.0,
-            "recovery_days": 0,
-            "near_term_buffer": "3200.00"
-          }
-        }
-    """
     user_id = _effective_user_id()
-
-    balance = Balance.query.filter_by(user_id=user_id).order_by(
-        desc(Balance.date), desc(Balance.id)
-    ).first()
-
-    try:
-        balance_amount = float(balance.amount)
-    except (ValueError, TypeError, AttributeError):
-        balance_amount = 0.0
-
-    schedules = Schedule.query.filter_by(user_id=user_id).all()
-    holds = Hold.query.filter_by(user_id=user_id).all()
-    skips = Skip.query.filter_by(user_id=user_id).all()
-    scenarios = Scenario.query.filter_by(user_id=user_id).all()
-
-    _trans, run, _run_scenario = update_cash(
-        balance_amount, schedules, holds, skips, scenarios, commit=False
-    )
-
+    _balance, balance_amount, _trans, run, _run_scenario = _project_data(user_id)
     raw = calculate_cash_risk_score(balance_amount, run)
 
-    # Re-serialize monetary/float values as decimal strings for API consistency.
     return api_ok({
         "score": raw["score"],
         "status": raw["status"],
@@ -362,43 +586,140 @@ def api_risk_score():
     })
 
 
-# ── GET /api/v1/balance ─────────────────────────────────────────────────────
-
 @api.route("/balance", methods=["GET"])
 @api_login_required
 def api_balance():
-    """Return the current balance snapshot.
-
-    A lightweight endpoint that returns only the latest balance record
-    without running the projection engine.  Ideal for widgets and quick
-    balance checks.
-
-    Response 200::
-
-        {
-          "data": {
-            "id": 1,
-            "amount": "5000.00",
-            "date": "2026-04-09"
-          }
-        }
-
-    If no balance record exists, ``amount`` defaults to ``"0.00"`` and
-    ``date`` defaults to today.
-    """
     user_id = _effective_user_id()
-
-    balance = Balance.query.filter_by(user_id=user_id).order_by(
-        desc(Balance.date), desc(Balance.id)
-    ).first()
+    balance = _latest_balance(user_id)
 
     if balance:
         return api_ok(serialize_balance(balance))
 
-    # No balance record — return a sensible default.
     todaydate = datetime.today().date()
+    return api_ok({"id": None, "amount": _amount(0), "date": _date(todaydate)})
+
+
+@api.route("/balance", methods=["POST"])
+@api_login_required
+def api_set_balance():
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+
+    user_id = _effective_user_id()
+    body = request.get_json(silent=True) or {}
+    errors = _validate_balance_payload(body)
+    if errors:
+        return validation_error(errors)
+
+    balance_date = datetime.strptime(body.get("date") or datetime.today().date().isoformat(), "%Y-%m-%d").date()
+    balance = Balance(user_id=user_id, amount=body["amount"], date=balance_date)
+    db.session.add(balance)
+    db.session.commit()
+    return api_created(serialize_balance(balance))
+
+
+@api.route("/balance/history", methods=["GET"])
+@api_login_required
+def api_balance_history():
+    user_id = _effective_user_id()
+    errors, limit, offset = _parse_limit_offset()
+    if errors:
+        return validation_error(errors)
+
+    query = Balance.query.filter_by(user_id=user_id).order_by(desc(Balance.date), desc(Balance.id))
+    total = query.count()
+    if limit is not None:
+        query = query.limit(limit).offset(offset)
+
+    return api_list([serialize_balance(b) for b in query.all()], total=total, limit=limit, offset=offset)
+
+
+@api.route("/settings", methods=["GET"])
+@api_login_required
+def api_settings():
+    user = get_api_user()
+    user_id = _effective_user_id()
+
+    about = version()
+    try:
+        parts = about.split("::")
+        app_version = parts[0].split(":", 1)[1].strip()
+        py_version = parts[1].split(":", 1)[1].strip()
+    except (IndexError, ValueError):
+        app_version = about.strip()
+        py_version = ""
+
+    ai_config = AISettings.query.filter_by(user_id=user_id).first()
     return api_ok({
-        "id": None,
-        "amount": _amount(0),
-        "date": _date(todaydate),
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "is_admin": bool(user.admin),
+            "is_global_admin": bool(user.is_global_admin),
+            "is_guest": user.account_owner_id is not None,
+        },
+        "app": {
+            "version": app_version,
+            "python_version": py_version,
+        },
+        "ai": {
+            "configured": bool(ai_config and ai_config.api_key),
+            "model": ai_config.model_version if ai_config else None,
+            "last_updated": _datetime(ai_config.last_updated) if ai_config else None,
+        },
     })
+
+
+@api.route("/insights", methods=["GET"])
+@api_login_required
+def api_insights():
+    user_id = _effective_user_id()
+    ai_config = AISettings.query.filter_by(user_id=user_id).first()
+    if not ai_config:
+        return api_ok({"configured": False, "insights": None, "last_updated": None})
+
+    insights = None
+    if ai_config.last_insights:
+        try:
+            insights = json.loads(ai_config.last_insights)
+        except (json.JSONDecodeError, ValueError):
+            insights = None
+
+    return api_ok({
+        "configured": bool(ai_config.api_key),
+        "insights": insights,
+        "last_updated": _datetime(ai_config.last_updated),
+        "model": ai_config.model_version,
+    })
+
+
+@api.route("/insights/refresh", methods=["POST"])
+@api_login_required
+def api_insights_refresh():
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
+
+    user_id = _effective_user_id()
+    ai_config = AISettings.query.filter_by(user_id=user_id).first()
+    if not ai_config or not ai_config.api_key:
+        return validation_error({"api_key": "No OpenAI API key configured"})
+
+    balance_record = _latest_balance(user_id)
+    current_balance = float(balance_record.amount) if balance_record else 0.0
+
+    schedules = Schedule.query.filter_by(user_id=user_id).all()
+    holds = Hold.query.filter_by(user_id=user_id).all()
+    skips = Skip.query.filter_by(user_id=user_id).all()
+
+    try:
+        insights_json = fetch_insights(ai_config.api_key, current_balance, schedules, holds, skips, model=ai_config.model_version)
+        parsed = json.loads(insights_json)
+    except Exception:
+        return validation_error({"insights": "Unable to generate AI insights"}, message="AI insights generation failed")
+
+    ai_config.last_insights = insights_json
+    ai_config.last_updated = datetime.now(timezone.utc)
+    db.session.commit()
+
+    return api_ok({"configured": True, "insights": parsed, "last_updated": _datetime(ai_config.last_updated), "model": ai_config.model_version})

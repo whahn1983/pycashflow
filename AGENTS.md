@@ -311,3 +311,22 @@ their own credentials.
 
 10. **Document new endpoints.** Update `MOBILE_API_REFERENCE.md` and the
     endpoint inventory in `API_CONVENTIONS.md` when adding routes.
+
+---
+
+## iOS App (SwiftUI) Notes
+
+A SwiftUI client now lives under `/ios-app` with this structure:
+
+- `/ios-app/PyCashFlowApp/App`: app entry (`PyCashFlowApp`) and root navigation (`RootView`)
+- `/ios-app/PyCashFlowApp/Core/Networking`: HTTP API client and envelope decoding
+- `/ios-app/PyCashFlowApp/Core/Auth`: session manager/token state
+- `/ios-app/PyCashFlowApp/Core/Models`: API-aligned DTOs
+- `/ios-app/PyCashFlowApp/Features/*`: screen modules (`Login`, `Dashboard`, `Accounts`, `Projections`, `Schedules`, `Scenarios`, `Settings`)
+
+### iOS Architecture Conventions
+
+- UI layers should consume only backend API contracts; no embedded cashflow business logic.
+- API envelopes must decode from backend `{ data: ... }` / `{ data: [...], meta: ... }` shapes.
+- Authentication is Bearer-token based; session state should be centralized in `SessionManager`.
+- If UI needs new behavior, add/extend backend API endpoints rather than client-side rule duplication.

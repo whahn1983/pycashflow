@@ -733,3 +733,66 @@ class TestBalance:
         with flask_app.app_context():
             User.query.filter_by(email="_nobal@test.local").delete()
             _db.session.commit()
+
+
+class TestWriteEndpoints:
+    def test_create_update_delete_schedule(self, client):
+        token = _login(client)
+        create = client.post(
+            "/api/v1/schedules",
+            headers=_bearer(token),
+            json={
+                "name": "_mobile_sched",
+                "amount": "123.45",
+                "type": "Expense",
+                "frequency": "Monthly",
+                "start_date": date.today().isoformat(),
+            },
+            content_type="application/json",
+        )
+        assert create.status_code == 201
+        item = _json(create)["data"]
+
+        update = client.put(
+            f"/api/v1/schedules/{item['id']}",
+            headers=_bearer(token),
+            json={
+                "name": "_mobile_sched_upd",
+                "amount": "150.00",
+                "type": "Expense",
+                "frequency": "Monthly",
+                "start_date": date.today().isoformat(),
+            },
+            content_type="application/json",
+        )
+        assert update.status_code == 200
+        assert _json(update)["data"]["name"] == "_mobile_sched_upd"
+
+        delete = client.delete(f"/api/v1/schedules/{item['id']}", headers=_bearer(token))
+        assert delete.status_code == 204
+
+    def test_balance_post_and_history(self, client):
+        token = _login(client)
+        resp = client.post(
+            "/api/v1/balance",
+            headers=_bearer(token),
+            json={"amount": "999.00", "date": date.today().isoformat()},
+            content_type="application/json",
+        )
+        assert resp.status_code == 201
+
+        history = client.get("/api/v1/balance/history?limit=1&offset=0", headers=_bearer(token))
+        assert history.status_code == 200
+        body = _json(history)
+        assert "meta" in body
+        assert "limit" in body["meta"]
+
+    def test_settings_and_insights_read(self, client):
+        token = _login(client)
+        settings = client.get("/api/v1/settings", headers=_bearer(token))
+        assert settings.status_code == 200
+        assert "app" in _json(settings)["data"]
+
+        insights = client.get("/api/v1/insights", headers=_bearer(token))
+        assert insights.status_code == 200
+        assert "configured" in _json(insights)["data"]
