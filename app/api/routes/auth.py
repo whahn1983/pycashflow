@@ -117,18 +117,22 @@ def api_login():
 def api_login_2fa():
     body = request.get_json(silent=True) or {}
     errors: dict = {}
-    if not body.get("challenge", "").strip():
+    challenge_raw = body.get("challenge")
+    challenge = challenge_raw.strip() if isinstance(challenge_raw, str) else ""
+    if not challenge:
         errors["challenge"] = "Challenge is required"
-    if not body.get("code", "").strip():
+    code_raw = body.get("code")
+    code = code_raw.strip() if isinstance(code_raw, str) else ""
+    if not code:
         errors["code"] = "Code is required"
     if errors:
         return validation_error(errors)
 
-    user = _verify_twofa_challenge(body["challenge"].strip())
+    user = _verify_twofa_challenge(challenge)
     if user is None or not user.is_active or not user.twofa_enabled:
         return unauthorized("Invalid or expired 2FA challenge")
 
-    submitted = body["code"].strip()
+    submitted = code
     twofa_ok = False
 
     try:
@@ -145,7 +149,7 @@ def api_login_2fa():
     if not twofa_ok:
         return unauthorized("Invalid verification code")
 
-    _mark_twofa_challenge_consumed(body["challenge"].strip())
+    _mark_twofa_challenge_consumed(challenge)
     raw_token, _record = create_token_for_user(user)
     return api_ok({"token": raw_token, "user": serialize_user(user)})
 

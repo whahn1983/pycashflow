@@ -439,6 +439,14 @@ class TestAuthEnhancements:
                 user.twofa_secret = None
                 _db.session.commit()
 
+    def test_login_2fa_validation_rejects_non_string_fields(self, client):
+        resp = client.post("/api/v1/auth/login/2fa", json={"challenge": 123, "code": 456})
+        assert resp.status_code == 422
+        body = _json(resp)
+        assert body["code"] == "validation_error"
+        assert "challenge" in body["fields"]
+        assert "code" in body["fields"]
+
     def test_change_password(self, client):
         token = _json(_login(client))["data"]["token"]
         resp = client.put(

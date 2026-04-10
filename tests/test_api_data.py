@@ -802,6 +802,38 @@ class TestWriteEndpoints:
         assert "meta" in body
         assert "limit" in body["meta"]
 
+    def test_create_schedule_rejects_non_string_name(self, client):
+        token = _login(client)
+        resp = client.post(
+            "/api/v1/schedules",
+            headers=_bearer(token),
+            json={
+                "name": 123,
+                "amount": "50.00",
+                "type": "Expense",
+                "frequency": "Monthly",
+                "start_date": date.today().isoformat(),
+            },
+            content_type="application/json",
+        )
+        assert resp.status_code == 422
+        body = _json(resp)
+        assert body["code"] == "validation_error"
+        assert "name" in body["fields"]
+
+    def test_balance_post_rejects_non_string_date(self, client):
+        token = _login(client)
+        resp = client.post(
+            "/api/v1/balance",
+            headers=_bearer(token),
+            json={"amount": "999.00", "date": 123},
+            content_type="application/json",
+        )
+        assert resp.status_code == 422
+        body = _json(resp)
+        assert body["code"] == "validation_error"
+        assert "date" in body["fields"]
+
     def test_settings_and_insights_read(self, client):
         token = _login(client)
         settings = client.get("/api/v1/settings", headers=_bearer(token))

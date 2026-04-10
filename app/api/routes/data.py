@@ -80,7 +80,8 @@ def _parse_limit_offset():
 
 def _validate_schedule_payload(body: dict) -> dict:
     errors = {}
-    name = (body.get("name") or "").strip()
+    name_raw = body.get("name")
+    name = name_raw.strip() if isinstance(name_raw, str) else ""
     if not name or len(name) > _MAX_NAME_LEN:
         errors["name"] = f"Name must be between 1 and {_MAX_NAME_LEN} characters"
 
@@ -116,7 +117,7 @@ def _validate_balance_payload(body: dict) -> dict:
     if date_val:
         try:
             datetime.strptime(date_val, "%Y-%m-%d")
-        except ValueError:
+        except (TypeError, ValueError):
             errors["date"] = "date must be YYYY-MM-DD"
     return errors
 
