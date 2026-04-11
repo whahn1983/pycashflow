@@ -15,6 +15,7 @@ status codes, redirects, and flash messages where they are easy to assert.
 """
 
 import pytest
+import importlib
 from werkzeug.security import generate_password_hash
 
 
@@ -230,3 +231,55 @@ def test_delete_user_removes_passkey_credentials(
     assert passkey_credential_model.query.filter_by(
         credential_id="guest-credential-to-delete"
     ).first() is None
+
+
+class TestGuestOnboarding:
+    def test_add_guest_sends_password_setup_email(
+        self, auth_client, flask_app, app_ctx, user_model, password_setup_token_model, monkeypatch
+    ):
+        monkeypatch.setitem(flask_app.config, "FRONTEND_BASE_URL", "https://app.example.com/")
+        sent = {}
+
+        def _fake_send_password_setup_email(user_name, user_email, setup_url, expires_minutes):
+            sent["user_name"] = user_name
+            sent["user_email"] = user_email
+            sent["setup_url"] = setup_url
+            sent["expires_minutes"] = expires_minutes
+            return True
+
+        main_module = importlib.import_module("app.main")
+        monkeypatch.setattr(main_module, "send_password_setup_email", _fake_send_password_setup_email)
+        resp = auth_client.post(
+            "/add_guest",
+            data={"name": "Guest Invite", "email": "guest-invite@test.local"},
+            follow_redirects=True,
+        )
+
+        assert resp.status_code == 200
+        assert _flashed(resp.data, "password setup email was sent")
+        assert sent["user_name"] == "Guest Invite"
+        assert sent["user_email"] == "guest-invite@test.local"
+        assert sent["setup_url"].startswith("https://app.example.com/auth/set-password/")
+        assert isinstance(sent["expires_minutes"], int)
+
+        guest = user_model.query.filter_by(email="guest-invite@test.local").first()
+        assert guest is not None
+        assert guest.account_owner_id is not None
+
+        app_ctx.session.query(password_setup_token_model).filter_by(user_id=guest.id).delete()
+        app_ctx.session.delete(guest)
+        app_ctx.session.commit()
+
+    def test_add_guest_requires_frontend_base_url(
+        self, auth_client, flask_app, app_ctx, user_model, monkeypatch
+    ):
+        monkeypatch.setitem(flask_app.config, "FRONTEND_BASE_URL", "")
+        resp = auth_client.post(
+            "/add_guest",
+            data={"name": "No Frontend", "email": "guest-no-front@test.local"},
+            follow_redirects=True,
+        )
+
+        assert resp.status_code == 200
+        assert _flashed(resp.data, "frontend_base_url must be configured")
+        assert user_model.query.filter_by(email="guest-no-front@test.local").first() is None

@@ -1,13 +1,16 @@
-from flask import request, redirect, url_for, send_from_directory, flash, send_file, Response, session
+from flask import (
+    request, redirect, url_for, send_from_directory, flash, send_file, Response, session, current_app
+)
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import (
     Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip,
-    GlobalEmailSettings, AISettings, PasskeyCredential, UserToken,
+    GlobalEmailSettings, AISettings, PasskeyCredential, UserToken, PasswordSetupToken,
 )
 from app import db, limiter
 from datetime import datetime, timezone
 import os
+import secrets
 import json
 import logging
 from sqlalchemy import desc, extract, asc
@@ -16,8 +19,10 @@ from .cashflow import update_cash, plot_cash, calculate_cash_risk_score
 from .auth import admin_required, global_admin_required, account_owner_required
 from .files import export, upload, version
 from .getemail import send_account_activation_notification
+from .getemail import send_password_setup_email
 from .crypto_utils import encrypt_password, decrypt_password
 from .ai_insights import fetch_insights, validate_model
+from .password_setup import create_password_setup_link
 from .totp_utils import (
     generate_totp_secret, encrypt_totp_secret, decrypt_totp_secret,
     generate_qr_code_b64, verify_totp,
@@ -828,6 +833,7 @@ def delete_user(id):
 
             # Delete all API tokens for this user
             db.session.query(UserToken).filter_by(user_id=user_id).delete()
+            db.session.query(PasswordSetupToken).filter_by(user_id=user_id).delete()
 
             # Now delete the user
             db.session.delete(user)
@@ -1049,14 +1055,15 @@ def add_guest():
         flash('A user with this email already exists')
         return redirect(url_for('main.manage_guests'))
 
-    # Generate a random password for guest (they can change it later)
-    import secrets
-    temp_password = secrets.token_urlsafe(16)
+    frontend_base = (current_app.config.get("FRONTEND_BASE_URL") or "").strip().rstrip("/")
+    if not frontend_base:
+        flash("FRONTEND_BASE_URL must be configured before inviting guest users")
+        return redirect(url_for('main.manage_guests'))
 
     new_guest = User(
         email=email,
         name=name,
-        password=generate_password_hash(temp_password, method='scrypt'),
+        password=generate_password_hash(secrets.token_urlsafe(48), method='scrypt'),
         admin=False,  # Guests are not admins
         is_global_admin=False,
         is_active=True,
@@ -1067,9 +1074,21 @@ def add_guest():
     db.session.add(new_guest)
     db.session.commit()
 
-    # Return template directly so the plaintext password is never stored in the session cookie.
-    # The password is only held in this request's local scope and rendered once.
-    return render_template('guest_password.html', temp_password=temp_password, name=name, email=email)
+    setup_url, expires_minutes = create_password_setup_link(new_guest)
+    sent = send_password_setup_email(
+        user_name=name,
+        user_email=email,
+        setup_url=setup_url,
+        expires_minutes=expires_minutes,
+    )
+    if sent:
+        flash(f"Guest invited. A password setup email was sent to {email}.")
+    else:
+        flash(
+            "Guest created, but setup email could not be sent. "
+            "Check global email settings and try again."
+        )
+    return redirect(url_for('main.manage_guests'))
 
 
 @main.route('/guest_password')
@@ -1088,6 +1107,7 @@ def remove_guest(guest_id):
     guest = User.query.filter_by(id=int(guest_id), account_owner_id=current_user.id).first()
 
     if guest:
+        db.session.query(PasswordSetupToken).filter_by(user_id=guest.id).delete()
         db.session.delete(guest)
         db.session.commit()
         flash('Guest user removed successfully')

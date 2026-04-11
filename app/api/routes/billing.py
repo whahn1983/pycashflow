@@ -17,9 +17,7 @@ from app import db
 from app.models import User
 from app.getemail import send_password_setup_email
 from app.password_setup import (
-    build_password_setup_url,
-    create_password_setup_token,
-    get_password_setup_ttl_minutes,
+    create_password_setup_link,
 )
 from app.subscription import (
     SUB_ACTIVE,
@@ -92,13 +90,12 @@ def _send_setup_email_for_new_user(user: User, created: bool) -> None:
     if not created:
         return
 
-    raw_token, _record = create_password_setup_token(user)
-    setup_url = build_password_setup_url(raw_token)
+    setup_url, expires_minutes = create_password_setup_link(user)
     sent = send_password_setup_email(
         user_name=user.name or user.email.split("@")[0],
         user_email=user.email,
         setup_url=setup_url,
-        expires_minutes=get_password_setup_ttl_minutes(),
+        expires_minutes=expires_minutes,
     )
     if not sent:
         logger.warning("Password setup email could not be sent for user_id=%s", user.id)
