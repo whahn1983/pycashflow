@@ -52,6 +52,12 @@ def create_password_setup_token(user: User) -> tuple[str, PasswordSetupToken]:
     return raw_token, token_record
 
 
+def create_password_setup_link(user: User) -> tuple[str, int]:
+    """Create a one-time setup token for ``user`` and return URL + expiry minutes."""
+    raw_token, _record = create_password_setup_token(user)
+    return build_password_setup_url(raw_token), get_password_setup_ttl_minutes()
+
+
 def consume_password_setup_token(raw_token: str) -> User | None:
     token_record = PasswordSetupToken.query.filter_by(token_hash=hash_token(raw_token)).first()
     if token_record is None:
