@@ -19,6 +19,9 @@ from app.subscription import (
     SUB_ACTIVE,
     SUB_EXPIRED,
     apply_subscription_status,
+    owner_for_user,
+    payments_enabled,
+    subscription_is_current,
 )
 
 from app.api import api
@@ -192,6 +195,41 @@ def api_create_checkout_session():
             "checkout_url": f"https://checkout.stripe.com/pay/{session_id}",
             "mode": "subscription",
             "subscription_source": "stripe",
+        }
+    )
+
+
+@api.route("/billing/status", methods=["GET"])
+@api_login_required
+def api_billing_status():
+    user = get_api_user()
+    owner = owner_for_user(user)
+    owner_id = user.owner_user_id or user.account_owner_id
+
+    effective_is_active = bool(user.is_global_admin)
+    if not effective_is_active:
+        if payments_enabled():
+            effective_is_active = subscription_is_current(owner)
+        else:
+            effective_is_active = bool(user.is_active)
+
+    subscription_subject = owner or user
+    expiry = subscription_subject.subscription_expiry
+    if expiry and expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=timezone.utc)
+
+    return api_ok(
+        {
+            "user_id": user.id,
+            "is_active": bool(user.is_active),
+            "effective_is_active": effective_is_active,
+            "subscription_status": subscription_subject.subscription_status,
+            "subscription_source": subscription_subject.subscription_source,
+            "subscription_expiry": expiry.strftime("%Y-%m-%dT%H:%M:%SZ") if expiry else None,
+            "payments_enabled": payments_enabled(),
+            "is_global_admin": bool(user.is_global_admin),
+            "is_guest": owner_id is not None,
+            "owner_user_id": owner_id,
         }
     )
 
