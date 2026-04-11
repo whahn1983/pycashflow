@@ -16,6 +16,7 @@ status codes, redirects, and flash messages where they are easy to assert.
 
 import pytest
 import importlib
+from datetime import datetime, timezone
 from werkzeug.security import generate_password_hash
 
 
@@ -231,6 +232,56 @@ def test_delete_user_removes_passkey_credentials(
     assert passkey_credential_model.query.filter_by(
         credential_id="guest-credential-to-delete"
     ).first() is None
+
+
+def test_delete_owner_removes_guest_password_setup_tokens(
+    auth_client, app_ctx, user_model, password_setup_token_model
+):
+    db = app_ctx
+    acting_admin = user_model.query.filter_by(email="admin@test.local").first()
+    acting_admin.is_global_admin = True
+    db.session.flush()
+
+    owner = user_model(
+        email="owner-delete@test.local",
+        password=generate_password_hash("testpass123", method="scrypt"),
+        name="Owner To Delete",
+        admin=True,
+        is_active=True,
+        account_owner_id=None,
+        is_global_admin=False,
+    )
+    db.session.add(owner)
+    db.session.flush()
+
+    guest = user_model(
+        email="guest-owner-delete@test.local",
+        password=generate_password_hash("testpass123", method="scrypt"),
+        name="Guest Of Owner To Delete",
+        admin=False,
+        is_active=True,
+        account_owner_id=owner.id,
+        is_global_admin=False,
+    )
+    db.session.add(guest)
+    db.session.flush()
+
+    guest_id = guest.id
+    token = password_setup_token_model(
+        user_id=guest.id,
+        token_hash="a" * 64,
+        expires_at=datetime.now(timezone.utc),
+    )
+    db.session.add(token)
+    db.session.commit()
+    token_id = token.id
+
+    resp = auth_client.post(f"/delete_user/{owner.id}", follow_redirects=False)
+
+    assert resp.status_code in (301, 302)
+    assert user_model.query.filter_by(id=owner.id).first() is None
+    assert user_model.query.filter_by(id=guest_id).first() is None
+    assert password_setup_token_model.query.filter_by(id=token_id).first() is None
 
 
 class TestGuestOnboarding:

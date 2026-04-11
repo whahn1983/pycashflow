@@ -807,6 +807,15 @@ def delete_user(id):
             # Manually delete all related data before deleting the user
             user_id = user.id
 
+            # Delete setup tokens for all guests before deleting guest rows
+            guest_ids = [
+                guest_id for (guest_id,) in db.session.query(User.id).filter_by(account_owner_id=user_id).all()
+            ]
+            if guest_ids:
+                db.session.query(PasswordSetupToken).filter(
+                    PasswordSetupToken.user_id.in_(guest_ids)
+                ).delete(synchronize_session=False)
+
             # Delete all guest users for this admin user
             db.session.query(User).filter_by(account_owner_id=user_id).delete()
 
