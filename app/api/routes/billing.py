@@ -200,7 +200,7 @@ def api_create_checkout_session():
 
 
 @api.route("/billing/status", methods=["GET"])
-@api_login_required
+@api_login_required(enforce_active=False)
 def api_billing_status():
     user = get_api_user()
     owner = owner_for_user(user)
