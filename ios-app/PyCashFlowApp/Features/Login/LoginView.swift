@@ -91,7 +91,7 @@ struct LoginView: View {
                 await MainActor.run { errorText = "Login token missing" }
                 return
             }
-            await MainActor.run { session.setSession(token: token, user: response.data.user) }
+            await session.establishSession(token: token, user: response.data.user)
         } catch {
             await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Login failed" }
         }
@@ -111,7 +111,7 @@ struct LoginView: View {
                 await MainActor.run { errorText = "2FA login token missing" }
                 return
             }
-            await MainActor.run { session.setSession(token: token, user: response.data.user) }
+            await session.establishSession(token: token, user: response.data.user)
         } catch {
             await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "2FA failed" }
         }
