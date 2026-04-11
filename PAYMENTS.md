@@ -45,6 +45,8 @@ Default behavior in this repository is `PAYMENTS_ENABLED=false`.
   - `customer.subscription.deleted`
   - `invoice.payment_failed`
 - Auto-creates user by email when needed and sets owner + active subscription.
+- For first-time paid users only, creates a one-time password setup token and
+  sends an onboarding email. Existing users do not receive setup email.
 
 ## App Store Flow
 
@@ -52,6 +54,33 @@ Default behavior in this repository is `PAYMENTS_ENABLED=false`.
 - Public endpoint for iOS receipt or transaction payload.
 - Current implementation has **stub verification scaffold** (`verification_status=verified_stub`) for future Apple server verification integration.
 - Extracts email + expiry, creates/updates account owner, marks source `app_store`, and activates account.
+- For first-time paid users only, creates a one-time password setup token and
+  sends an onboarding email. Existing users do not receive setup email.
+
+## Paid User Onboarding Lifecycle
+
+When a subscription event creates a brand-new user:
+
+1. User is auto-created by normalized email and activated.
+2. A cryptographically random one-time password setup token is generated.
+3. Only the token hash is stored in `password_setup_tokens` (never plaintext).
+4. Token has a short TTL (default 60 minutes), is tied to a user, and is
+   invalid after first successful use.
+5. Email contains a user-facing setup link using frontend origin:
+   `{FRONTEND_BASE_URL}/auth/set-password/{token}`.
+6. User completes setup via `POST /api/v1/auth/complete-password-setup` and
+   then logs in normally with email/password.
+
+If subscription events match an existing user email, subscription state is
+updated silently and no password setup email is sent.
+
+## FRONTEND_BASE_URL Usage
+
+- `FRONTEND_BASE_URL` is used for all payment-onboarding links sent to users.
+- The configured base URL is normalized by stripping trailing slashes before
+  route concatenation.
+- Password setup route is fixed and hardcoded as `/auth/set-password`.
+- Backend/internal URLs are never used in user-facing setup email links.
 
 ## Guest Access Rules
 

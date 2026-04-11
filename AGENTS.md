@@ -344,3 +344,9 @@ A SwiftUI client now lives under `/ios-app` with this structure:
 - Global admins always bypass subscription checks and must remain active.
 - Guests inherit effective access from their account owner (`owner_user_id` or legacy `account_owner_id`).
 - Expired owner subscriptions disable guest access.
+- Payment-created users must never receive plaintext passwords.
+- For newly created paid users (Stripe/App Store), generate one-time password
+  setup token, store only token hash + expiry + used state, and send setup
+  email. Existing users must not receive setup email.
+- User-facing password setup links must always use `FRONTEND_BASE_URL` with
+  trailing-slash normalization and fixed route `/auth/set-password/<token>`.

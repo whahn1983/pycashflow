@@ -31,6 +31,11 @@ def create_app():
     app.config["PASSKEY_RP_ID"] = os.environ.get("PASSKEY_RP_ID", "")
     app.config["PASSKEY_RP_NAME"] = os.environ.get("PASSKEY_RP_NAME", "PyCashFlow")
     app.config["PASSKEY_ORIGIN"] = os.environ.get("PASSKEY_ORIGIN", "")
+    app.config["FRONTEND_BASE_URL"] = os.environ.get("FRONTEND_BASE_URL", "").strip()
+    app.config["PASSWORD_SETUP_TOKEN_TTL_MINUTES"] = os.environ.get(
+        "PASSWORD_SETUP_TOKEN_TTL_MINUTES",
+        "60",
+    )
     app.config["PAYMENTS_ENABLED"] = os.environ.get("PAYMENTS_ENABLED", "false").lower() == "true"
 
     basedir = os.path.abspath(os.path.dirname(__file__))

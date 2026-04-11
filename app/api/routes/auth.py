@@ -10,6 +10,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from app import limiter, db
 from app.models import User, UserToken
 from app.auth import _DUMMY_HASH
+from app.password_setup import consume_password_setup_token
 from app.totp_utils import decrypt_totp_secret, verify_totp, verify_and_consume_backup_code
 from app.subscription import enforce_user_access
 
@@ -89,6 +90,16 @@ def _verify_twofa_challenge(challenge: str) -> User | None:
     if not isinstance(user_id, int):
         return None
     return db.session.get(User, user_id)
+
+
+def _validate_new_password(password: str) -> str | None:
+    if len(password) < 8:
+        return "Password must be at least 8 characters"
+    if password.lower() == password or password.upper() == password:
+        return "Password must include uppercase and lowercase letters"
+    if not any(ch.isdigit() for ch in password):
+        return "Password must include at least one number"
+    return None
 
 
 @api.route("/auth/login", methods=["POST"])
@@ -231,3 +242,31 @@ def api_change_password():
 @api_login_required
 def api_me():
     return api_ok(serialize_user(get_api_user()))
+
+
+@api.route("/auth/complete-password-setup", methods=["POST"])
+def api_complete_password_setup():
+    body = request.get_json(silent=True) or {}
+    token = (body.get("token") or "").strip()
+    new_password = body.get("password") or ""
+
+    errors: dict = {}
+    if not token:
+        errors["token"] = "Token is required"
+    if not new_password:
+        errors["password"] = "Password is required"
+    else:
+        password_error = _validate_new_password(new_password)
+        if password_error:
+            errors["password"] = password_error
+    if errors:
+        return validation_error(errors)
+
+    user = consume_password_setup_token(token)
+    if user is None:
+        return unauthorized("Invalid or expired password setup token")
+
+    user.password = generate_password_hash(new_password, method="scrypt")
+    user.is_active = True
+    db.session.commit()
+    return api_ok({"message": "Password setup complete"})

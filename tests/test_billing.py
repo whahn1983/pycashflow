@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from werkzeug.security import generate_password_hash
 
 from app import db
-from app.models import User
+from app.models import PasswordSetupToken, User
 from app.api.auth_utils import create_token_for_user
 
 
@@ -138,6 +138,127 @@ def test_appstore_verification_stub_mode_can_activate_owner(flask_app, client):
         assert user.subscription_source == "app_store"
         assert user.subscription_status == "active"
         assert user.is_active is True
+
+
+def test_stripe_new_user_generates_setup_token_and_sends_email(
+    flask_app, client, monkeypatch, billing_routes_module
+):
+    sent_links = []
+    with flask_app.app_context():
+        flask_app.config["STRIPE_WEBHOOK_SECRET"] = "whsec_test_secret"
+        flask_app.config["FRONTEND_BASE_URL"] = "https://app.example.com/"
+
+    def _fake_send_password_setup_email(user_name, user_email, setup_url, expires_minutes):
+        sent_links.append((user_email, setup_url, expires_minutes))
+        return True
+
+    monkeypatch.setattr(billing_routes_module, "send_password_setup_email", _fake_send_password_setup_email)
+
+    payload = {
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "id": "cs_test_setup_1",
+                "subscription": "sub_setup_1",
+                "customer_details": {"email": "new-stripe-setup@test.local"},
+                "current_period_end": int((datetime.now(timezone.utc) + timedelta(days=30)).timestamp()),
+            }
+        },
+    }
+    raw = json.dumps(payload)
+    resp = client.post(
+        "/api/v1/billing/webhook/stripe",
+        data=raw,
+        headers={"Stripe-Signature": _sign(raw, "whsec_test_secret")},
+    )
+    assert resp.status_code == 200
+
+    with flask_app.app_context():
+        user = User.query.filter_by(email="new-stripe-setup@test.local").first()
+        assert user is not None
+        token = PasswordSetupToken.query.filter_by(user_id=user.id).first()
+        assert token is not None
+        assert token.used_at is None
+    assert len(sent_links) == 1
+    assert sent_links[0][0] == "new-stripe-setup@test.local"
+    assert sent_links[0][1].startswith("https://app.example.com/auth/set-password/")
+
+
+def test_appstore_new_user_generates_setup_token_and_sends_email(
+    flask_app, client, monkeypatch, billing_routes_module
+):
+    sent_links = []
+    with flask_app.app_context():
+        flask_app.config["APPSTORE_ALLOW_STUB_VERIFICATION"] = True
+        flask_app.config["FRONTEND_BASE_URL"] = "https://app.example.com"
+
+    def _fake_send_password_setup_email(user_name, user_email, setup_url, expires_minutes):
+        sent_links.append((user_email, setup_url, expires_minutes))
+        return True
+
+    monkeypatch.setattr(billing_routes_module, "send_password_setup_email", _fake_send_password_setup_email)
+
+    expiry = (datetime.now(timezone.utc) + timedelta(days=20)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    resp = client.post(
+        "/api/v1/billing/verify-appstore",
+        json={
+            "email": "new-appstore-setup@test.local",
+            "receipt_data": "dummy-receipt",
+            "expiry_date": expiry,
+            "transaction": {"original_transaction_id": "ios_txn_setup_1"},
+        },
+    )
+    assert resp.status_code == 200
+
+    with flask_app.app_context():
+        user = User.query.filter_by(email="new-appstore-setup@test.local").first()
+        assert user is not None
+        token = PasswordSetupToken.query.filter_by(user_id=user.id).first()
+        assert token is not None
+    assert len(sent_links) == 1
+    assert sent_links[0][1].startswith("https://app.example.com/auth/set-password/")
+
+
+def test_existing_user_does_not_get_password_setup_email(
+    flask_app, client, monkeypatch, billing_routes_module
+):
+    sent_calls = []
+    with flask_app.app_context():
+        flask_app.config["APPSTORE_ALLOW_STUB_VERIFICATION"] = True
+        existing = User(
+            email="existing-paid-user@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Existing",
+            admin=True,
+            is_account_owner=True,
+            is_active=True,
+        )
+        db.session.add(existing)
+        db.session.commit()
+
+    def _fake_send_password_setup_email(user_name, user_email, setup_url, expires_minutes):
+        sent_calls.append(user_email)
+        return True
+
+    monkeypatch.setattr(billing_routes_module, "send_password_setup_email", _fake_send_password_setup_email)
+
+    expiry = (datetime.now(timezone.utc) + timedelta(days=20)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    resp = client.post(
+        "/api/v1/billing/verify-appstore",
+        json={
+            "email": "existing-paid-user@test.local",
+            "receipt_data": "dummy-receipt",
+            "expiry_date": expiry,
+            "transaction": {"original_transaction_id": "ios_txn_existing_1"},
+        },
+    )
+    assert resp.status_code == 200
+    assert sent_calls == []
+
+    with flask_app.app_context():
+        user = User.query.filter_by(email="existing-paid-user@test.local").first()
+        assert user is not None
+        assert PasswordSetupToken.query.filter_by(user_id=user.id).first() is None
 
 
 def test_guest_access_depends_on_owner_subscription(flask_app, client):

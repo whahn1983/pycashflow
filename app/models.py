@@ -199,3 +199,19 @@ class UserToken(db.Model):
 
     # Relationships
     user = db.relationship('User', backref='api_tokens')
+
+
+class PasswordSetupToken(db.Model):
+    """One-time password setup tokens used for payment-created users."""
+
+    __tablename__ = 'password_setup_tokens'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    token_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime, nullable=True)
+
+    # Relationships
+    user = db.relationship('User', backref='password_setup_tokens')
