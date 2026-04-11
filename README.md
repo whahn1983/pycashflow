@@ -216,10 +216,8 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
    pip install -r requirements.txt
    ```
 
-3. **Initialize Database**
+3. **Apply Database Migrations**
    ```bash
-   flask db init
-   flask db migrate -m "Initial migration"
    flask db upgrade
    ```
 
@@ -743,7 +741,6 @@ docker rm pycashflow
 ```bash
 cd /path/to/pycashflow
 git pull origin master
-flask db migrate -m "Update migration"
 flask db upgrade
 # Restart your WSGI server
 ```
@@ -752,9 +749,17 @@ flask db upgrade
 
 PyCashFlow uses Flask-Migrate for database schema management:
 
-- Migrations are automatically generated when database models change
-- Mount `/mnt/migrations` volume (Docker) to persist migration files
-- Run `flask db upgrade` after pulling updates
+- Migrations in `migrations/versions/` are source-controlled and are the only
+  schema history used by deployments.
+- Containers/startup scripts must **never** run `flask db init` or
+  `flask db migrate` automatically.
+- Startup may run `flask db upgrade` to apply checked-in migrations.
+- For model/schema changes during development:
+  1. Update models.
+  2. Run `flask db migrate -m "<description>"`.
+  3. Review the generated migration file in `migrations/versions/`.
+  4. Run `flask db upgrade`.
+  5. Commit both model changes and migration file to Git.
 
 ---
 
