@@ -6,6 +6,7 @@ struct LoginView: View {
     @State private var password = ""
     @State private var challenge: String?
     @State private var twoFACode = ""
+    @State private var selfHostedURL = ""
     @State private var errorText: String?
     @State private var isLoading = false
 
@@ -20,6 +21,48 @@ struct LoginView: View {
                         .foregroundStyle(AppTheme.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                Picker("App Mode", selection: $session.appMode) {
+                    ForEach(SessionManager.AppMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .onChange(of: session.appMode) { _, newValue in
+                    session.switchMode(newValue)
+                }
+                .surfaceCard()
+
+                if session.appMode == .selfHosted {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Self-Hosted API Base URL")
+                            .foregroundStyle(AppTheme.textPrimary)
+                        TextField("https://your-server.example.com/api/v1", text: $selfHostedURL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .padding(12)
+                            .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+                            .foregroundStyle(AppTheme.textPrimary)
+                        Button("Save Server URL") {
+                            if !session.updateSelfHostedBaseURL(selfHostedURL) {
+                                errorText = "Please enter a valid URL, including /api/v1."
+                            } else {
+                                errorText = nil
+                            }
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                    }
+                    .surfaceCard()
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Using PyCashFlow Cloud hosted service.")
+                            .foregroundStyle(AppTheme.textSecondary)
+                        NavigationLink("Activate or Restore Cloud Subscription") {
+                            SubscriptionPaywallView(message: "Use App Store subscription to activate or restore your hosted PyCashFlow Cloud account.")
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                    }
+                    .surfaceCard()
+                }
 
                 VStack(spacing: 12) {
                     if challenge == nil {
@@ -61,6 +104,9 @@ struct LoginView: View {
         }
         .appBackground()
         .navigationTitle("Login")
+        .onAppear {
+            selfHostedURL = session.selfHostedBaseURLText
+        }
     }
 
     private func submit() async {

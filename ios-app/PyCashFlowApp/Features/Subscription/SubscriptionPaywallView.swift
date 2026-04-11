@@ -4,6 +4,7 @@ import StoreKit
 struct SubscriptionPaywallView: View {
     @EnvironmentObject var session: SessionManager
     @StateObject private var manager = StoreKitSubscriptionManager()
+    @State private var cloudEmail = ""
 
     let message: String
 
@@ -14,9 +15,20 @@ struct SubscriptionPaywallView: View {
                     .font(.title.bold())
                     .foregroundStyle(AppTheme.textPrimary)
 
+                Text("App Store subscription is only for PyCashFlow Cloud account activation and maintenance.")
+                    .foregroundStyle(AppTheme.textSecondary)
+                    .surfaceCard()
+
                 Text(message)
                     .foregroundStyle(AppTheme.textSecondary)
                     .surfaceCard()
+
+                TextField("Cloud account email", text: $cloudEmail)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(12)
+                    .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+                    .foregroundStyle(AppTheme.textPrimary)
 
                 if let status = session.billingStatus {
                     VStack(alignment: .leading, spacing: 6) {
@@ -42,7 +54,16 @@ struct SubscriptionPaywallView: View {
                             Text(product.description)
                                 .foregroundStyle(AppTheme.textSecondary)
                             Button("Subscribe • \(product.displayPrice)") {
-                                Task { await manager.purchase(product, session: session) }
+                                Task {
+                                    await manager.purchase(
+                                        product,
+                                        email: resolvedEmail,
+                                        token: session.token
+                                    )
+                                    if session.isAuthenticated {
+                                        await session.refreshSubscriptionState(forceProfileRefresh: true)
+                                    }
+                                }
                             }
                             .buttonStyle(PrimaryButtonStyle())
                             .disabled(manager.isBusy)
@@ -52,7 +73,12 @@ struct SubscriptionPaywallView: View {
                 }
 
                 Button("Restore Purchases") {
-                    Task { await manager.restorePurchases(session: session) }
+                    Task {
+                        await manager.restorePurchases(email: resolvedEmail, token: session.token)
+                        if session.isAuthenticated {
+                            await session.refreshSubscriptionState(forceProfileRefresh: true)
+                        }
+                    }
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(manager.isBusy)
@@ -77,13 +103,25 @@ struct SubscriptionPaywallView: View {
                     session.clear()
                 }
                 .buttonStyle(PrimaryButtonStyle())
+
+                Button("Switch to Self-Hosted Mode") {
+                    session.switchMode(.selfHosted)
+                }
+                .buttonStyle(PrimaryButtonStyle())
             }
             .padding(20)
         }
         .appBackground()
         .task {
             await manager.loadProducts()
+            if cloudEmail.isEmpty {
+                cloudEmail = session.user?.email ?? ""
+            }
         }
         .navigationTitle("Subscription")
+    }
+
+    private var resolvedEmail: String {
+        cloudEmail.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

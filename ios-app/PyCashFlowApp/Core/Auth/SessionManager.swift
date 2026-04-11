@@ -3,6 +3,19 @@ import Security
 
 @MainActor
 final class SessionManager: ObservableObject {
+    enum AppMode: String, CaseIterable, Identifiable {
+        case cloud
+        case selfHosted
+
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .cloud: return "PyCashFlow Cloud"
+            case .selfHosted: return "Self-Hosted"
+            }
+        }
+    }
+
     enum AccessState: Equatable {
         case unknown
         case checking
@@ -14,8 +27,15 @@ final class SessionManager: ObservableObject {
     @Published var user: UserDTO?
     @Published var billingStatus: BillingStatusDTO?
     @Published var accessState: AccessState = .unknown
+    @Published var appMode: AppMode = Self.loadMode()
+    @Published var selfHostedBaseURLText: String = Self.loadSelfHostedURL().absoluteString
 
     var isAuthenticated: Bool { token != nil }
+    var currentBaseURL: URL { APIClient.shared.baseURL }
+
+    init() {
+        applyBaseURLForMode()
+    }
 
     func bootstrap() async {
         guard token != nil else {
@@ -82,6 +102,55 @@ final class SessionManager: ObservableObject {
         accessState = .unknown
         TokenKeychainStore.deleteToken()
         UserDefaults.standard.removeObject(forKey: "api_token")
+    }
+
+    func switchMode(_ newMode: AppMode) {
+        guard newMode != appMode else { return }
+        appMode = newMode
+        UserDefaults.standard.set(newMode.rawValue, forKey: Self.modeKey)
+        applyBaseURLForMode()
+        clear()
+    }
+
+    @discardableResult
+    func updateSelfHostedBaseURL(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let parsed = URL(string: trimmed), parsed.scheme != nil, parsed.host != nil else {
+            return false
+        }
+        selfHostedBaseURLText = parsed.absoluteString
+        UserDefaults.standard.set(parsed.absoluteString, forKey: Self.selfHostedURLKey)
+        if appMode == .selfHosted {
+            APIClient.shared.baseURL = parsed
+        }
+        return true
+    }
+
+    private func applyBaseURLForMode() {
+        switch appMode {
+        case .cloud:
+            APIClient.shared.baseURL = AppEnvironment.cloudAPIBaseURL
+        case .selfHosted:
+            APIClient.shared.baseURL = Self.loadSelfHostedURL()
+        }
+    }
+
+    private static let modeKey = "APP_MODE"
+    private static let selfHostedURLKey = "SELF_HOSTED_API_BASE_URL"
+
+    private static func loadMode() -> AppMode {
+        let raw = UserDefaults.standard.string(forKey: modeKey)
+        return AppMode(rawValue: raw ?? "") ?? .cloud
+    }
+
+    private static func loadSelfHostedURL() -> URL {
+        if let raw = UserDefaults.standard.string(forKey: selfHostedURLKey),
+           let url = URL(string: raw),
+           url.scheme != nil,
+           url.host != nil {
+            return url
+        }
+        return AppEnvironment.defaultSelfHostedAPIBaseURL
     }
 }
 
