@@ -542,7 +542,7 @@ def send_password_setup_email(user_name, user_email, setup_url, expires_minutes)
         text_content = f"""
 Hello {user_name},
 
-Your PyCashFlow Cloud account was created after your subscription purchase.
+Your PyCashFlow Cloud account was created.
 
 Please set your password using this secure one-time link:
 {setup_url}
