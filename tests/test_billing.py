@@ -27,6 +27,7 @@ def _json(resp):
 def test_stripe_webhook_checkout_activation_flow(flask_app, client):
     with flask_app.app_context():
         flask_app.config["STRIPE_WEBHOOK_SECRET"] = "whsec_test_secret"
+        flask_app.config["FRONTEND_BASE_URL"] = "https://app.example.com"
 
     payload = {
         "type": "checkout.session.completed",
@@ -117,6 +118,7 @@ def test_appstore_verification_creates_or_updates_owner(flask_app, client):
 def test_appstore_verification_stub_mode_can_activate_owner(flask_app, client):
     with flask_app.app_context():
         flask_app.config["APPSTORE_ALLOW_STUB_VERIFICATION"] = True
+        flask_app.config["FRONTEND_BASE_URL"] = "https://app.example.com"
 
     expiry = (datetime.now(timezone.utc) + timedelta(days=20)).strftime("%Y-%m-%dT%H:%M:%SZ")
     resp = client.post(

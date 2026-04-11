@@ -102,6 +102,17 @@ def test_complete_password_setup_invalid_token(flask_app, client):
     assert resp.status_code == 401
 
 
+def test_complete_password_setup_rejects_non_string_fields(client):
+    resp = client.post(
+        "/api/v1/auth/complete-password-setup",
+        json={"token": 123, "password": ["not-a-string"]},
+    )
+    assert resp.status_code == 422
+    fields = _json(resp)["fields"]
+    assert fields["token"] == "Token must be a string"
+    assert fields["password"] == "Password must be a string"
+
+
 def test_password_setup_url_uses_frontend_base_url(flask_app, password_setup_helpers):
     build_password_setup_url = password_setup_helpers["build_url"]
     with flask_app.app_context():
@@ -110,6 +121,18 @@ def test_password_setup_url_uses_frontend_base_url(flask_app, password_setup_hel
             build_password_setup_url("abc123")
             == "https://app.yourdomain.com/auth/set-password/abc123"
         )
+
+
+def test_password_setup_url_requires_frontend_base_url(flask_app, password_setup_helpers):
+    build_password_setup_url = password_setup_helpers["build_url"]
+    with flask_app.app_context():
+        flask_app.config["FRONTEND_BASE_URL"] = ""
+        try:
+            build_password_setup_url("abc123")
+        except RuntimeError as exc:
+            assert "FRONTEND_BASE_URL must be configured" in str(exc)
+        else:
+            raise AssertionError("Expected RuntimeError when FRONTEND_BASE_URL is unset")
 
 
 def test_password_setup_token_stored_hashed_only(
