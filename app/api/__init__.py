@@ -20,3 +20,4 @@ register_error_handlers(api)
 # Import route modules — side-effect: routes are registered on ``api``
 from .routes import auth  # noqa: E402, F401
 from .routes import data  # noqa: E402, F401
+from .routes import billing  # noqa: E402, F401

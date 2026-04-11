@@ -792,3 +792,96 @@ Additional behavior updates:
 - Pagination query params `limit` / `offset` are now supported on list endpoints.
 - `/dashboard` now includes both legacy `risk` and serialized `risk_v2`; `risk` is deprecated.
 - Guests remain read-only and receive `403 forbidden` on mutation endpoints.
+
+## 2026-04-10 Payments Update
+
+### User object additions
+
+`POST /api/v1/auth/login` and `GET /api/v1/auth/me` now include:
+
+- `subscription_status`: `active | inactive | trial | expired`
+- `subscription_source`: `stripe | app_store | manual | none`
+- `subscription_expiry`: UTC datetime string or `null`
+
+### New billing endpoints
+
+#### POST /api/v1/billing/create-checkout-session
+
+Create a Stripe subscription checkout session payload.
+
+**Auth required:** Yes (Bearer token)
+
+**Owner-only:** Guests receive `401 unauthorized`.
+
+**Request body:**
+
+```json
+{
+  "success_url": "https://app.example.com/billing/success",
+  "cancel_url": "https://app.example.com/billing/cancel"
+}
+```
+
+**Response `201 Created`:**
+
+```json
+{
+  "data": {
+    "id": "cs_test_...",
+    "checkout_url": "https://checkout.stripe.com/pay/cs_test_...",
+    "mode": "subscription",
+    "subscription_source": "stripe"
+  }
+}
+```
+
+#### POST /api/v1/billing/webhook/stripe
+
+Stripe webhook receiver. Verifies `Stripe-Signature` using server-side
+`STRIPE_WEBHOOK_SECRET`, then updates subscription state.
+
+**Auth required:** No (signature is required)
+
+**Handled event types:**
+- `checkout.session.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.payment_failed`
+
+#### POST /api/v1/billing/verify-appstore
+
+Server endpoint for iOS subscription verification.
+
+**Auth required:** No
+
+**Request body (minimum):**
+
+```json
+{
+  "email": "ios-user@example.com",
+  "receipt_data": "base64-receipt",
+  "expiry_date": "2026-12-31T23:59:59Z"
+}
+```
+
+`transaction` payload may optionally include transaction identifiers.
+
+**Response `200 OK`:**
+
+```json
+{
+  "data": {
+    "verification_status": "verified_stub",
+    "user_id": 123,
+    "subscription_status": "active",
+    "subscription_source": "app_store"
+  }
+}
+```
+
+### Access enforcement
+
+- If `PAYMENTS_ENABLED=true`, owner subscription state gates access for owner + guests.
+- If `PAYMENTS_ENABLED=false`, subscription checks are bypassed (manual/self-hosted mode).
+- Global admins always bypass subscription gating.

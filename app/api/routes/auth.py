@@ -11,6 +11,7 @@ from app import limiter, db
 from app.models import User, UserToken
 from app.auth import _DUMMY_HASH
 from app.totp_utils import decrypt_totp_secret, verify_totp, verify_and_consume_backup_code
+from app.subscription import enforce_user_access
 
 from app.api import api
 from app.api.auth_utils import (
@@ -111,7 +112,7 @@ def api_login():
     candidate_hash = user.password if user else _DUMMY_HASH
     password_ok = check_password_hash(candidate_hash, password)
 
-    if not password_ok or user is None or not user.is_active:
+    if not password_ok or user is None or not enforce_user_access(user):
         return unauthorized("Invalid credentials or account is not active")
 
     if user.twofa_enabled:
@@ -146,7 +147,7 @@ def api_login_2fa():
         return validation_error(errors)
 
     user = _verify_twofa_challenge(challenge)
-    if user is None or not user.is_active or not user.twofa_enabled:
+    if user is None or not enforce_user_access(user) or not user.twofa_enabled:
         return unauthorized("Invalid or expired 2FA challenge")
 
     submitted = code

@@ -36,7 +36,7 @@ _MAX_NAME_LEN = 100
 
 def _effective_user_id() -> int:
     user = get_api_user()
-    return user.account_owner_id or user.id
+    return user.owner_user_id or user.account_owner_id or user.id
 
 
 def _forbid_guest_writes():

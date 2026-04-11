@@ -219,3 +219,12 @@ brute-force attacks.
 
 Business endpoints (schedules, balances, projections, etc.) will be added
 in subsequent phases per the API_GAP_REPORT.md implementation sequence.
+
+## Billing Endpoints (v1)
+
+- `POST /api/v1/billing/create-checkout-session` (Bearer auth required)
+- `POST /api/v1/billing/webhook/stripe` (public, Stripe signature required)
+- `POST /api/v1/billing/verify-appstore` (public, server-side verification path)
+
+Subscription enforcement is controlled via `PAYMENTS_ENABLED`.
+When enabled, non-global-admin authenticated users must have an active/trial owner subscription.

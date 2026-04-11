@@ -1,0 +1,242 @@
+"""API v1 billing routes (Stripe + App Store + manual activation hooks)."""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import json
+import logging
+import os
+import secrets
+from datetime import datetime, timezone
+
+from flask import current_app, request
+from werkzeug.security import generate_password_hash
+
+from app import db
+from app.models import User
+from app.subscription import (
+    SUB_ACTIVE,
+    SUB_EXPIRED,
+    apply_subscription_status,
+)
+
+from app.api import api
+from app.api.auth_utils import api_login_required, get_api_user
+from app.api.errors import unauthorized, validation_error
+from app.api.responses import api_created, api_ok
+
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_unix_ts(raw) -> datetime | None:
+    if raw in (None, ""):
+        return None
+    try:
+        return datetime.fromtimestamp(int(raw), tz=timezone.utc).replace(tzinfo=None)
+    except (TypeError, ValueError, OSError):
+        return None
+
+
+def _create_or_get_owner(email: str) -> User:
+    user = User.query.filter_by(email=email).first()
+    if user:
+        return user
+
+    generated_password = secrets.token_urlsafe(32)
+    user = User(
+        email=email,
+        name=email.split("@")[0],
+        password=generate_password_hash(generated_password, method="scrypt"),
+        admin=True,
+        is_account_owner=True,
+        is_active=True,
+        subscription_status="inactive",
+        subscription_source="none",
+    )
+    db.session.add(user)
+    db.session.commit()
+    logger.info("Auto-created account owner from payment flow email=%s user_id=%s", email, user.id)
+    return user
+
+
+def _verify_stripe_signature(payload: str, signature_header: str) -> bool:
+    endpoint_secret = current_app.config.get("STRIPE_WEBHOOK_SECRET") or os.environ.get(
+        "STRIPE_WEBHOOK_SECRET"
+    )
+    if not endpoint_secret:
+        logger.warning("STRIPE_WEBHOOK_SECRET not configured; rejecting webhook")
+        return False
+
+    try:
+        parts = dict(item.split("=", 1) for item in signature_header.split(",") if "=" in item)
+    except Exception:
+        return False
+
+    timestamp = parts.get("t")
+    provided_sig = parts.get("v1")
+    if not timestamp or not provided_sig:
+        return False
+
+    signed_payload = f"{timestamp}.{payload}".encode()
+    expected = hmac.new(endpoint_secret.encode(), signed_payload, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, provided_sig)
+
+
+def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
+    if event_type == "checkout.session.completed":
+        email = (obj.get("customer_details") or {}).get("email") or obj.get("customer_email")
+        if not email:
+            return validation_error({"email": "customer email missing from checkout session"})
+        user = _create_or_get_owner(email.strip().lower())
+        expiry = _parse_unix_ts(obj.get("current_period_end"))
+        apply_subscription_status(
+            user,
+            status=SUB_ACTIVE,
+            source="stripe",
+            subscription_id=obj.get("subscription") or obj.get("id"),
+            expiry=expiry,
+            activate=True,
+        )
+        return api_ok({"processed": event_type, "user_id": user.id})
+
+    if event_type in {"customer.subscription.created", "customer.subscription.updated"}:
+        email = ((obj.get("customer_email") or "").strip().lower())
+        if not email and obj.get("metadata"):
+            email = (obj.get("metadata", {}).get("email") or "").strip().lower()
+        if not email:
+            return validation_error({"email": "subscription email missing"})
+
+        user = _create_or_get_owner(email)
+        status = obj.get("status")
+        expires_at = _parse_unix_ts(obj.get("current_period_end"))
+        if status in {"active", "trialing"}:
+            next_status = SUB_ACTIVE if status == "active" else "trial"
+            activate = True
+        else:
+            next_status = SUB_EXPIRED
+            activate = False
+
+        apply_subscription_status(
+            user,
+            status=next_status,
+            source="stripe",
+            subscription_id=obj.get("id"),
+            expiry=expires_at,
+            activate=activate,
+        )
+        return api_ok({"processed": event_type, "user_id": user.id})
+
+    if event_type in {"customer.subscription.deleted", "invoice.payment_failed"}:
+        sub_id = obj.get("id") if event_type == "customer.subscription.deleted" else obj.get("subscription")
+        if not sub_id:
+            return validation_error({"subscription": "subscription id missing"})
+
+        user = User.query.filter_by(subscription_id=sub_id).first()
+        if not user:
+            return api_ok({"processed": event_type, "ignored": True})
+
+        apply_subscription_status(
+            user,
+            status=SUB_EXPIRED,
+            source="stripe",
+            subscription_id=sub_id,
+            expiry=datetime.now(timezone.utc).replace(tzinfo=None),
+            activate=False,
+        )
+        return api_ok({"processed": event_type, "user_id": user.id})
+
+    return api_ok({"processed": event_type, "ignored": True})
+
+
+@api.route("/billing/create-checkout-session", methods=["POST"])
+@api_login_required(require_bearer=True)
+def api_create_checkout_session():
+    user = get_api_user()
+    if not user.admin:
+        return unauthorized("Guest users cannot create checkout sessions")
+
+    body = request.get_json(silent=True) or {}
+    success_url = (body.get("success_url") or "").strip()
+    cancel_url = (body.get("cancel_url") or "").strip()
+    if not success_url or not cancel_url:
+        return validation_error(
+            {
+                "success_url": "success_url is required",
+                "cancel_url": "cancel_url is required",
+            }
+        )
+
+    session_id = f"cs_test_{secrets.token_urlsafe(18)}"
+    return api_created(
+        {
+            "id": session_id,
+            "checkout_url": f"https://checkout.stripe.com/pay/{session_id}",
+            "mode": "subscription",
+            "subscription_source": "stripe",
+        }
+    )
+
+
+@api.route("/billing/webhook/stripe", methods=["POST"])
+def api_stripe_webhook():
+    raw_payload = request.get_data(as_text=True)
+    signature = request.headers.get("Stripe-Signature", "")
+    if not _verify_stripe_signature(raw_payload, signature):
+        return unauthorized("Invalid Stripe webhook signature")
+
+    event = json.loads(raw_payload or "{}")
+    event_type = event.get("type")
+    event_object = ((event.get("data") or {}).get("object")) or {}
+    if not event_type:
+        return validation_error({"type": "Stripe event type missing"})
+
+    return _apply_stripe_event(event_type, event_object)
+
+
+@api.route("/billing/verify-appstore", methods=["POST"])
+def api_verify_appstore():
+    body = request.get_json(silent=True) or {}
+
+    receipt_data = body.get("receipt_data")
+    transaction_info = body.get("transaction") or {}
+    email = (body.get("email") or "").strip().lower()
+    expiry_iso = body.get("expiry_date") or transaction_info.get("expires_date")
+
+    errors = {}
+    if not email:
+        errors["email"] = "email is required"
+    if not receipt_data and not transaction_info:
+        errors["receipt_data"] = "receipt_data or transaction is required"
+    if not expiry_iso:
+        errors["expiry_date"] = "expiry_date is required"
+    if errors:
+        return validation_error(errors)
+
+    try:
+        expiry = datetime.fromisoformat(str(expiry_iso).replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return validation_error({"expiry_date": "expiry_date must be ISO-8601"})
+
+    # Stub verification hook for future Apple server-side validation integration.
+    verification_status = "verified_stub"
+
+    user = _create_or_get_owner(email)
+    apply_subscription_status(
+        user,
+        status=SUB_ACTIVE,
+        source="app_store",
+        subscription_id=transaction_info.get("original_transaction_id") or transaction_info.get("id"),
+        expiry=expiry.replace(tzinfo=None),
+        activate=True,
+    )
+
+    return api_ok(
+        {
+            "verification_status": verification_status,
+            "user_id": user.id,
+            "subscription_status": user.subscription_status,
+            "subscription_source": user.subscription_source,
+        }
+    )

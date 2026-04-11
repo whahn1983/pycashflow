@@ -45,6 +45,7 @@ from flask_login import current_user
 # Module-level imports: captured at app-creation time, before test stubs.
 from app import db
 from app.models import UserToken
+from app.subscription import enforce_user_access
 
 from .errors import unauthorized
 
@@ -143,12 +144,17 @@ def api_login_required(f=None, *, require_bearer: bool = False):
             # 1. Bearer token takes precedence
             user = _load_user_from_bearer()
             if user is not None:
+                if not enforce_user_access(user):
+                    return unauthorized("Invalid credentials or account is not active")
                 g.api_user = user
                 return func(*args, **kwargs)
 
             # 2. Optional session cookie fallback (Flask-Login)
             if not require_bearer and current_user.is_authenticated:
-                g.api_user = current_user._get_current_object()
+                session_user = current_user._get_current_object()
+                if not enforce_user_access(session_user):
+                    return unauthorized("Invalid credentials or account is not active")
+                g.api_user = session_user
                 return func(*args, **kwargs)
 
             if require_bearer:

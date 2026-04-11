@@ -330,3 +330,17 @@ A SwiftUI client now lives under `/ios-app` with this structure:
 - API envelopes must decode from backend `{ data: ... }` / `{ data: [...], meta: ... }` shapes.
 - Authentication is Bearer-token based; session state should be centralized in `SessionManager`.
 - If UI needs new behavior, add/extend backend API endpoints rather than client-side rule duplication.
+
+---
+
+## Payments & Activation Rules
+
+- `PAYMENTS_ENABLED=true` enforces subscription checks for authenticated non-global-admin users.
+- `PAYMENTS_ENABLED=false` bypasses subscription enforcement for self-hosted/manual operation.
+- Subscription truth sources:
+  - Stripe webhook events (`/api/v1/billing/webhook/stripe`)
+  - App Store verification endpoint (`/api/v1/billing/verify-appstore`)
+- Do not trust client-side purchase state for activation.
+- Global admins always bypass subscription checks and must remain active.
+- Guests inherit effective access from their account owner (`owner_user_id` or legacy `account_owner_id`).
+- Expired owner subscriptions disable guest access.

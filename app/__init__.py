@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
+from flask_login import current_user, logout_user
 import secrets
 import os
 import logging
@@ -30,6 +31,7 @@ def create_app():
     app.config["PASSKEY_RP_ID"] = os.environ.get("PASSKEY_RP_ID", "")
     app.config["PASSKEY_RP_NAME"] = os.environ.get("PASSKEY_RP_NAME", "PyCashFlow")
     app.config["PASSKEY_ORIGIN"] = os.environ.get("PASSKEY_ORIGIN", "")
+    app.config["PAYMENTS_ENABLED"] = os.environ.get("PAYMENTS_ENABLED", "false").lower() == "true"
 
     basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -73,11 +75,24 @@ def create_app():
     login_manager.init_app(app)
 
     from .models import User
+    from .subscription import enforce_user_access
 
     @login_manager.user_loader
     def load_user(user_id):
         # since the user_id is just the primary key of our user table, use it in the query for the user
         return User.query.get(int(user_id))
+
+    @app.before_request
+    def _enforce_authenticated_access():
+        from flask import request
+        if not current_user.is_authenticated:
+            return None
+        if request.path.startswith("/api/"):
+            return None
+        if enforce_user_access(current_user._get_current_object()):
+            return None
+        logout_user()
+        return login_manager.unauthorized()
 
     # blueprint for auth routes in our app
     from .auth import auth as auth_blueprint

@@ -5,6 +5,7 @@ from .models import User, Settings, PasskeyCredential
 from app import db, limiter
 from .getemail import send_new_user_notification
 from .totp_utils import verify_totp, decrypt_totp_secret, verify_and_consume_backup_code
+from .subscription import enforce_user_access
 import logging
 from datetime import datetime, timezone
 from functools import wraps
@@ -91,8 +92,8 @@ def login_post():
         flash('Please check your login details and try again.')
         return redirect(url_for('auth.login'))
 
-    # check if the user account is active
-    if not user.is_active:
+    # check if the user account is active and subscription-valid
+    if not enforce_user_access(user):
         flash('Your account is pending approval. Please contact an administrator.')
         return redirect(url_for('auth.login'))
 
@@ -266,7 +267,7 @@ def account_owner_required(f):
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
             return redirect(url_for('auth.login'))
-        if current_user.account_owner_id is not None:
+        if current_user.owner_user_id is not None or current_user.account_owner_id is not None:
             flash('Account owner access required')
             return redirect(url_for('main.index'))
         return f(*args, **kwargs)
@@ -293,7 +294,7 @@ def passkey_login_options():
         return jsonify({"error": "Unable to start passkey login."}), 400
 
     user = User.query.filter_by(email=email).first()
-    if not user or not user.is_active or not user.passkey_credentials:
+    if not user or not enforce_user_access(user) or not user.passkey_credentials:
         return jsonify({"error": "Unable to start passkey login."}), 400
 
     allow_credentials = [
@@ -353,7 +354,7 @@ def login_passkey_post():
         flash("Passkey verification failed. Please try again.")
         return redirect(url_for('auth.login'))
 
-    if not user.is_active:
+    if not enforce_user_access(user):
         flash('Your account is pending approval. Please contact an administrator.')
         return redirect(url_for('auth.login'))
 

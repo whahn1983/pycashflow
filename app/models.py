@@ -12,12 +12,26 @@ class User(UserMixin, db.Model):
     is_global_admin = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=False)
     account_owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    is_account_owner = db.Column(db.Boolean, default=True, nullable=False, server_default=db.true())
+    owner_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    subscription_status = db.Column(
+        db.String(20), default='inactive', nullable=False, server_default='inactive'
+    )
+    subscription_source = db.Column(
+        db.String(20), default='none', nullable=False, server_default='none'
+    )
+    subscription_id = db.Column(db.String(255), nullable=True)
+    subscription_expiry = db.Column(db.DateTime, nullable=True)
     twofa_enabled = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
     twofa_secret = db.Column(db.String(500), nullable=True)   # Fernet-encrypted TOTP secret
     twofa_backup_codes = db.Column(db.Text, nullable=True)    # JSON array of scrypt-hashed backup codes
 
     # Relationships
-    guests = db.relationship('User', backref=db.backref('account_owner', remote_side=[id]))
+    guests = db.relationship(
+        'User',
+        foreign_keys='User.account_owner_id',
+        backref=db.backref('account_owner', remote_side=[id]),
+    )
 
     # Constraints
     __table_args__ = (
