@@ -1,5 +1,6 @@
 """Password setup onboarding flow tests."""
 
+import importlib
 from datetime import datetime, timedelta, timezone
 
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -197,3 +198,55 @@ def test_web_set_password_route_completes_setup(
         assert db_user is not None
         assert db_user.is_active is True
         assert check_password_hash(db_user.password, "NewSecure123")
+
+
+def test_forgot_password_route_sends_setup_email(
+    flask_app, client, app_ctx, user_model, password_setup_token_model, monkeypatch
+):
+    with flask_app.app_context():
+        user = user_model(
+            email="forgot-password@test.local",
+            password=generate_password_hash("TempPass123", method="scrypt"),
+            name="Forgot Password User",
+            admin=True,
+            is_active=True,
+        )
+        app_ctx.session.add(user)
+        app_ctx.session.commit()
+
+    flask_app.config["FRONTEND_BASE_URL"] = "https://app.example.com/"
+    sent = {}
+
+    def _fake_send_password_setup_email(user_name, user_email, setup_url, expires_minutes):
+        sent["user_name"] = user_name
+        sent["user_email"] = user_email
+        sent["setup_url"] = setup_url
+        sent["expires_minutes"] = expires_minutes
+        return True
+
+    auth_module = importlib.import_module("app.auth")
+    monkeypatch.setattr(auth_module, "send_password_setup_email", _fake_send_password_setup_email)
+
+    resp = client.post(
+        "/forgot-password",
+        data={"email": "forgot-password@test.local"},
+        follow_redirects=True,
+    )
+
+    assert resp.status_code == 200
+    assert b"password reset link has been sent" in resp.data
+    assert sent["user_name"] == "Forgot Password User"
+    assert sent["user_email"] == "forgot-password@test.local"
+    assert sent["setup_url"].startswith("https://app.example.com/auth/set-password/")
+    assert isinstance(sent["expires_minutes"], int)
+
+    with flask_app.app_context():
+        db_user = user_model.query.filter_by(email="forgot-password@test.local").first()
+        token = password_setup_token_model.query.filter_by(user_id=db_user.id).first()
+        assert token is not None
+
+
+def test_login_page_includes_forgot_password_link(client):
+    resp = client.get("/login")
+    assert resp.status_code == 200
+    assert b"Forgot password?" in resp.data
