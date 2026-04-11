@@ -160,3 +160,40 @@ def test_password_setup_token_stored_hashed_only(
         assert stored is not None
         assert stored.token_hash != raw_token
         assert len(stored.token_hash) == 64
+
+
+def test_web_set_password_route_renders(client):
+    resp = client.get("/auth/set-password/example-token")
+    assert resp.status_code == 200
+    assert b"Set your password" in resp.data
+
+
+def test_web_set_password_route_completes_setup(
+    flask_app, client, app_ctx, user_model, password_setup_helpers
+):
+    create_password_setup_token = password_setup_helpers["create_token"]
+    with flask_app.app_context():
+        user = user_model(
+            email="web-setup@test.local",
+            password=generate_password_hash("TempPass123", method="scrypt"),
+            name="Web Setup",
+            admin=True,
+            is_active=False,
+        )
+        app_ctx.session.add(user)
+        app_ctx.session.commit()
+        raw_token, _record = create_password_setup_token(user)
+
+    resp = client.post(
+        f"/auth/set-password/{raw_token}",
+        data={"password": "NewSecure123", "confirm_password": "NewSecure123"},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert b"Password setup complete. Please sign in." in resp.data
+
+    with flask_app.app_context():
+        db_user = user_model.query.filter_by(email="web-setup@test.local").first()
+        assert db_user is not None
+        assert db_user.is_active is True
+        assert check_password_hash(db_user.password, "NewSecure123")
