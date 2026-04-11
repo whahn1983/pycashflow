@@ -29,6 +29,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
   - [Response Format](#response-format)
 - [AI Insights](#ai-insights)
   - [Cash Risk Score](#cash-risk-score)
+- [Payments & Activation](#payments--activation)
 - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
 - [Email Integration](#email-integration)
 - [Data Management](#data-management)
@@ -196,7 +197,7 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
 
 #### Prerequisites
 
-- Python 3.9 or higher
+- Python 3.11 or higher
 - pip (Python package manager)
 - Git
 - WSGI server (Waitress, Gunicorn, or uWSGI)
@@ -252,6 +253,24 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
 
    # Optional: set to false for local HTTP development only
    SESSION_COOKIE_SECURE=false
+
+   # Optional: subscription enforcement toggle
+   # true = enforce active subscription for non-global-admin users
+   # false = bypass subscription checks for self-hosted/manual deployments
+   PAYMENTS_ENABLED=false
+
+   # Required for payment-created user onboarding links (Stripe/App Store)
+   # Example: https://app.example.com
+   FRONTEND_BASE_URL=
+
+   # Optional: password setup link expiration in minutes (default: 60)
+   PASSWORD_SETUP_TOKEN_TTL_MINUTES=60
+
+   # Optional: Stripe webhook signing secret for webhook validation
+   STRIPE_WEBHOOK_SECRET=
+
+   # Optional: local/dev-only App Store stub verification
+   APPSTORE_ALLOW_STUB_VERIFICATION=false
 
    # Optional: configure rate-limit backend (Redis recommended for multi-worker)
    # RATELIMIT_STORAGE_URI=redis://localhost:6379/0
@@ -573,6 +592,35 @@ When an OpenAI API key is configured and insights are refreshed, the AI also gen
 5. Return to the dashboard and click **Refresh** to generate your first analysis
 
 > **Note**: AI queries are only made when you click Refresh, keeping costs minimal. The last-updated timestamp on the card shows how stale the cached results are.
+
+---
+
+## Payments & Activation
+
+PyCashFlow supports optional subscription enforcement for hosted deployments while remaining friendly to self-hosted installations.
+
+### Runtime Toggle
+
+- `PAYMENTS_ENABLED=true`: Enforces subscription checks for authenticated **non-global-admin** users
+- `PAYMENTS_ENABLED=false`: Bypasses subscription checks (recommended default for self-hosted/manual operation)
+
+### Subscription Truth Sources
+
+When payment enforcement is enabled, activation state is driven server-side from:
+
+- Stripe webhook events at `POST /api/v1/billing/webhook/stripe`
+- App Store verification at `POST /api/v1/billing/verify-appstore`
+
+Client-side purchase state is **not** trusted as an activation source.
+
+### Password Setup for Payment-Created Users
+
+For users created from payment flows (Stripe/App Store), PyCashFlow sends a one-time password setup link instead of assigning a plaintext password. This flow depends on:
+
+- `FRONTEND_BASE_URL` (required): Base URL used to build setup links
+- `PASSWORD_SETUP_TOKEN_TTL_MINUTES` (optional): Link expiration window
+
+Setup links are generated on the fixed frontend route: `/auth/set-password/<token>`.
 
 ---
 
