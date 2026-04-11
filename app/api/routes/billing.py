@@ -84,6 +84,13 @@ def _verify_stripe_signature(payload: str, signature_header: str) -> bool:
     return hmac.compare_digest(expected, provided_sig)
 
 
+def _appstore_stub_verification_enabled() -> bool:
+    configured = current_app.config.get("APPSTORE_ALLOW_STUB_VERIFICATION")
+    if configured is None:
+        configured = os.environ.get("APPSTORE_ALLOW_STUB_VERIFICATION", "")
+    return str(configured).strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
     if event_type == "checkout.session.completed":
         email = (obj.get("customer_details") or {}).get("email") or obj.get("customer_email")
@@ -105,10 +112,20 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
         email = ((obj.get("customer_email") or "").strip().lower())
         if not email and obj.get("metadata"):
             email = (obj.get("metadata", {}).get("email") or "").strip().lower()
-        if not email:
-            return validation_error({"email": "subscription email missing"})
+        subscription_id = obj.get("id")
+        user = None
+        if subscription_id:
+            user = User.query.filter_by(subscription_id=subscription_id).first()
+        if user is None and email:
+            user = _create_or_get_owner(email)
+        if user is None:
+            logger.warning(
+                "Skipping Stripe subscription event without resolvable user: type=%s sub_id=%s",
+                event_type,
+                subscription_id,
+            )
+            return api_ok({"processed": event_type, "ignored": True})
 
-        user = _create_or_get_owner(email)
         status = obj.get("status")
         expires_at = _parse_unix_ts(obj.get("current_period_end"))
         if status in {"active", "trialing"}:
@@ -122,7 +139,7 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
             user,
             status=next_status,
             source="stripe",
-            subscription_id=obj.get("id"),
+            subscription_id=subscription_id,
             expiry=expires_at,
             activate=activate,
         )
@@ -219,7 +236,13 @@ def api_verify_appstore():
     except ValueError:
         return validation_error({"expiry_date": "expiry_date must be ISO-8601"})
 
-    # Stub verification hook for future Apple server-side validation integration.
+    verification_status = "verification_unavailable"
+    if not _appstore_stub_verification_enabled():
+        logger.warning("Rejected App Store verification: server-side verification is not configured")
+        return unauthorized(
+            "App Store verification is not configured on this server"
+        )
+
     verification_status = "verified_stub"
 
     user = _create_or_get_owner(email)

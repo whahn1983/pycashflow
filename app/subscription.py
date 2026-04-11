@@ -129,17 +129,23 @@ def enforce_user_access(user: User | None) -> bool:
             db.session.commit()
         return True
 
-    if not user.is_active:
-        return False
-
     if not payments_enabled():
-        return True
+        return bool(user.is_active)
 
     owner = owner_for_user(user)
     if owner is None:
         return False
 
     if subscription_is_current(owner):
+        changed = False
+        if not owner.is_global_admin and not owner.is_active:
+            owner.is_active = True
+            changed = True
+        if not user.is_active:
+            user.is_active = True
+            changed = True
+        if changed:
+            db.session.commit()
         return True
 
     changed = _expire_user(owner)

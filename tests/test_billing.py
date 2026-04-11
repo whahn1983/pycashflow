@@ -107,12 +107,33 @@ def test_appstore_verification_creates_or_updates_owner(flask_app, client):
             "transaction": {"original_transaction_id": "ios_txn_1"},
         },
     )
+    assert resp.status_code == 401
+
+    with flask_app.app_context():
+        user = User.query.filter_by(email="ios-user@test.local").first()
+        assert user is None
+
+
+def test_appstore_verification_stub_mode_can_activate_owner(flask_app, client):
+    with flask_app.app_context():
+        flask_app.config["APPSTORE_ALLOW_STUB_VERIFICATION"] = True
+
+    expiry = (datetime.now(timezone.utc) + timedelta(days=20)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    resp = client.post(
+        "/api/v1/billing/verify-appstore",
+        json={
+            "email": "ios-stub@test.local",
+            "receipt_data": "dummy-receipt",
+            "expiry_date": expiry,
+            "transaction": {"original_transaction_id": "ios_txn_1"},
+        },
+    )
     assert resp.status_code == 200
     body = _json(resp)["data"]
     assert body["verification_status"] == "verified_stub"
 
     with flask_app.app_context():
-        user = User.query.filter_by(email="ios-user@test.local").first()
+        user = User.query.filter_by(email="ios-stub@test.local").first()
         assert user is not None
         assert user.subscription_source == "app_store"
         assert user.subscription_status == "active"
@@ -159,6 +180,90 @@ def test_guest_access_depends_on_owner_subscription(flask_app, client):
         guest_db = User.query.filter_by(email="guest-expired@test.local").first()
         assert guest_db.is_active is False
         flask_app.config["PAYMENTS_ENABLED"] = original_toggle
+
+
+def test_inactive_guest_is_reactivated_when_owner_subscription_is_current(flask_app, client):
+    original_toggle = flask_app.config["PAYMENTS_ENABLED"]
+    with flask_app.app_context():
+        flask_app.config["PAYMENTS_ENABLED"] = True
+        owner = User(
+            email="owner-active@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Owner",
+            admin=True,
+            is_active=True,
+            subscription_status="active",
+            subscription_source="stripe",
+            subscription_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
+        )
+        db.session.add(owner)
+        db.session.commit()
+
+        guest = User(
+            email="guest-inactive@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Guest",
+            admin=False,
+            is_active=False,
+            account_owner_id=owner.id,
+            owner_user_id=owner.id,
+            is_account_owner=False,
+            subscription_status="inactive",
+            subscription_source="none",
+        )
+        db.session.add(guest)
+        db.session.commit()
+
+        raw, _ = create_token_for_user(guest)
+
+    resp = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {raw}"})
+    assert resp.status_code == 200
+
+    with flask_app.app_context():
+        guest_db = User.query.filter_by(email="guest-inactive@test.local").first()
+        assert guest_db.is_active is True
+        flask_app.config["PAYMENTS_ENABLED"] = original_toggle
+
+
+def test_subscription_webhook_update_without_email_uses_existing_subscription_id(flask_app, client):
+    with flask_app.app_context():
+        flask_app.config["STRIPE_WEBHOOK_SECRET"] = "whsec_test_secret"
+        user = User(
+            email="sub-update@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="SubUpdate",
+            admin=True,
+            is_account_owner=True,
+            is_active=False,
+            subscription_status="expired",
+            subscription_source="stripe",
+            subscription_id="sub_existing_123",
+        )
+        db.session.add(user)
+        db.session.commit()
+
+    payload = {
+        "type": "customer.subscription.updated",
+        "data": {
+            "object": {
+                "id": "sub_existing_123",
+                "status": "active",
+                "current_period_end": int((datetime.now(timezone.utc) + timedelta(days=45)).timestamp()),
+            }
+        },
+    }
+    raw = json.dumps(payload)
+    resp = client.post(
+        "/api/v1/billing/webhook/stripe",
+        data=raw,
+        headers={"Stripe-Signature": _sign(raw, "whsec_test_secret")},
+    )
+    assert resp.status_code == 200
+
+    with flask_app.app_context():
+        user = User.query.filter_by(email="sub-update@test.local").first()
+        assert user.subscription_status == "active"
+        assert user.is_active is True
 
 
 def test_global_admin_is_subscription_exempt(flask_app, client):
