@@ -316,6 +316,51 @@ Sensitive fields (password, 2FA secret, backup codes) are never included.
 
 ---
 
+### POST /api/v1/auth/complete-password-setup
+
+Complete first-time password setup for payment-created users using a one-time
+setup token from onboarding email.
+
+**Auth required:** No
+
+**Request:**
+
+```json
+{
+  "token": "<setup-token>",
+  "password": "NewSecure123"
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `token` | string | Yes | One-time token from email link |
+| `password` | string | Yes | Must meet password policy |
+
+**Response `200 OK`:**
+
+```json
+{
+  "data": {
+    "message": "Password setup complete"
+  }
+}
+```
+
+**Response `401 Unauthorized`:**
+
+Returned for invalid, expired, or already-used setup tokens.
+
+```json
+{
+  "error": "Invalid or expired password setup token",
+  "code": "unauthorized",
+  "status": 401
+}
+```
+
+---
+
 ### GET /api/v1/dashboard
 
 Dashboard summary for a mobile home screen.

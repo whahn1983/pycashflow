@@ -15,6 +15,12 @@ from werkzeug.security import generate_password_hash
 
 from app import db
 from app.models import User
+from app.getemail import send_password_setup_email
+from app.password_setup import (
+    build_password_setup_url,
+    create_password_setup_token,
+    get_password_setup_ttl_minutes,
+)
 from app.subscription import (
     SUB_ACTIVE,
     SUB_EXPIRED,
@@ -42,16 +48,15 @@ def _parse_unix_ts(raw) -> datetime | None:
         return None
 
 
-def _create_or_get_owner(email: str) -> User:
+def _create_or_get_owner(email: str) -> tuple[User, bool]:
     user = User.query.filter_by(email=email).first()
     if user:
-        return user
+        return user, False
 
-    generated_password = secrets.token_urlsafe(32)
     user = User(
         email=email,
         name=email.split("@")[0],
-        password=generate_password_hash(generated_password, method="scrypt"),
+        password=generate_password_hash(secrets.token_urlsafe(48), method="scrypt"),
         admin=True,
         is_account_owner=True,
         is_active=True,
@@ -61,7 +66,23 @@ def _create_or_get_owner(email: str) -> User:
     db.session.add(user)
     db.session.commit()
     logger.info("Auto-created account owner from payment flow email=%s user_id=%s", email, user.id)
-    return user
+    return user, True
+
+
+def _send_setup_email_for_new_user(user: User, created: bool) -> None:
+    if not created:
+        return
+
+    raw_token, _record = create_password_setup_token(user)
+    setup_url = build_password_setup_url(raw_token)
+    sent = send_password_setup_email(
+        user_name=user.name or user.email.split("@")[0],
+        user_email=user.email,
+        setup_url=setup_url,
+        expires_minutes=get_password_setup_ttl_minutes(),
+    )
+    if not sent:
+        logger.warning("Password setup email could not be sent for user_id=%s", user.id)
 
 
 def _verify_stripe_signature(payload: str, signature_header: str) -> bool:
@@ -99,7 +120,7 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
         email = (obj.get("customer_details") or {}).get("email") or obj.get("customer_email")
         if not email:
             return validation_error({"email": "customer email missing from checkout session"})
-        user = _create_or_get_owner(email.strip().lower())
+        user, created = _create_or_get_owner(email.strip().lower())
         expiry = _parse_unix_ts(obj.get("current_period_end"))
         apply_subscription_status(
             user,
@@ -109,6 +130,7 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
             expiry=expiry,
             activate=True,
         )
+        _send_setup_email_for_new_user(user, created)
         return api_ok({"processed": event_type, "user_id": user.id})
 
     if event_type in {"customer.subscription.created", "customer.subscription.updated"}:
@@ -119,8 +141,9 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
         user = None
         if subscription_id:
             user = User.query.filter_by(subscription_id=subscription_id).first()
+        created = False
         if user is None and email:
-            user = _create_or_get_owner(email)
+            user, created = _create_or_get_owner(email)
         if user is None:
             logger.warning(
                 "Skipping Stripe subscription event without resolvable user: type=%s sub_id=%s",
@@ -146,6 +169,7 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
             expiry=expires_at,
             activate=activate,
         )
+        _send_setup_email_for_new_user(user, created)
         return api_ok({"processed": event_type, "user_id": user.id})
 
     if event_type in {"customer.subscription.deleted", "invoice.payment_failed"}:
@@ -290,7 +314,7 @@ def api_verify_appstore():
 
     verification_status = "verified_stub"
 
-    user = _create_or_get_owner(email)
+    user, created = _create_or_get_owner(email)
     apply_subscription_status(
         user,
         status=SUB_ACTIVE,
@@ -299,6 +323,7 @@ def api_verify_appstore():
         expiry=expiry.replace(tzinfo=None),
         activate=True,
     )
+    _send_setup_email_for_new_user(user, created)
 
     return api_ok(
         {

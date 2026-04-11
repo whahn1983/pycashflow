@@ -36,7 +36,13 @@ from app.models import (
     User as _User,
     Balance as _Balance,
     PasskeyCredential as _PasskeyCredential,
+    PasswordSetupToken as _PasswordSetupToken,
 )  # noqa: E402
+from app.password_setup import (  # noqa: E402
+    build_password_setup_url as _build_password_setup_url,
+    create_password_setup_token as _create_password_setup_token,
+)
+from app.api.routes import billing as _billing_routes  # noqa: E402
 import _helpers  # noqa: F401  – pre-load real cashflow refs before any test-module stubs
 from werkzeug.security import generate_password_hash                # noqa: E402
 
@@ -120,3 +126,24 @@ def user_model():
 def passkey_credential_model():
     """Return the real PasskeyCredential model captured before stubs are installed."""
     return _PasskeyCredential
+
+
+@pytest.fixture(scope="session")
+def password_setup_token_model():
+    """Return the real PasswordSetupToken model captured before stubs are installed."""
+    return _PasswordSetupToken
+
+
+@pytest.fixture(scope="session")
+def password_setup_helpers():
+    """Return password setup helpers captured before any module stubs are installed."""
+    return {
+        "build_url": _build_password_setup_url,
+        "create_token": _create_password_setup_token,
+    }
+
+
+@pytest.fixture(scope="session")
+def billing_routes_module():
+    """Return billing routes module captured before any module stubs are installed."""
+    return _billing_routes

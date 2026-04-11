@@ -19,6 +19,7 @@ import re
 import imaplib
 import email
 import smtplib
+from flask import current_app
 from email.header import decode_header
 from email.utils import parseaddr
 from email.mime.text import MIMEText
@@ -517,6 +518,69 @@ The PyCashFlow Team
 
     except Exception as exc:
         logger.exception("Unexpected error sending activation notification")
+        return False
+
+
+def send_password_setup_email(user_name, user_email, setup_url, expires_minutes):
+    """Send password setup email for payment-created cloud users."""
+    try:
+        email_settings = GlobalEmailSettings.query.first()
+        if not email_settings:
+            logger.warning("No global email settings configured, skipping password setup email")
+            return False
+
+        from_email = email_settings.email
+        password = decrypt_password(email_settings.password)
+        smtp_server = email_settings.smtp_server
+        support_contact = current_app.config.get("SUPPORT_CONTACT_EMAIL") or from_email
+
+        msg = MIMEMultipart('alternative')
+        msg['From'] = from_email
+        msg['To'] = user_email
+        msg['Subject'] = 'Set Your PyCashFlow Password'
+
+        text_content = f"""
+Hello {user_name},
+
+Your PyCashFlow Cloud account was created after your subscription purchase.
+
+Please set your password using this secure one-time link:
+{setup_url}
+
+This link expires in {expires_minutes} minutes and can only be used once.
+If you did not expect this email or need help, contact {support_contact}.
+
+Best regards,
+The PyCashFlow Team
+"""
+        part1 = MIMEText(text_content, 'plain')
+        msg.attach(part1)
+
+        try:
+            server = smtplib.SMTP(smtp_server, 587, timeout=10)
+            server.starttls()
+            server.login(from_email, password)
+            server.sendmail(from_email, user_email, msg.as_string())
+            server.quit()
+            logger.info("Sent password setup email user_id_email=%s", user_email)
+            return True
+        except (smtplib.SMTPException, OSError) as exc:
+            logger.warning(
+                "Port 587 (STARTTLS) failed for password setup email, trying port 465 (SSL): %s",
+                exc,
+            )
+            try:
+                server = smtplib.SMTP_SSL(smtp_server, 465, timeout=10)
+                server.login(from_email, password)
+                server.sendmail(from_email, user_email, msg.as_string())
+                server.quit()
+                logger.info("Sent password setup email via SSL user_email=%s", user_email)
+                return True
+            except (smtplib.SMTPException, OSError) as exc2:
+                logger.error("Failed password setup email via both ports: %s", exc2)
+                return False
+    except Exception:
+        logger.exception("Unexpected error sending password setup email")
         return False
 
 
