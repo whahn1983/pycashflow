@@ -21,6 +21,14 @@ struct SettingsView: View {
                     Text("AI Configured: \(settings.ai.configured ? "Yes" : "No")").surfaceCard()
                 }
 
+                if let billing = session.billingStatus {
+                    Text("Subscription: \(billing.subscription_status ?? "inactive") via \(billing.subscription_source ?? "none")")
+                        .surfaceCard()
+                    if let expiry = billing.subscription_expiry {
+                        Text("Subscription expiry: \(expiry)").surfaceCard()
+                    }
+                }
+
                 if let insights {
                     Text("Insights: \((insights.insights ?? []).joined(separator: "\n• "))")
                         .surfaceCard()
@@ -37,6 +45,9 @@ struct SettingsView: View {
                         .buttonStyle(PrimaryButtonStyle())
                 }
                 .surfaceCard()
+
+                Button("Refresh Subscription Status") { Task { await session.refreshSubscriptionState(forceProfileRefresh: true) } }
+                    .buttonStyle(PrimaryButtonStyle())
 
                 Button("Logout", role: .destructive) { Task { await logout() } }
                     .buttonStyle(PrimaryButtonStyle())

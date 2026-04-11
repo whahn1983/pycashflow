@@ -1,11 +1,29 @@
 import Foundation
 import Security
 
+@MainActor
 final class SessionManager: ObservableObject {
+    enum AccessState: Equatable {
+        case unknown
+        case checking
+        case allowed
+        case blocked(message: String)
+    }
+
     @Published var token: String? = TokenKeychainStore.readTokenMigratingLegacy()
     @Published var user: UserDTO?
+    @Published var billingStatus: BillingStatusDTO?
+    @Published var accessState: AccessState = .unknown
 
     var isAuthenticated: Bool { token != nil }
+
+    func bootstrap() async {
+        guard token != nil else {
+            accessState = .unknown
+            return
+        }
+        await refreshSubscriptionState(forceProfileRefresh: true)
+    }
 
     func setSession(token: String, user: UserDTO) {
         self.token = token
@@ -17,9 +35,51 @@ final class SessionManager: ObservableObject {
         }
     }
 
+    func establishSession(token: String, user: UserDTO) async {
+        setSession(token: token, user: user)
+        await refreshSubscriptionState(forceProfileRefresh: true)
+    }
+
+    func refreshSubscriptionState(forceProfileRefresh: Bool = false) async {
+        guard let token else {
+            accessState = .unknown
+            return
+        }
+
+        accessState = .checking
+
+        do {
+            if forceProfileRefresh || user == nil {
+                let me: APIEnvelope<UserDTO> = try await APIClient.shared.request(
+                    "auth/me",
+                    token: token,
+                    as: APIEnvelope<UserDTO>.self
+                )
+                user = me.data
+            }
+
+            let status = try await BillingAPI.fetchBillingStatus(token: token)
+            billingStatus = status
+            accessState = status.effectiveAccessAllowed
+                ? .allowed
+                : .blocked(message: status.accessMessage)
+        } catch let apiError as APIErrorEnvelope {
+            if apiError.status == 401 {
+                clear()
+                accessState = .unknown
+                return
+            }
+            accessState = .blocked(message: apiError.error)
+        } catch {
+            accessState = .blocked(message: "Unable to refresh account status. Please try again.")
+        }
+    }
+
     func clear() {
         token = nil
         user = nil
+        billingStatus = nil
+        accessState = .unknown
         TokenKeychainStore.deleteToken()
         UserDefaults.standard.removeObject(forKey: "api_token")
     }

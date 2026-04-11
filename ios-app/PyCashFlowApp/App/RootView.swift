@@ -5,11 +5,22 @@ struct RootView: View {
 
     var body: some View {
         NavigationStack {
-            if session.isAuthenticated {
-                DashboardView()
-            } else {
+            if !session.isAuthenticated {
                 LoginView()
+            } else {
+                switch session.accessState {
+                case .unknown, .checking:
+                    ProgressView("Checking account status...")
+                        .foregroundStyle(AppTheme.textPrimary)
+                case .allowed:
+                    DashboardView()
+                case .blocked(let message):
+                    SubscriptionPaywallView(message: message)
+                }
             }
+        }
+        .task {
+            await session.bootstrap()
         }
         .preferredColorScheme(.dark)
     }

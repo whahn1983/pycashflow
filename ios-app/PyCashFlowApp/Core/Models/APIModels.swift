@@ -21,6 +21,9 @@ struct UserDTO: Decodable {
     let is_global_admin: Bool?
     let twofa_enabled: Bool?
     let is_guest: Bool
+    let subscription_status: String?
+    let subscription_source: String?
+    let subscription_expiry: String?
 }
 
 struct LoginResponseDTO: Decodable {
@@ -28,6 +31,47 @@ struct LoginResponseDTO: Decodable {
     let twofa_required: Bool?
     let challenge: String?
     let user: UserDTO
+}
+
+struct BillingStatusDTO: Decodable {
+    let user_id: Int?
+    let is_active: Bool?
+    let effective_is_active: Bool?
+    let subscription_status: String?
+    let subscription_source: String?
+    let subscription_expiry: String?
+    let payments_enabled: Bool?
+    let is_global_admin: Bool?
+    let is_guest: Bool?
+    let owner_user_id: Int?
+
+    var effectiveAccessAllowed: Bool {
+        if is_global_admin == true {
+            return true
+        }
+        if let effective_is_active {
+            return effective_is_active
+        }
+        return is_active ?? false
+    }
+
+    var accessMessage: String {
+        let status = subscription_status ?? "inactive"
+        if status == "expired" {
+            return "Subscription expired. Renew to continue using owner-only features."
+        }
+        if is_guest == true {
+            return "Guest access depends on your account owner's active subscription."
+        }
+        return "An active subscription is required to continue."
+    }
+}
+
+struct AppStoreVerificationResponseDTO: Decodable {
+    let verification_status: String
+    let user_id: Int?
+    let subscription_status: String?
+    let subscription_source: String?
 }
 
 struct DashboardDTO: Decodable {
