@@ -168,7 +168,7 @@ docker run -d \
   -p 127.0.0.1:5000:5000 \
   -v /mnt/data:/app/app/data \
   -v /mnt/migrations:/app/migrations \
-  -v /etc/localtime:/etc/localtime:ro \
+  -e TZ=America/New_York \
   -v /mnt/.env:/app/app/.env \
   --restart always \
   --pull always \
@@ -182,8 +182,17 @@ docker run -d \
 |--------------|---------|----------|
 | `/mnt/data:/app/app/data` | Persistent database storage | **Yes** |
 | `/mnt/migrations:/app/migrations` | Database migration files | Recommended |
-| `/etc/localtime:/etc/localtime:ro` | Correct timezone for calculations | Recommended |
 | `/mnt/.env:/app/app/.env` | Environment variables (.env settings, passkeys, bootstrap admin, etc.) | Optional |
+
+#### Time Zone Configuration
+
+Set the container's local time zone using the `TZ` environment variable:
+
+```bash
+-e TZ=America/New_York
+```
+
+If `TZ` is not provided, the container defaults to `UTC`.
 
 #### Access the Application
 
@@ -275,6 +284,9 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
 
    # Optional: Database URL (defaults to SQLite)
    DATABASE_URL=sqlite:///data/db.sqlite
+
+   # Optional: container/app timezone (defaults to UTC)
+   TZ=America/New_York
    ```
 
 5. **Run the Application**
