@@ -12,9 +12,7 @@ chown appuser:appgroup /app/getemail.log
 # Daemon log goes to /app/crond.log (separate from job output in getemail.log).
 /usr/sbin/crond -f -l 8 -L /app/crond.log -c /app/crontabs/ &
 
-# Flask migrations as appuser
-su-exec appuser /usr/local/bin/flask --app app db init
-su-exec appuser /usr/local/bin/flask --app app db migrate
+# Apply checked-in migrations as appuser (never generate migrations at startup)
 su-exec appuser /usr/local/bin/flask --app app db upgrade
 
 # Run waitress as appuser (exec replaces the root shell — no root process remains)
