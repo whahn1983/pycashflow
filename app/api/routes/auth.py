@@ -247,13 +247,19 @@ def api_me():
 @api.route("/auth/complete-password-setup", methods=["POST"])
 def api_complete_password_setup():
     body = request.get_json(silent=True) or {}
-    token = (body.get("token") or "").strip()
-    new_password = body.get("password") or ""
+    token_raw = body.get("token")
+    token = token_raw.strip() if isinstance(token_raw, str) else ""
+    password_raw = body.get("password")
+    new_password = password_raw if isinstance(password_raw, str) else ""
 
     errors: dict = {}
-    if not token:
+    if token_raw is not None and not isinstance(token_raw, str):
+        errors["token"] = "Token must be a string"
+    elif not token:
         errors["token"] = "Token is required"
-    if not new_password:
+    if password_raw is not None and not isinstance(password_raw, str):
+        errors["password"] = "Password must be a string"
+    elif not new_password:
         errors["password"] = "Password is required"
     else:
         password_error = _validate_new_password(new_password)

@@ -36,7 +36,7 @@ def build_password_setup_url(raw_token: str) -> str:
     frontend_base = (current_app.config.get("FRONTEND_BASE_URL") or "").strip()
     normalized_base = frontend_base.rstrip("/")
     if not normalized_base:
-        normalized_base = (current_app.config.get("PREFERRED_URL_SCHEME") or "http") + "://localhost"
+        raise RuntimeError("FRONTEND_BASE_URL must be configured for password setup links")
     return f"{normalized_base}{PASSWORD_SETUP_ROUTE}/{raw_token}"
 
 
