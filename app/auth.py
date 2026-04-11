@@ -4,6 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from .models import User, Settings, PasskeyCredential
 from app import db, limiter
 from .getemail import send_new_user_notification
+from .password_setup import consume_password_setup_token
 from .totp_utils import verify_totp, decrypt_totp_secret, verify_and_consume_backup_code
 from .subscription import enforce_user_access
 import logging
@@ -53,6 +54,16 @@ auth = Blueprint('auth', __name__)
 
 
 PASSKEY_CHALLENGE_TTL_SECONDS = 300
+
+
+def _validate_new_password(password: str) -> str | None:
+    if len(password) < 8:
+        return "Password must be at least 8 characters"
+    if password.lower() == password or password.upper() == password:
+        return "Password must include uppercase and lowercase letters"
+    if not any(ch.isdigit() for ch in password):
+        return "Password must include at least one number"
+    return None
 
 
 def _passkey_enabled() -> bool:
@@ -229,6 +240,43 @@ def logout():
     session.clear()
     logout_user()
     return redirect(url_for('main.index'))
+
+
+@auth.route('/auth/set-password/<token>', methods=['GET', 'POST'])
+def set_password(token: str):
+    setup_token = (token or "").strip()
+    if not setup_token:
+        flash("Invalid or expired password setup token")
+        return redirect(url_for('auth.login'))
+
+    if request.method == 'GET':
+        return render_template("set_password.html", token=setup_token)
+
+    password = request.form.get("password", "")
+    confirm_password = request.form.get("confirm_password", "")
+
+    if not password:
+        flash("Password is required")
+        return render_template("set_password.html", token=setup_token)
+    if password != confirm_password:
+        flash("Passwords do not match")
+        return render_template("set_password.html", token=setup_token)
+
+    password_error = _validate_new_password(password)
+    if password_error:
+        flash(password_error)
+        return render_template("set_password.html", token=setup_token)
+
+    user = consume_password_setup_token(setup_token)
+    if user is None:
+        flash("Invalid or expired password setup token")
+        return render_template("set_password.html", token=setup_token)
+
+    user.password = generate_password_hash(password, method="scrypt")
+    user.is_active = True
+    db.session.commit()
+    flash("Password setup complete. Please sign in.")
+    return redirect(url_for("auth.login"))
 
 
 def admin_required(f):
