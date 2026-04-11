@@ -33,7 +33,7 @@ def upgrade():
         batch_op.add_column(sa.Column('subscription_source', sa.String(length=20), nullable=False, server_default='none'))
         batch_op.add_column(sa.Column('subscription_id', sa.String(length=255), nullable=True))
         batch_op.add_column(sa.Column('subscription_expiry', sa.DateTime(), nullable=True))
-        batch_op.create_foreign_key('fk_user_owner_user_id', 'user', ['owner_user_id'], ['id'])
+        batch_op.create_foreign_key('fk_user_owner_user_id_user', 'user', ['owner_user_id'], ['id'])
 
 
 def downgrade():
@@ -47,7 +47,7 @@ def downgrade():
             "pk": "pk_%(table_name)s",
         },
     ) as batch_op:
-        batch_op.drop_constraint('fk_user_owner_user_id', type_='foreignkey')
+        batch_op.drop_constraint('fk_user_owner_user_id_user', type_='foreignkey')
         batch_op.drop_column('subscription_expiry')
         batch_op.drop_column('subscription_id')
         batch_op.drop_column('subscription_source')
