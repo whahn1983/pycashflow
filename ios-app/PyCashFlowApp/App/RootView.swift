@@ -15,7 +15,11 @@ struct RootView: View {
                 case .allowed:
                     DashboardView()
                 case .blocked(let message):
-                    SubscriptionPaywallView(message: message)
+                    if session.appMode == .cloud {
+                        SubscriptionPaywallView(message: message)
+                    } else {
+                        DashboardView()
+                    }
                 }
             }
         }

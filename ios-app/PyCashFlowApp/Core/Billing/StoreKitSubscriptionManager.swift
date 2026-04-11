@@ -27,9 +27,9 @@ final class StoreKitSubscriptionManager: ObservableObject {
         }
     }
 
-    func purchase(_ product: Product, session: SessionManager) async {
-        guard let user = session.user else {
-            errorMessage = "Sign in again before purchasing."
+    func purchase(_ product: Product, email: String, token: String?) async {
+        guard !email.isEmpty else {
+            errorMessage = "Email is required to activate a hosted cloud account."
             return
         }
 
@@ -42,10 +42,9 @@ final class StoreKitSubscriptionManager: ObservableObject {
             switch result {
             case .success(let verification):
                 let transaction = try checkVerified(verification)
-                try await submit(transaction: transaction, email: user.email, token: session.token)
+                try await submit(transaction: transaction, email: email, token: token)
                 await transaction.finish()
-                statusMessage = "Purchase verified. Refreshing account status..."
-                await session.refreshSubscriptionState(forceProfileRefresh: true)
+                statusMessage = "Purchase verified with backend."
             case .pending:
                 statusMessage = "Purchase pending approval."
             case .userCancelled:
@@ -60,9 +59,9 @@ final class StoreKitSubscriptionManager: ObservableObject {
         isBusy = false
     }
 
-    func restorePurchases(session: SessionManager) async {
-        guard let user = session.user else {
-            errorMessage = "Sign in again before restoring purchases."
+    func restorePurchases(email: String, token: String?) async {
+        guard !email.isEmpty else {
+            errorMessage = "Email is required to restore a hosted cloud account."
             return
         }
 
@@ -79,9 +78,8 @@ final class StoreKitSubscriptionManager: ObservableObject {
                 return
             }
 
-            try await submit(transaction: latest, email: user.email, token: session.token)
-            statusMessage = "Restore verified. Refreshing account status..."
-            await session.refreshSubscriptionState(forceProfileRefresh: true)
+            try await submit(transaction: latest, email: email, token: token)
+            statusMessage = "Restore verified with backend."
         } catch {
             errorMessage = "Restore failed. Please try again."
         }

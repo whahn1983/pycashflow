@@ -3,7 +3,7 @@ import Foundation
 final class APIClient {
     static let shared = APIClient()
 
-    var baseURL: URL = AppEnvironment.apiBaseURL
+    var baseURL: URL = AppEnvironment.cloudAPIBaseURL
 
     func request<T: Decodable>(
         _ path: String,
@@ -66,7 +66,7 @@ private struct AnyEncodable: Encodable {
 }
 
 enum AppEnvironment {
-    static let apiBaseURL: URL = {
+    static let cloudAPIBaseURL: URL = {
         let key = "API_BASE_URL"
 
         if let plistValue = Bundle.main.object(forInfoDictionaryKey: key) as? String,
@@ -88,6 +88,24 @@ enum AppEnvironment {
         }
 
         return URL(string: "https://example.com/api/v1")!
+    }()
+
+    static let defaultSelfHostedAPIBaseURL: URL = {
+        let key = "SELF_HOSTED_API_BASE_URL"
+
+        if let plistValue = Bundle.main.object(forInfoDictionaryKey: key) as? String,
+           let url = URL(string: plistValue),
+           !plistValue.isEmpty {
+            return url
+        }
+
+        if let defaultsValue = UserDefaults.standard.string(forKey: key),
+           let url = URL(string: defaultsValue),
+           !defaultsValue.isEmpty {
+            return url
+        }
+
+        return URL(string: "http://localhost:5000/api/v1")!
     }()
 
     static let appStoreProductIDs: [String] = {

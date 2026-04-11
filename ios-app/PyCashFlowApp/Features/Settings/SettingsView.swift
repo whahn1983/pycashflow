@@ -21,6 +21,9 @@ struct SettingsView: View {
                     Text("AI Configured: \(settings.ai.configured ? "Yes" : "No")").surfaceCard()
                 }
 
+                Text("Mode: \(session.appMode.label)").surfaceCard()
+                Text("API: \(session.currentBaseURL.absoluteString)").surfaceCard()
+
                 if let billing = session.billingStatus {
                     Text("Subscription: \(billing.subscription_status ?? "inactive") via \(billing.subscription_source ?? "none")")
                         .surfaceCard()
@@ -48,6 +51,11 @@ struct SettingsView: View {
 
                 Button("Refresh Subscription Status") { Task { await session.refreshSubscriptionState(forceProfileRefresh: true) } }
                     .buttonStyle(PrimaryButtonStyle())
+
+                Button("Switch to Self-Hosted Mode") {
+                    session.switchMode(.selfHosted)
+                }
+                .buttonStyle(PrimaryButtonStyle())
 
                 Button("Logout", role: .destructive) { Task { await logout() } }
                     .buttonStyle(PrimaryButtonStyle())
