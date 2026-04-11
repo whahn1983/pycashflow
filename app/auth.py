@@ -3,8 +3,8 @@ from flask_login import login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from .models import User, Settings, PasskeyCredential
 from app import db, limiter
-from .getemail import send_new_user_notification
-from .password_setup import consume_password_setup_token
+from .getemail import send_new_user_notification, send_password_setup_email
+from .password_setup import consume_password_setup_token, create_password_setup_link
 from .totp_utils import verify_totp, decrypt_totp_secret, verify_and_consume_backup_code
 from .subscription import enforce_user_access
 import logging
@@ -78,6 +78,41 @@ def _passkey_enabled() -> bool:
 @auth.route('/login')
 def login():
     return render_template('login.html', passkey_enabled=_passkey_enabled())
+
+
+@auth.route('/forgot-password', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+def forgot_password():
+    if request.method == 'GET':
+        return render_template('forgot_password.html')
+
+    email = (request.form.get('email') or '').strip().lower()
+    success_message = (
+        "If an account exists for that email, a password reset link has been sent."
+    )
+    if not email:
+        flash("Email address is required")
+        return render_template('forgot_password.html')
+
+    user = User.query.filter_by(email=email).first()
+    if user is not None:
+        try:
+            setup_url, expires_minutes = create_password_setup_link(user)
+            sent = send_password_setup_email(
+                user_name=user.name or user.email.split('@')[0],
+                user_email=user.email,
+                setup_url=setup_url,
+                expires_minutes=expires_minutes,
+            )
+            if not sent:
+                logger.warning("Password reset email could not be sent for user_id=%s", user.id)
+        except RuntimeError:
+            logger.exception("Forgot-password flow unavailable; FRONTEND_BASE_URL missing")
+            flash("Password reset is currently unavailable. Please contact support.")
+            return render_template('forgot_password.html')
+
+    flash(success_message)
+    return redirect(url_for('auth.login'))
 
 
 @auth.route('/login', methods=['POST'])
