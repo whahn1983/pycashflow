@@ -13,7 +13,9 @@ class User(UserMixin, db.Model):
     is_active = db.Column(db.Boolean, default=False)
     account_owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     is_account_owner = db.Column(db.Boolean, default=True, nullable=False, server_default=db.true())
-    owner_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    owner_user_id = db.Column(
+        db.Integer, db.ForeignKey('user.id', name='fk_user_owner_user_id'), nullable=True
+    )
     subscription_status = db.Column(
         db.String(20), default='inactive', nullable=False, server_default='inactive'
     )
