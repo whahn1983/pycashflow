@@ -308,3 +308,73 @@ def test_payments_toggle_disables_subscription_enforcement(flask_app, client):
 
     with flask_app.app_context():
         flask_app.config["PAYMENTS_ENABLED"] = original_toggle
+
+
+def test_billing_status_endpoint_returns_subscription_snapshot(flask_app, client):
+    with flask_app.app_context():
+        user = User(
+            email="billing-status@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="BillingStatus",
+            admin=True,
+            is_active=True,
+            subscription_status="active",
+            subscription_source="stripe",
+            subscription_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
+        )
+        db.session.add(user)
+        db.session.commit()
+        raw, _ = create_token_for_user(user)
+
+    resp = client.get("/api/v1/billing/status", headers={"Authorization": f"Bearer {raw}"})
+    assert resp.status_code == 200
+    body = _json(resp)["data"]
+    assert body["user_id"] is not None
+    assert body["is_active"] is True
+    assert body["effective_is_active"] is True
+    assert body["subscription_status"] == "active"
+    assert body["subscription_source"] == "stripe"
+    assert isinstance(body["payments_enabled"], bool)
+    assert body["is_guest"] is False
+    assert body["owner_user_id"] is None
+
+
+def test_billing_status_endpoint_for_guest_uses_owner_subscription(flask_app, client):
+    with flask_app.app_context():
+        owner = User(
+            email="billing-owner@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Owner",
+            admin=True,
+            is_active=True,
+            subscription_status="active",
+            subscription_source="stripe",
+            subscription_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
+        )
+        db.session.add(owner)
+        db.session.commit()
+
+        guest = User(
+            email="billing-guest@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Guest",
+            admin=False,
+            is_active=True,
+            is_account_owner=False,
+            owner_user_id=owner.id,
+            account_owner_id=owner.id,
+            subscription_status="inactive",
+            subscription_source="none",
+        )
+        db.session.add(guest)
+        db.session.commit()
+        raw, _ = create_token_for_user(guest)
+
+    resp = client.get("/api/v1/billing/status", headers={"Authorization": f"Bearer {raw}"})
+    assert resp.status_code == 200
+    body = _json(resp)["data"]
+    assert body["effective_is_active"] is True
+    assert body["subscription_status"] == "active"
+    assert body["subscription_source"] == "stripe"
+    assert body["is_guest"] is True
+    assert body["owner_user_id"] is not None
