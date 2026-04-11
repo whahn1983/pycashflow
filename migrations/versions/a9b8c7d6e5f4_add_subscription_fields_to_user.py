@@ -17,7 +17,16 @@ depends_on = None
 
 
 def upgrade():
-    with op.batch_alter_table('user') as batch_op:
+    with op.batch_alter_table(
+        'user',
+        naming_convention={
+            "ix": "ix_%(table_name)s_%(column_0_name)s",
+            "uq": "uq_%(table_name)s_%(column_0_name)s",
+            "ck": "ck_%(table_name)s_%(constraint_name)s",
+            "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+            "pk": "pk_%(table_name)s",
+        },
+    ) as batch_op:
         batch_op.add_column(sa.Column('is_account_owner', sa.Boolean(), nullable=False, server_default=sa.true()))
         batch_op.add_column(sa.Column('owner_user_id', sa.Integer(), nullable=True))
         batch_op.add_column(sa.Column('subscription_status', sa.String(length=20), nullable=False, server_default='inactive'))
@@ -28,7 +37,16 @@ def upgrade():
 
 
 def downgrade():
-    with op.batch_alter_table('user') as batch_op:
+    with op.batch_alter_table(
+        'user',
+        naming_convention={
+            "ix": "ix_%(table_name)s_%(column_0_name)s",
+            "uq": "uq_%(table_name)s_%(column_0_name)s",
+            "ck": "ck_%(table_name)s_%(constraint_name)s",
+            "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+            "pk": "pk_%(table_name)s",
+        },
+    ) as batch_op:
         batch_op.drop_constraint('fk_user_owner_user_id', type_='foreignkey')
         batch_op.drop_column('subscription_expiry')
         batch_op.drop_column('subscription_id')
