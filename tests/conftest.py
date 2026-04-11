@@ -26,6 +26,7 @@ os.environ.setdefault("APP_SECRET", "pytest-app-secret-for-crypto-utils-32!")
 os.environ.setdefault("PASSKEY_RP_ID", "localhost")
 os.environ.setdefault("PASSKEY_RP_NAME", "PyCashFlow Test")
 os.environ.setdefault("PASSKEY_ORIGIN", "http://localhost")
+os.environ.setdefault("PAYMENTS_ENABLED", "false")
 
 # ── Capture real app references BEFORE stubs are set up ──────────────────────
 # conftest.py is loaded before test_*.py files, so all imports here use the

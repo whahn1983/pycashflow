@@ -42,9 +42,10 @@ def get_effective_user_id():
     For guest users, returns their account owner's ID.
     For account owners, returns their own ID.
     """
-    if current_user.account_owner_id:
+    owner_id = current_user.owner_user_id or current_user.account_owner_id
+    if owner_id:
         # Guest user - return account owner's ID
-        return current_user.account_owner_id
+        return owner_id
     else:
         # Account owner or standalone user - return their own ID
         return current_user.id
@@ -965,7 +966,8 @@ def create_user():
             else:
                 return redirect(url_for('main.manage_guests'))
         user = User(name=name, email=email, admin=admin, is_global_admin=is_global_admin,
-                    is_active=is_active, password=password, account_owner_id=account_owner_id)
+                    is_active=is_active, password=password, account_owner_id=account_owner_id,
+                    owner_user_id=account_owner_id, is_account_owner=account_owner_id is None)
         db.session.add(user)
         db.session.commit()
         flash("Added Successfully")
@@ -1057,7 +1059,10 @@ def add_guest():
         password=generate_password_hash(temp_password, method='scrypt'),
         admin=False,  # Guests are not admins
         is_global_admin=False,
-        account_owner_id=current_user.id
+        is_active=True,
+        account_owner_id=current_user.id,
+        owner_user_id=current_user.id,
+        is_account_owner=False,
     )
     db.session.add(new_guest)
     db.session.commit()

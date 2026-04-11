@@ -53,7 +53,10 @@ def serialize_user(user) -> dict:
         "is_admin": bool(user.admin),
         "is_global_admin": bool(user.is_global_admin),
         "twofa_enabled": bool(user.twofa_enabled),
-        "is_guest": user.account_owner_id is not None,
+        "is_guest": (user.owner_user_id is not None) or (user.account_owner_id is not None),
+        "subscription_status": user.subscription_status,
+        "subscription_source": user.subscription_source,
+        "subscription_expiry": _datetime(user.subscription_expiry),
     }
 
 
