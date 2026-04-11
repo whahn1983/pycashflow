@@ -380,6 +380,55 @@ def test_billing_status_endpoint_for_guest_uses_owner_subscription(flask_app, cl
     assert body["owner_user_id"] is not None
 
 
+def test_billing_status_rejects_manual_deactivated_user(flask_app, client):
+    original_toggle = flask_app.config["PAYMENTS_ENABLED"]
+    with flask_app.app_context():
+        flask_app.config["PAYMENTS_ENABLED"] = False
+        user = User(
+            email="billing-manual-inactive@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="BillingManualInactive",
+            admin=True,
+            is_active=False,
+            subscription_status="inactive",
+            subscription_source="manual",
+        )
+        db.session.add(user)
+        db.session.commit()
+        raw, _ = create_token_for_user(user)
+
+    resp = client.get("/api/v1/billing/status", headers={"Authorization": f"Bearer {raw}"})
+    assert resp.status_code == 401
+
+    with flask_app.app_context():
+        flask_app.config["PAYMENTS_ENABLED"] = original_toggle
+
+
+def test_billing_status_rejects_admin_deactivated_user_with_current_subscription(flask_app, client):
+    original_toggle = flask_app.config["PAYMENTS_ENABLED"]
+    with flask_app.app_context():
+        flask_app.config["PAYMENTS_ENABLED"] = True
+        user = User(
+            email="billing-admin-inactive@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="BillingAdminInactive",
+            admin=True,
+            is_active=False,
+            subscription_status="active",
+            subscription_source="stripe",
+            subscription_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=10),
+        )
+        db.session.add(user)
+        db.session.commit()
+        raw, _ = create_token_for_user(user)
+
+    resp = client.get("/api/v1/billing/status", headers={"Authorization": f"Bearer {raw}"})
+    assert resp.status_code == 401
+
+    with flask_app.app_context():
+        flask_app.config["PAYMENTS_ENABLED"] = original_toggle
+
+
 def test_billing_status_allows_inactive_users_for_refresh(flask_app, client):
     original_toggle = flask_app.config["PAYMENTS_ENABLED"]
     with flask_app.app_context():
