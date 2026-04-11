@@ -186,6 +186,35 @@ def test_stripe_new_user_generates_setup_token_and_sends_email(
     assert sent_links[0][1].startswith("https://app.example.com/auth/set-password/")
 
 
+def test_stripe_new_user_requires_frontend_base_url(flask_app, client):
+    with flask_app.app_context():
+        flask_app.config["STRIPE_WEBHOOK_SECRET"] = "whsec_test_secret"
+        flask_app.config["FRONTEND_BASE_URL"] = ""
+
+    payload = {
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "id": "cs_test_setup_missing_frontend",
+                "subscription": "sub_setup_missing_frontend",
+                "customer_details": {"email": "missing-frontend@test.local"},
+                "current_period_end": int((datetime.now(timezone.utc) + timedelta(days=30)).timestamp()),
+            }
+        },
+    }
+    raw = json.dumps(payload)
+    resp = client.post(
+        "/api/v1/billing/webhook/stripe",
+        data=raw,
+        headers={"Stripe-Signature": _sign(raw, "whsec_test_secret")},
+    )
+    assert resp.status_code == 422
+
+    with flask_app.app_context():
+        user = User.query.filter_by(email="missing-frontend@test.local").first()
+        assert user is None
+
+
 def test_appstore_new_user_generates_setup_token_and_sends_email(
     flask_app, client, monkeypatch, billing_routes_module
 ):
@@ -219,6 +248,28 @@ def test_appstore_new_user_generates_setup_token_and_sends_email(
         assert token is not None
     assert len(sent_links) == 1
     assert sent_links[0][1].startswith("https://app.example.com/auth/set-password/")
+
+
+def test_appstore_new_user_requires_frontend_base_url(flask_app, client):
+    with flask_app.app_context():
+        flask_app.config["APPSTORE_ALLOW_STUB_VERIFICATION"] = True
+        flask_app.config["FRONTEND_BASE_URL"] = ""
+
+    expiry = (datetime.now(timezone.utc) + timedelta(days=20)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    resp = client.post(
+        "/api/v1/billing/verify-appstore",
+        json={
+            "email": "missing-appstore-frontend@test.local",
+            "receipt_data": "dummy-receipt",
+            "expiry_date": expiry,
+            "transaction": {"original_transaction_id": "ios_txn_setup_missing_frontend"},
+        },
+    )
+    assert resp.status_code == 422
+
+    with flask_app.app_context():
+        user = User.query.filter_by(email="missing-appstore-frontend@test.local").first()
+        assert user is None
 
 
 def test_existing_user_does_not_get_password_setup_email(

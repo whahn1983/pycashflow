@@ -38,6 +38,25 @@ from app.api.responses import api_created, api_ok
 
 logger = logging.getLogger(__name__)
 
+def _frontend_base_url_configured() -> bool:
+    frontend_base = (current_app.config.get("FRONTEND_BASE_URL") or "").strip()
+    return bool(frontend_base.rstrip("/"))
+
+
+def _can_create_paid_user(email: str) -> bool:
+    if _frontend_base_url_configured():
+        return True
+
+    existing = User.query.filter_by(email=email).first()
+    if existing is not None:
+        return True
+
+    logger.error(
+        "Cannot create payment user without FRONTEND_BASE_URL: email=%s",
+        email,
+    )
+    return False
+
 
 def _parse_unix_ts(raw) -> datetime | None:
     if raw in (None, ""):
@@ -120,7 +139,12 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
         email = (obj.get("customer_details") or {}).get("email") or obj.get("customer_email")
         if not email:
             return validation_error({"email": "customer email missing from checkout session"})
-        user, created = _create_or_get_owner(email.strip().lower())
+        normalized_email = email.strip().lower()
+        if not _can_create_paid_user(normalized_email):
+            return validation_error(
+                {"frontend_base_url": "FRONTEND_BASE_URL is required to onboard new paid users"}
+            )
+        user, created = _create_or_get_owner(normalized_email)
         expiry = _parse_unix_ts(obj.get("current_period_end"))
         apply_subscription_status(
             user,
@@ -143,6 +167,10 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
             user = User.query.filter_by(subscription_id=subscription_id).first()
         created = False
         if user is None and email:
+            if not _can_create_paid_user(email):
+                return validation_error(
+                    {"frontend_base_url": "FRONTEND_BASE_URL is required to onboard new paid users"}
+                )
             user, created = _create_or_get_owner(email)
         if user is None:
             logger.warning(
@@ -313,6 +341,11 @@ def api_verify_appstore():
         )
 
     verification_status = "verified_stub"
+
+    if not _can_create_paid_user(email):
+        return validation_error(
+            {"frontend_base_url": "FRONTEND_BASE_URL is required to onboard new paid users"}
+        )
 
     user, created = _create_or_get_owner(email)
     apply_subscription_status(
