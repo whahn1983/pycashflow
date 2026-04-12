@@ -35,6 +35,8 @@ from app import create_app as _create_app, db as _db               # noqa: E402
 from app.models import (
     User as _User,
     Balance as _Balance,
+    Settings as _Settings,
+    TextSettings as _TextSettings,
     PasskeyCredential as _PasskeyCredential,
     PasswordSetupToken as _PasswordSetupToken,
 )  # noqa: E402
@@ -132,6 +134,18 @@ def passkey_credential_model():
 def password_setup_token_model():
     """Return the real PasswordSetupToken model captured before stubs are installed."""
     return _PasswordSetupToken
+
+
+@pytest.fixture(scope="session")
+def settings_model():
+    """Return the real Settings model captured before any module stubs are installed."""
+    return _Settings
+
+
+@pytest.fixture(scope="session")
+def text_settings_model():
+    """Return the real TextSettings model captured before any module stubs are installed."""
+    return _TextSettings
 
 
 @pytest.fixture(scope="session")
