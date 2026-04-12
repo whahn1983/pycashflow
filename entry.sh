@@ -55,10 +55,15 @@ DEFAULT_GUNICORN_WORKERS=$((CPU_COUNT * 2 + 1))
 # Keep a single worker by default unless a shared rate-limit backend is configured.
 if [ -n "${GUNICORN_WORKERS:-}" ]; then
     RESOLVED_GUNICORN_WORKERS="${GUNICORN_WORKERS}"
-elif [ -z "${RATELIMIT_STORAGE_URI:-}" ] || [ "${RATELIMIT_STORAGE_URI}" = "memory://" ]; then
+elif [ -z "${RATELIMIT_STORAGE_URI:-}" ]; then
     RESOLVED_GUNICORN_WORKERS=1
 else
-    RESOLVED_GUNICORN_WORKERS="${DEFAULT_GUNICORN_WORKERS}"
+    # Treat any case/variant of memory://... as process-local storage.
+    RATELIMIT_STORAGE_URI_NORMALIZED="$(printf '%s' "${RATELIMIT_STORAGE_URI}" | tr '[:upper:]' '[:lower:]')"
+    case "${RATELIMIT_STORAGE_URI_NORMALIZED}" in
+        memory://*) RESOLVED_GUNICORN_WORKERS=1 ;;
+        *) RESOLVED_GUNICORN_WORKERS="${DEFAULT_GUNICORN_WORKERS}" ;;
+    esac
 fi
 
 GUNICORN_WORKERS="${RESOLVED_GUNICORN_WORKERS}"
