@@ -8,7 +8,7 @@ numpy
 python-dateutil
 natsort
 Flask-Migrate
-waitress
+gunicorn
 werkzeug
 webauthn
 python-dotenv

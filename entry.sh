@@ -44,5 +44,24 @@ chown appuser:appgroup /app/getemail.log
 # Apply checked-in migrations as appuser (never generate migrations at startup)
 su-exec appuser /usr/local/bin/flask --app app db upgrade
 
-# Run waitress as appuser (exec replaces the root shell — no root process remains)
-exec su-exec appuser waitress-serve --listen=0.0.0.0:5000 --call app:create_app
+# Derive safe Gunicorn defaults (override with env vars as needed).
+CPU_COUNT="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)"
+case "${CPU_COUNT}" in
+    ''|*[!0-9]*|0) CPU_COUNT=1 ;;
+esac
+DEFAULT_GUNICORN_WORKERS=$((CPU_COUNT * 2 + 1))
+GUNICORN_WORKERS="${GUNICORN_WORKERS:-${DEFAULT_GUNICORN_WORKERS}}"
+GUNICORN_TIMEOUT="${GUNICORN_TIMEOUT:-120}"
+
+echo "Starting Gunicorn: workers=${GUNICORN_WORKERS}, timeout=${GUNICORN_TIMEOUT}, bind=0.0.0.0:5000"
+
+# Run gunicorn as appuser (exec replaces the root shell — no root process remains)
+exec su-exec appuser gunicorn \
+    --bind 0.0.0.0:5000 \
+    --workers "${GUNICORN_WORKERS}" \
+    --worker-class sync \
+    --timeout "${GUNICORN_TIMEOUT}" \
+    --access-logfile - \
+    --error-logfile - \
+    --capture-output \
+    'app:create_app()'
