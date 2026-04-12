@@ -111,7 +111,7 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - **Flask**: Lightweight Python web framework
 - **SQLAlchemy**: SQL toolkit and ORM for database management
 - **Flask-Migrate**: Database migration management
-- **Waitress**: Production-ready WSGI server
+- **Gunicorn**: Production-ready WSGI server
 - **Flask-Login**: User session management
 - **Flask-Limiter**: Rate limiting for API and auth endpoints
 
@@ -198,6 +198,22 @@ If `TZ` is not provided, the container defaults to `UTC`.
 
 Once running, access PyCashFlow at `http://localhost:5000`
 
+#### Production WSGI Server (Gunicorn)
+
+Containerized production startup uses Gunicorn (via `/entry.sh`) and keeps startup behavior unchanged: timezone setup, ownership fixes, cron startup, and `flask db upgrade` before serving requests.
+
+Supported Gunicorn environment variables:
+
+- `GUNICORN_WORKERS`: Number of worker processes (default: `2 * CPU + 1`)
+- `GUNICORN_TIMEOUT`: Worker timeout seconds (default: `120`)
+
+Example:
+
+```bash
+-e GUNICORN_WORKERS=4 \
+-e GUNICORN_TIMEOUT=180
+```
+
 ---
 
 ### Manual Installation
@@ -209,7 +225,7 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
 - Python 3.11 or higher
 - pip (Python package manager)
 - Git
-- WSGI server (Waitress, Gunicorn, or uWSGI)
+- WSGI server (Gunicorn or uWSGI)
 - (Optional) Reverse proxy (Nginx or Apache)
 
 #### Installation Steps
