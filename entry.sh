@@ -1,23 +1,44 @@
 #!/bin/sh
 
+DOTENV_FILE="/app/app/.env"
+
+# Resolve a variable from runtime environment first, then from /app/app/.env.
+# Usage: get_env_or_dotenv "VAR_NAME" "default_value"
+get_env_or_dotenv() {
+    var_name="$1"
+    default_value="$2"
+
+    eval "runtime_value=\${${var_name}:-}"
+    if [ -n "${runtime_value}" ]; then
+        printf '%s' "${runtime_value}"
+        return 0
+    fi
+
+    if [ -f "${DOTENV_FILE}" ]; then
+        dotenv_value="$(awk -F= -v key="${var_name}" '
+            $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
+                sub(/^[[:space:]]*[^=]+=[[:space:]]*/, "", $0)
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+                gsub(/^["'"'"']|["'"'"']$/, "", $0)
+                print $0
+                exit
+            }
+        ' "${DOTENV_FILE}")"
+        if [ -n "${dotenv_value}" ]; then
+            printf '%s' "${dotenv_value}"
+            return 0
+        fi
+    fi
+
+    printf '%s' "${default_value}"
+}
+
 # Configure container local timezone from TZ env var, or /app/app/.env (defaults to UTC).
 #
 # Runtime env var takes precedence. If it is missing, attempt to read TZ from
 # the mounted .env file so timezone configuration works even when users only
 # set TZ there.
-TZ_VALUE="${TZ:-}"
-if [ -z "${TZ_VALUE}" ] && [ -f "/app/app/.env" ]; then
-    TZ_VALUE="$(awk -F= '
-        /^[[:space:]]*TZ[[:space:]]*=/ {
-            sub(/^[[:space:]]*TZ[[:space:]]*=[[:space:]]*/, "", $0)
-            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
-            gsub(/^["'"'"']|["'"'"']$/, "", $0)
-            print $0
-            exit
-        }
-    ' /app/app/.env)"
-fi
-TZ_VALUE="${TZ_VALUE:-UTC}"
+TZ_VALUE="$(get_env_or_dotenv "TZ" "UTC")"
 if [ -f "/usr/share/zoneinfo/${TZ_VALUE}" ]; then
     ln -snf "/usr/share/zoneinfo/${TZ_VALUE}" /etc/localtime
     echo "${TZ_VALUE}" > /etc/timezone
@@ -36,10 +57,24 @@ chown -R appuser:appgroup /app/migrations
 chown appuser:appgroup /app/getemail.log
 # crond.log is written by root crond — leave as root:root
 
-# Run crond in foreground mode (-f) so it doesn't double-fork into an
-# unreachable daemon; & sends it to the background so this script continues.
-# Daemon log goes to /app/crond.log (separate from job output in getemail.log).
-/usr/sbin/crond -f -l 8 -L /app/crond.log -c /app/crontabs/ &
+ENABLE_CRON_RESOLVED="$(get_env_or_dotenv "ENABLE_CRON" "true")"
+ENABLE_CRON_NORMALIZED="$(printf '%s' "${ENABLE_CRON_RESOLVED}" | tr '[:upper:]' '[:lower:]')"
+case "${ENABLE_CRON_NORMALIZED}" in
+    true|1|yes|on)
+        START_CRON=true
+        ;;
+    *)
+        START_CRON=false
+        ;;
+esac
+
+echo "ENABLE_CRON resolved to '${ENABLE_CRON_RESOLVED}' (from env/.env); cron startup: ${START_CRON}"
+if [ "${START_CRON}" = "true" ]; then
+    # Run crond in foreground mode (-f) so it doesn't double-fork into an
+    # unreachable daemon; & sends it to the background so this script continues.
+    # Daemon log goes to /app/crond.log (separate from job output in getemail.log).
+    /usr/sbin/crond -f -l 8 -L /app/crond.log -c /app/crontabs/ &
+fi
 
 # Apply checked-in migrations as appuser (never generate migrations at startup)
 su-exec appuser /usr/local/bin/flask --app app db upgrade

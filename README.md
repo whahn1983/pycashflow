@@ -169,6 +169,7 @@ docker run -d \
   -v /mnt/data:/app/app/data \
   -v /mnt/migrations:/app/migrations \
   -e TZ=America/New_York \
+  -e ENABLE_CRON=true \
   -v /mnt/.env:/app/app/.env \
   --restart always \
   --pull always \
@@ -200,16 +201,35 @@ Once running, access PyCashFlow at `http://localhost:5000`
 
 #### Production WSGI Server (Gunicorn)
 
-Containerized production startup uses Gunicorn (via `/entry.sh`) and keeps startup behavior unchanged: timezone setup, ownership fixes, cron startup, and `flask db upgrade` before serving requests.
+Containerized production startup uses Gunicorn (via `/entry.sh`) and keeps startup behavior unchanged: timezone setup, ownership fixes, optional cron startup, and `flask db upgrade` before serving requests.
+
+#### Cron Startup Control
+
+Use `ENABLE_CRON` to control whether container startup launches `crond`:
+
+- `ENABLE_CRON=true` (default): start cron inside the container
+- `ENABLE_CRON=false`: skip cron startup
+- If unset, startup defaults to `true`
+
+`ENABLE_CRON` can be provided either as a Docker environment variable (`-e ENABLE_CRON=...`) or in your mounted `.env` file at `/app/app/.env`.
+
+For platforms like **DigitalOcean App Platform** where you run scheduled jobs separately, set:
+
+```bash
+-e ENABLE_CRON=false
+```
 
 Supported Gunicorn environment variables:
 
-- `GUNICORN_WORKERS`: Number of worker processes (default: `2 * CPU + 1`)
+- `GUNICORN_WORKERS`: Number of worker processes. If unset, startup chooses:
+  - `1` when `RATELIMIT_STORAGE_URI` is unset or uses `memory://` (process-local rate-limit storage)
+  - otherwise `2 * CPU + 1`
 - `GUNICORN_TIMEOUT`: Worker timeout seconds (default: `120`)
 
 Example:
 
 ```bash
+-e ENABLE_CRON=false \
 -e GUNICORN_WORKERS=4 \
 -e GUNICORN_TIMEOUT=180
 ```
