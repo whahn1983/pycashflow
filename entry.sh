@@ -1,7 +1,24 @@
 #!/bin/sh
 
-# Configure container local timezone from TZ env var (defaults to UTC).
-TZ_VALUE="${TZ:-UTC}"
+# Configure container local timezone from TZ env var, or /app/app/.env (defaults to UTC).
+#
+# Runtime env var takes precedence. If it is missing, attempt to read TZ from
+# the mounted .env file so timezone configuration works even when users only
+# set TZ there.
+TZ_VALUE="${TZ:-}"
+if [ -z "${TZ_VALUE}" ] && [ -f "/app/app/.env" ]; then
+    TZ_VALUE="$(awk -F= '
+        /^[[:space:]]*TZ[[:space:]]*=/ {
+            sub(/^[[:space:]]*TZ[[:space:]]*=[[:space:]]*/, "", $0)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+            gsub(/^["'"'"']|["'"'"']$/, "", $0)
+            print $0
+            exit
+        }
+    ' /app/app/.env)"
+fi
+TZ_VALUE="${TZ_VALUE:-UTC}"
+export TZ="${TZ_VALUE}"
 if [ -f "/usr/share/zoneinfo/${TZ_VALUE}" ]; then
     ln -snf "/usr/share/zoneinfo/${TZ_VALUE}" /etc/localtime
     echo "${TZ_VALUE}" > /etc/timezone
