@@ -37,7 +37,6 @@ RUN mkdir -p /app/app/data && \
 
 ENV PYTHONPATH=/app
 ENV DATABASE_URL=sqlite:////app/app/data/db.sqlite
-ENV TZ=UTC
 
 HEALTHCHECK CMD curl --fail http://localhost:5000
 
