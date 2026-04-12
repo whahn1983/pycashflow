@@ -18,15 +18,16 @@ if [ -z "${TZ_VALUE}" ] && [ -f "/app/app/.env" ]; then
     ' /app/app/.env)"
 fi
 TZ_VALUE="${TZ_VALUE:-UTC}"
-export TZ="${TZ_VALUE}"
 if [ -f "/usr/share/zoneinfo/${TZ_VALUE}" ]; then
     ln -snf "/usr/share/zoneinfo/${TZ_VALUE}" /etc/localtime
     echo "${TZ_VALUE}" > /etc/timezone
 else
     echo "Invalid TZ '${TZ_VALUE}', falling back to UTC."
+    TZ_VALUE="UTC"
     ln -snf /usr/share/zoneinfo/UTC /etc/localtime
     echo "UTC" > /etc/timezone
 fi
+export TZ="${TZ_VALUE}"
 
 # Running as root here — fix ownership of any bind-mounted volumes so
 # appuser can read/write them, regardless of host directory ownership.
