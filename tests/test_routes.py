@@ -81,6 +81,64 @@ class TestAuthenticatedGetRoutes:
         assert "/" in resp.headers.get("Location", "")
 
 
+class TestSignupLinkBehavior:
+    def test_login_create_account_defaults_to_builtin_signup(self, client):
+        resp = client.get("/login", follow_redirects=True)
+        assert resp.status_code == 200
+        assert b'href="/signup"' in resp.data
+
+    def test_login_create_account_uses_external_signup_url(self, client, app_ctx, text_settings_model):
+        db = app_ctx
+        text_settings_model.query.filter_by(name="external_signup_url").delete()
+        db.session.add(
+            text_settings_model(name="external_signup_url", value="https://example.com/app-signup")
+        )
+        db.session.commit()
+
+        resp = client.get("/login", follow_redirects=True)
+        assert resp.status_code == 200
+        assert b'href="https://example.com/app-signup"' in resp.data
+
+        text_settings_model.query.filter_by(name="external_signup_url").delete()
+        db.session.commit()
+
+    def test_signup_route_redirects_to_external_url_when_configured(self, client, app_ctx, text_settings_model):
+        db = app_ctx
+        text_settings_model.query.filter_by(name="external_signup_url").delete()
+        db.session.add(
+            text_settings_model(name="external_signup_url", value="https://example.com/app-signup")
+        )
+        db.session.commit()
+
+        resp = client.get("/signup", follow_redirects=False)
+        assert resp.status_code in (301, 302)
+        assert resp.headers.get("Location") == "https://example.com/app-signup"
+
+        text_settings_model.query.filter_by(name="external_signup_url").delete()
+        db.session.commit()
+
+    def test_signups_post_rejects_invalid_external_signup_url(
+        self, auth_client, app_ctx, user_model, settings_model, text_settings_model
+    ):
+        db = app_ctx
+        admin = user_model.query.filter_by(email="admin@test.local").first()
+        admin.is_global_admin = True
+        db.session.commit()
+
+        settings_model.query.filter_by(name="signup").delete()
+        text_settings_model.query.filter_by(name="external_signup_url").delete()
+        db.session.commit()
+
+        resp = auth_client.post(
+            "/signups",
+            data={"signupvalue": "False", "external_signup_url": "javascript:alert(1)"},
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        assert _flashed(resp.data, "valid http")
+        assert text_settings_model.query.filter_by(name="external_signup_url").first() is None
+
+
 # ── Tests: schedule creation (POST /create) ───────────────────────────────────
 
 

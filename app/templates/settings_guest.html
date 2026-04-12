@@ -210,6 +210,21 @@
                             <option value="True" {% if signup_setting and signup_setting.value %}selected{% endif %}>Disabled (Block sign-ups)</option>
                         </select>
                     </div>
+                    <div class="form-group-modern">
+                        <label class="form-label-modern">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> External Sign-Up URL
+                        </label>
+                        <input
+                            class="form-control-modern"
+                            type="url"
+                            name="external_signup_url"
+                            placeholder="https://apps.apple.com/..."
+                            value="{{ signup_link_setting.value if signup_link_setting and signup_link_setting.value else '' }}"
+                        >
+                        <small style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                            When set, Create Account redirects users to this URL.
+                        </small>
+                    </div>
 
                     <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
                         <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">

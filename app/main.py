@@ -4,7 +4,7 @@ from flask import (
 from flask_login import login_required, current_user
 from flask import Blueprint, render_template
 from .models import (
-    Schedule, Scenario, Balance, User, Settings, Email, Hold, Skip,
+    Schedule, Scenario, Balance, User, Settings, TextSettings, Email, Hold, Skip,
     GlobalEmailSettings, AISettings, PasskeyCredential, UserToken, PasswordSetupToken,
 )
 from app import db, limiter
@@ -13,6 +13,7 @@ import os
 import secrets
 import json
 import logging
+from urllib.parse import urlparse
 from sqlalchemy import desc, extract, asc
 from werkzeug.security import generate_password_hash, check_password_hash
 from .cashflow import update_cash, plot_cash, calculate_cash_risk_score
@@ -148,15 +149,18 @@ def settings():
         email_config = Email.query.filter_by(user_id=user_id).first()
         global_email_config = GlobalEmailSettings.query.first()
         signup_setting = Settings.query.filter_by(name='signup').first()
+        signup_link_setting = TextSettings.query.filter_by(name='external_signup_url').first()
         return render_template('settings.html', about=about, app_version=app_version, py_version=py_version,
                              ai_configured=ai_configured, ai_model=ai_model,
                              email_config=email_config, global_email_config=global_email_config,
-                             signup_setting=signup_setting)
+                             signup_setting=signup_setting, signup_link_setting=signup_link_setting)
     else:
         email_config = Email.query.filter_by(user_id=user_id).first()
         signup_setting = Settings.query.filter_by(name='signup').first()
+        signup_link_setting = TextSettings.query.filter_by(name='external_signup_url').first()
         return render_template('settings_guest.html', about=about, app_version=app_version, py_version=py_version,
-                             email_config=email_config, signup_setting=signup_setting)
+                             email_config=email_config, signup_setting=signup_setting,
+                             signup_link_setting=signup_link_setting)
 
 
 @main.route('/schedule')
@@ -611,7 +615,15 @@ def changepw():
 def signups():
     # set the settings options, in this case disable signups, from the profile page
     if request.method == 'POST':
+        external_signup_url = (request.form.get('external_signup_url') or '').strip()
+        if external_signup_url:
+            parsed_url = urlparse(external_signup_url)
+            if parsed_url.scheme not in ('http', 'https') or not parsed_url.netloc:
+                flash('External sign-up URL must be a valid http(s) URL')
+                return redirect(url_for('main.settings'))
+
         signupsettingname = Settings.query.filter_by(name='signup').first()
+        signup_link_setting = TextSettings.query.filter_by(name='external_signup_url').first()
 
         if signupsettingname:
             if request.form['signupvalue'] == "True":
@@ -619,6 +631,12 @@ def signups():
             else:
                 signupvalue = False
             signupsettingname.value = signupvalue
+            if signup_link_setting:
+                signup_link_setting.value = external_signup_url or None
+            else:
+                db.session.add(
+                    TextSettings(name='external_signup_url', value=external_signup_url or None)
+                )
             db.session.commit()
 
             return redirect(url_for('main.settings'))
@@ -630,6 +648,12 @@ def signups():
             signupvalue = False
         settings = Settings(name="signup", value=signupvalue)
         db.session.add(settings)
+        if signup_link_setting:
+            signup_link_setting.value = external_signup_url or None
+        else:
+            db.session.add(
+                TextSettings(name='external_signup_url', value=external_signup_url or None)
+            )
         db.session.commit()
 
         return redirect(url_for('main.settings'))

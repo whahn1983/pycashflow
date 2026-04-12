@@ -119,6 +119,17 @@ class Settings(db.Model):
     )
 
 
+class TextSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100))
+    value = db.Column(db.String(500))
+
+    # Constraints
+    __table_args__ = (
+        db.UniqueConstraint('name', name='uq_text_settings_name'),
+    )
+
+
 class Email(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)

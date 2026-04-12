@@ -74,7 +74,7 @@
         <!-- Sign up link -->
         <div style="margin-top: 1.5rem; text-align: center; padding-top: 1.5rem; border-top: 1px solid var(--border);">
             <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Don't have an account?</p>
-            <a href="{{url_for('auth.signup')}}" style="color: var(--accent); text-decoration: none; font-weight: 600;">
+            <a href="{{ external_signup_url or url_for('auth.signup') }}" style="color: var(--accent); text-decoration: none; font-weight: 600;">
                 <i class="fa-solid fa-user-plus"></i>
                 Create Account
             </a>

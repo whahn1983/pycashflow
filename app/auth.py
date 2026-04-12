@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, session, jsonify, current_app
 from flask_login import login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from .models import User, Settings, PasskeyCredential
+from .models import User, Settings, PasskeyCredential, TextSettings
 from app import db, limiter
 from .getemail import send_new_user_notification, send_password_setup_email
 from .password_setup import consume_password_setup_token, create_password_setup_link
@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timezone
 from functools import wraps
 import json
+from urllib.parse import urlparse
 
 try:
     from webauthn import (
@@ -75,9 +76,25 @@ def _passkey_enabled() -> bool:
     )
 
 
+def _external_signup_url() -> str | None:
+    setting = TextSettings.query.filter_by(name='external_signup_url').first()
+    if not setting or not setting.value:
+        return None
+
+    candidate = setting.value.strip()
+    parsed = urlparse(candidate)
+    if parsed.scheme not in ('http', 'https') or not parsed.netloc:
+        return None
+    return candidate
+
+
 @auth.route('/login')
 def login():
-    return render_template('login.html', passkey_enabled=_passkey_enabled())
+    return render_template(
+        'login.html',
+        passkey_enabled=_passkey_enabled(),
+        external_signup_url=_external_signup_url(),
+    )
 
 
 @auth.route('/forgot-password', methods=['GET', 'POST'])
@@ -212,6 +229,10 @@ def login_2fa_post():
 
 @auth.route('/signup')
 def signup():
+    external_signup_url = _external_signup_url()
+    if external_signup_url:
+        return redirect(external_signup_url)
+
     try:
         setting = Settings.query.filter_by(name='signup').first()
         if setting and setting.value == 1:
