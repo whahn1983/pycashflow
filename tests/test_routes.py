@@ -117,6 +117,32 @@ class TestSignupLinkBehavior:
         text_settings_model.query.filter_by(name="external_signup_url").delete()
         db.session.commit()
 
+    def test_signup_post_redirects_to_external_url_when_configured(
+        self, client, app_ctx, text_settings_model, user_model
+    ):
+        db = app_ctx
+        text_settings_model.query.filter_by(name="external_signup_url").delete()
+        db.session.add(
+            text_settings_model(name="external_signup_url", value="https://example.com/app-signup")
+        )
+        db.session.commit()
+
+        email = "external-signup-post@test.local"
+        user_model.query.filter_by(email=email).delete()
+        db.session.commit()
+
+        resp = client.post(
+            "/signup",
+            data={"email": email, "name": "External Post", "password": "TestPass123"},
+            follow_redirects=False,
+        )
+        assert resp.status_code in (301, 302)
+        assert resp.headers.get("Location") == "https://example.com/app-signup"
+        assert user_model.query.filter_by(email=email).first() is None
+
+        text_settings_model.query.filter_by(name="external_signup_url").delete()
+        db.session.commit()
+
     def test_signups_post_rejects_invalid_external_signup_url(
         self, auth_client, app_ctx, user_model, settings_model, text_settings_model
     ):

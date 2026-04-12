@@ -246,6 +246,10 @@ def signup():
 @auth.route('/signup', methods=['POST'])
 @limiter.limit("5 per minute")
 def signup_post():
+    external_signup_url = _external_signup_url()
+    if external_signup_url:
+        return redirect(external_signup_url)
+
     # code to validate and add user to database goes here
     email = (request.form.get('email') or '').strip().lower()
     name = request.form.get('name')
