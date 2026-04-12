@@ -50,7 +50,18 @@ case "${CPU_COUNT}" in
     ''|*[!0-9]*|0) CPU_COUNT=1 ;;
 esac
 DEFAULT_GUNICORN_WORKERS=$((CPU_COUNT * 2 + 1))
-GUNICORN_WORKERS="${GUNICORN_WORKERS:-${DEFAULT_GUNICORN_WORKERS}}"
+
+# Flask-Limiter defaults to in-memory storage (memory://), which is process-local.
+# Keep a single worker by default unless a shared rate-limit backend is configured.
+if [ -n "${GUNICORN_WORKERS:-}" ]; then
+    RESOLVED_GUNICORN_WORKERS="${GUNICORN_WORKERS}"
+elif [ -z "${RATELIMIT_STORAGE_URI:-}" ] || [ "${RATELIMIT_STORAGE_URI}" = "memory://" ]; then
+    RESOLVED_GUNICORN_WORKERS=1
+else
+    RESOLVED_GUNICORN_WORKERS="${DEFAULT_GUNICORN_WORKERS}"
+fi
+
+GUNICORN_WORKERS="${RESOLVED_GUNICORN_WORKERS}"
 GUNICORN_TIMEOUT="${GUNICORN_TIMEOUT:-120}"
 
 echo "Starting Gunicorn: workers=${GUNICORN_WORKERS}, timeout=${GUNICORN_TIMEOUT}, bind=0.0.0.0:5000"
