@@ -37,6 +37,15 @@ def create_app():
         "60",
     )
     app.config["PAYMENTS_ENABLED"] = os.environ.get("PAYMENTS_ENABLED", "false").lower() == "true"
+    app.config["APPSTORE_ALLOW_STUB_VERIFICATION"] = (
+        os.environ.get("APPSTORE_ALLOW_STUB_VERIFICATION", "false").lower() == "true"
+    )
+    app.config["APPLE_ISSUER_ID"] = os.environ.get("APPLE_ISSUER_ID", "")
+    app.config["APPLE_KEY_ID"] = os.environ.get("APPLE_KEY_ID", "")
+    app.config["APPLE_PRIVATE_KEY"] = os.environ.get("APPLE_PRIVATE_KEY", "")
+    app.config["APPLE_PRIVATE_KEY_PATH"] = os.environ.get("APPLE_PRIVATE_KEY_PATH", "")
+    app.config["APPLE_BUNDLE_ID"] = os.environ.get("APPLE_BUNDLE_ID", "")
+    app.config["APPLE_ENVIRONMENT"] = os.environ.get("APPLE_ENVIRONMENT", "production")
 
     basedir = os.path.abspath(os.path.dirname(__file__))
 

@@ -142,6 +142,219 @@ def test_appstore_verification_stub_mode_can_activate_owner(flask_app, client):
         assert user.is_active is True
 
 
+def test_appstore_existing_user_subscription_update_no_duplicate(
+    flask_app, client, monkeypatch, billing_routes_module
+):
+    with flask_app.app_context():
+        existing = User(
+            email="ios-existing@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Existing iOS",
+            admin=True,
+            is_account_owner=True,
+            is_active=False,
+            subscription_status="expired",
+            subscription_source="app_store",
+            subscription_id="orig_old",
+        )
+        db.session.add(existing)
+        db.session.commit()
+        existing_id = existing.id
+
+    monkeypatch.setattr(
+        billing_routes_module,
+        "_verify_appstore_purchase",
+        lambda transaction_info, receipt_data: {
+            "verification_status": "verified",
+            "is_active": True,
+            "expiry": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=40),
+            "subscription_id": "orig_txn_renewed",
+            "environment": "production",
+        },
+    )
+
+    resp = client.post(
+        "/api/v1/billing/verify-appstore",
+        json={
+            "email": "ios-existing@test.local",
+            "receipt_data": "receipt",
+            "transaction": {"original_transaction_id": "orig_txn_renewed"},
+        },
+    )
+    assert resp.status_code == 200
+
+    with flask_app.app_context():
+        users = User.query.filter_by(email="ios-existing@test.local").all()
+        assert len(users) == 1
+        user = users[0]
+        assert user.id == existing_id
+        assert user.subscription_status == "active"
+        assert user.subscription_source == "app_store"
+        assert user.subscription_id == "orig_txn_renewed"
+        assert user.is_active is True
+
+
+def test_appstore_expired_subscription_deactivates_owner_and_guest(
+    flask_app, client, monkeypatch, billing_routes_module
+):
+    with flask_app.app_context():
+        owner = User(
+            email="ios-owner-expire@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Owner",
+            admin=True,
+            is_account_owner=True,
+            is_active=True,
+            subscription_status="active",
+            subscription_source="app_store",
+            subscription_id="orig_expire",
+        )
+        db.session.add(owner)
+        db.session.commit()
+
+        guest = User(
+            email="ios-guest-expire@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Guest",
+            admin=False,
+            is_active=True,
+            is_account_owner=False,
+            owner_user_id=owner.id,
+            account_owner_id=owner.id,
+            subscription_status="inactive",
+            subscription_source="none",
+        )
+        db.session.add(guest)
+        db.session.commit()
+
+    monkeypatch.setattr(
+        billing_routes_module,
+        "_verify_appstore_purchase",
+        lambda transaction_info, receipt_data: {
+            "verification_status": "verified",
+            "is_active": False,
+            "expiry": datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1),
+            "subscription_id": "orig_expire",
+            "environment": "production",
+        },
+    )
+
+    resp = client.post(
+        "/api/v1/billing/verify-appstore",
+        json={
+            "email": "ios-owner-expire@test.local",
+            "receipt_data": "receipt",
+            "transaction": {"original_transaction_id": "orig_expire"},
+        },
+    )
+    assert resp.status_code == 200
+
+    with flask_app.app_context():
+        owner = User.query.filter_by(email="ios-owner-expire@test.local").first()
+        guest = User.query.filter_by(email="ios-guest-expire@test.local").first()
+        assert owner is not None
+        assert guest is not None
+        assert owner.subscription_status == "expired"
+        assert owner.is_active is False
+        assert guest.is_active is True
+
+        # Enforced access checks must also disable guests when owner is expired.
+        raw, _ = create_token_for_user(guest)
+
+    original_toggle = flask_app.config["PAYMENTS_ENABLED"]
+    with flask_app.app_context():
+        flask_app.config["PAYMENTS_ENABLED"] = True
+    me_resp = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {raw}"})
+    assert me_resp.status_code == 401
+    with flask_app.app_context():
+        refreshed_guest = User.query.filter_by(email="ios-guest-expire@test.local").first()
+        assert refreshed_guest.is_active is False
+        flask_app.config["PAYMENTS_ENABLED"] = original_toggle
+
+
+def test_appstore_renewed_subscription_reactivates_deactivated_owner(
+    flask_app, client, monkeypatch, billing_routes_module
+):
+    with flask_app.app_context():
+        owner = User(
+            email="ios-owner-renew@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Owner Renew",
+            admin=True,
+            is_account_owner=True,
+            is_active=False,
+            subscription_status="expired",
+            subscription_source="app_store",
+            subscription_id="orig_renew",
+        )
+        db.session.add(owner)
+        db.session.commit()
+
+    monkeypatch.setattr(
+        billing_routes_module,
+        "_verify_appstore_purchase",
+        lambda transaction_info, receipt_data: {
+            "verification_status": "verified",
+            "is_active": True,
+            "expiry": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=25),
+            "subscription_id": "orig_renew",
+            "environment": "sandbox",
+        },
+    )
+
+    resp = client.post(
+        "/api/v1/billing/verify-appstore",
+        json={
+            "email": "ios-owner-renew@test.local",
+            "receipt_data": "receipt",
+            "transaction": {"original_transaction_id": "orig_renew"},
+        },
+    )
+    assert resp.status_code == 200
+    assert _json(resp)["data"]["environment"] == "sandbox"
+
+    with flask_app.app_context():
+        owner = User.query.filter_by(email="ios-owner-renew@test.local").first()
+        assert owner is not None
+        assert owner.subscription_status == "active"
+        assert owner.is_active is True
+
+
+def test_appstore_failed_verification_does_not_activate_user(
+    flask_app, client, monkeypatch, billing_routes_module
+):
+    with flask_app.app_context():
+        user = User(
+            email="ios-fail@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Failed",
+            admin=True,
+            is_account_owner=True,
+            is_active=False,
+            subscription_status="expired",
+            subscription_source="app_store",
+        )
+        db.session.add(user)
+        db.session.commit()
+
+    def _raise_verification_error(transaction_info, receipt_data):
+        raise billing_routes_module.AppStoreVerificationError("bad receipt")
+
+    monkeypatch.setattr(billing_routes_module, "_verify_appstore_purchase", _raise_verification_error)
+
+    resp = client.post(
+        "/api/v1/billing/verify-appstore",
+        json={"email": "ios-fail@test.local", "receipt_data": "bad", "transaction": {}},
+    )
+    assert resp.status_code == 401
+
+    with flask_app.app_context():
+        user = User.query.filter_by(email="ios-fail@test.local").first()
+        assert user is not None
+        assert user.subscription_status == "expired"
+        assert user.is_active is False
+
+
 def test_stripe_new_user_generates_setup_token_and_sends_email(
     flask_app, client, monkeypatch, billing_routes_module
 ):

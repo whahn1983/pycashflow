@@ -19,6 +19,10 @@ from app.getemail import send_password_setup_email
 from app.password_setup import (
     create_password_setup_link,
 )
+from app.appstore import (
+    AppStoreVerificationError,
+    verify_app_store_subscription,
+)
 from app.subscription import (
     SUB_ACTIVE,
     SUB_EXPIRED,
@@ -129,6 +133,80 @@ def _appstore_stub_verification_enabled() -> bool:
     if configured is None:
         configured = os.environ.get("APPSTORE_ALLOW_STUB_VERIFICATION", "")
     return str(configured).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _verify_appstore_purchase(transaction_info: dict, receipt_data: str | None):
+    """Verify App Store purchase data against Apple APIs.
+
+    Stub verification can be enabled for local development/testing only.
+    """
+    original_transaction_id = (
+        (transaction_info.get("original_transaction_id") or "").strip()
+        or (transaction_info.get("originalTransactionId") or "").strip()
+    )
+
+    if _appstore_stub_verification_enabled():
+        if not original_transaction_id:
+            original_transaction_id = (
+                (transaction_info.get("id") or "").strip()
+                or (receipt_data or "stub-receipt").strip()
+            )
+        if not original_transaction_id:
+            raise AppStoreVerificationError("missing original transaction id")
+        return {
+            "verification_status": "verified_stub",
+            "is_active": True,
+            "expiry": None,
+            "subscription_id": original_transaction_id,
+            "environment": "stub",
+        }
+
+    if not original_transaction_id:
+        raise AppStoreVerificationError(
+            "transaction.original_transaction_id is required when stub verification is disabled"
+        )
+
+    issuer_id = (current_app.config.get("APPLE_ISSUER_ID") or os.environ.get("APPLE_ISSUER_ID") or "").strip()
+    key_id = (current_app.config.get("APPLE_KEY_ID") or os.environ.get("APPLE_KEY_ID") or "").strip()
+    private_key = current_app.config.get("APPLE_PRIVATE_KEY") or os.environ.get("APPLE_PRIVATE_KEY")
+    private_key_path = current_app.config.get("APPLE_PRIVATE_KEY_PATH") or os.environ.get("APPLE_PRIVATE_KEY_PATH")
+    environment = (
+        current_app.config.get("APPLE_ENVIRONMENT")
+        or os.environ.get("APPLE_ENVIRONMENT")
+        or "production"
+    )
+    expected_bundle_id = (
+        current_app.config.get("APPLE_BUNDLE_ID")
+        or os.environ.get("APPLE_BUNDLE_ID")
+        or ""
+    ).strip()
+
+    if not issuer_id or not key_id:
+        raise AppStoreVerificationError(
+            "Apple credentials are incomplete: APPLE_ISSUER_ID and APPLE_KEY_ID are required"
+        )
+
+    verification = verify_app_store_subscription(
+        original_transaction_id=original_transaction_id,
+        issuer_id=issuer_id,
+        key_id=key_id,
+        private_key=private_key,
+        private_key_path=private_key_path,
+        environment=environment,
+    )
+
+    if expected_bundle_id and verification.bundle_id and verification.bundle_id != expected_bundle_id:
+        raise AppStoreVerificationError("App Store bundle identifier mismatch")
+
+    return {
+        "verification_status": "verified",
+        "is_active": verification.is_active,
+        "expiry": verification.expiry,
+        "subscription_id": verification.original_transaction_id,
+        "environment": verification.environment,
+        "status_code": verification.status_code,
+        "bundle_id": verification.bundle_id,
+    }
 
 
 def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
@@ -313,31 +391,23 @@ def api_verify_appstore():
     receipt_data = body.get("receipt_data")
     transaction_info = body.get("transaction") or {}
     email = (body.get("email") or "").strip().lower()
-    expiry_iso = body.get("expiry_date") or transaction_info.get("expires_date")
-
     errors = {}
     if not email:
         errors["email"] = "email is required"
     if not receipt_data and not transaction_info:
         errors["receipt_data"] = "receipt_data or transaction is required"
-    if not expiry_iso:
-        errors["expiry_date"] = "expiry_date is required"
     if errors:
         return validation_error(errors)
 
     try:
-        expiry = datetime.fromisoformat(str(expiry_iso).replace("Z", "+00:00")).astimezone(timezone.utc)
-    except ValueError:
-        return validation_error({"expiry_date": "expiry_date must be ISO-8601"})
+        verification = _verify_appstore_purchase(transaction_info, receipt_data)
+    except AppStoreVerificationError as exc:
+        logger.warning("App Store verification failed: %s", exc)
+        return unauthorized("App Store verification failed")
 
-    verification_status = "verification_unavailable"
-    if not _appstore_stub_verification_enabled():
-        logger.warning("Rejected App Store verification: server-side verification is not configured")
-        return unauthorized(
-            "App Store verification is not configured on this server"
-        )
-
-    verification_status = "verified_stub"
+    expiry = verification.get("expiry")
+    is_active = bool(verification.get("is_active"))
+    subscription_status = SUB_ACTIVE if is_active else SUB_EXPIRED
 
     if not _can_create_paid_user(email):
         return validation_error(
@@ -347,19 +417,20 @@ def api_verify_appstore():
     user, created = _create_or_get_owner(email)
     apply_subscription_status(
         user,
-        status=SUB_ACTIVE,
+        status=subscription_status,
         source="app_store",
-        subscription_id=transaction_info.get("original_transaction_id") or transaction_info.get("id"),
-        expiry=expiry.replace(tzinfo=None),
-        activate=True,
+        subscription_id=verification.get("subscription_id"),
+        expiry=expiry,
+        activate=is_active,
     )
     _send_setup_email_for_new_user(user, created)
 
     return api_ok(
         {
-            "verification_status": verification_status,
+            "verification_status": verification.get("verification_status"),
             "user_id": user.id,
             "subscription_status": user.subscription_status,
             "subscription_source": user.subscription_source,
+            "environment": verification.get("environment"),
         }
     )
