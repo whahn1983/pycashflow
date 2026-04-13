@@ -896,7 +896,18 @@ Stripe webhook receiver. Verifies `Stripe-Signature` using server-side
 
 #### POST /api/v1/billing/verify-appstore
 
-Server endpoint for iOS subscription verification.
+Server endpoint for iOS subscription verification against Apple App Store Server API.
+
+
+### App Store verification notes
+
+- Real verification requires backend App Store Connect credentials (`APPLE_ISSUER_ID`,
+  `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` or `APPLE_PRIVATE_KEY_PATH`).
+- `transaction.original_transaction_id` is required for real verification.
+- `APPLE_ENVIRONMENT=auto` enables production-first with sandbox fallback.
+- Response `data.environment` indicates which environment resolved the transaction.
+- If verification fails, backend returns `401 unauthorized` and no account activation occurs.
+- Local development may opt into `APPSTORE_ALLOW_STUB_VERIFICATION=true` (non-production).
 
 **Auth required:** No
 
@@ -917,7 +928,7 @@ Server endpoint for iOS subscription verification.
 ```json
 {
   "data": {
-    "verification_status": "verified_stub",
+    "verification_status": "verified",
     "user_id": 123,
     "subscription_status": "active",
     "subscription_source": "app_store"

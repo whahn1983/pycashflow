@@ -5,7 +5,7 @@
 PyCashFlow supports three activation sources:
 
 1. **Stripe subscriptions** (web checkout + webhook truth source)
-2. **Apple App Store subscriptions** (server-side verification endpoint; currently stubbed verifier)
+2. **Apple App Store subscriptions** (server-side verification via App Store Server API JWT auth)
 3. **Self-hosted/manual** activation when `PAYMENTS_ENABLED=false`
 
 All subscription state is stored on `User` and enforced centrally for both web and API auth paths.
@@ -51,11 +51,19 @@ Default behavior in this repository is `PAYMENTS_ENABLED=false`.
 ## App Store Flow
 
 ### `POST /api/v1/billing/verify-appstore`
-- Public endpoint for iOS receipt or transaction payload.
-- Current implementation has **stub verification scaffold** (`verification_status=verified_stub`) for future Apple server verification integration.
-- Extracts email + expiry, creates/updates account owner, marks source `app_store`, and activates account.
+- Public endpoint for iOS receipt/transaction payload.
+- Uses Apple App Store Server API (`/inApps/v1/subscriptions/{originalTransactionId}`)
+  with ES256 JWT bearer auth generated from App Store Connect credentials.
+- Supports `APPLE_ENVIRONMENT=production|sandbox|auto` (`auto` tries production then sandbox).
+- Optionally validates `APPLE_BUNDLE_ID` against Apple-signed transaction payload.
+- Applies subscription lifecycle transitions from Apple truth source:
+  - Active statuses (`1`, `3`, `4`) => `subscription_status=active`, `is_active=true`
+  - Non-active statuses => `subscription_status=expired`, `is_active=false`
+- Creates/updates account owner by email and stores source `app_store`.
 - For first-time paid users only, creates a one-time password setup token and
   sends an onboarding email. Existing users do not receive setup email.
+- Optional local/dev stub mode remains available with
+  `APPSTORE_ALLOW_STUB_VERIFICATION=true` (returns `verification_status=verified_stub`).
 
 ## Paid User Onboarding Lifecycle
 
@@ -96,3 +104,16 @@ Global admins always remain active and bypass subscription checks.
 - Client-provided payment status is never trusted for final access control.
 - Stripe webhooks must pass signature verification.
 - Subscription transitions are logged with user id, source, status changes, and expiry.
+
+
+## App Store Server Credentials
+
+Set these environment variables for real App Store verification:
+
+- `APPLE_ISSUER_ID`
+- `APPLE_KEY_ID`
+- `APPLE_PRIVATE_KEY` **or** `APPLE_PRIVATE_KEY_PATH`
+- `APPLE_ENVIRONMENT` (`production`, `sandbox`, or `auto`)
+- `APPLE_BUNDLE_ID` (recommended for payload binding)
+
+If credentials are missing and stub mode is disabled, verification requests are rejected.

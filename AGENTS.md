@@ -339,7 +339,10 @@ A SwiftUI client now lives under `/ios-app` with this structure:
 - `PAYMENTS_ENABLED=false` bypasses subscription enforcement for self-hosted/manual operation.
 - Subscription truth sources:
   - Stripe webhook events (`/api/v1/billing/webhook/stripe`)
-  - App Store verification endpoint (`/api/v1/billing/verify-appstore`)
+  - App Store verification endpoint (`/api/v1/billing/verify-appstore`) using
+    App Store Server API JWT auth (`APPLE_ISSUER_ID`, `APPLE_KEY_ID`,
+    `APPLE_PRIVATE_KEY`/`APPLE_PRIVATE_KEY_PATH`, optional `APPLE_BUNDLE_ID`,
+    and `APPLE_ENVIRONMENT=production|sandbox|auto`)
 - Do not trust client-side purchase state for activation.
 - Global admins always bypass subscription checks and must remain active.
 - Guests inherit effective access from their account owner (`owner_user_id` or legacy `account_owner_id`).
