@@ -1396,7 +1396,9 @@ body.modal-open {
 .insight-card-list {
   display: grid;
   gap: 0.75rem;
-  max-height: 40rem;
+  max-height: calc(100vh - 20rem);
+  max-height: calc(100dvh - 20rem);
+  min-height: 20rem;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
@@ -1438,7 +1440,9 @@ body.modal-open {
 
 @media (max-width: 768px) {
   .insight-card-list {
-    max-height: 32rem;
+    max-height: calc(100vh - 16rem);
+    max-height: calc(100dvh - 16rem);
+    min-height: 18rem;
   }
 }
 
