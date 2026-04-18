@@ -34,8 +34,6 @@ def upgrade():
 
 
 def downgrade():
-    bind = op.get_bind()
-    inspector = sa.inspect(bind)
-
-    if inspector.has_table('text_settings'):
-        op.drop_table('text_settings')
+    # The down revision already includes text_settings via a8c9d0e1f2a3.
+    # Dropping here would remove schema/data that should exist at c4d5e6f7a8b9.
+    pass
