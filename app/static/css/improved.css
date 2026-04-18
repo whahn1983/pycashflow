@@ -1395,6 +1395,8 @@ body.modal-open {
 /* AI-insight style data cards for management pages */
 .insight-card-list {
   display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: 0.75rem;
   max-height: calc(100vh - 20rem);
   max-height: calc(100dvh - 20rem);
