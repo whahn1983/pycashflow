@@ -1,7 +1,7 @@
 """add user-scoped indexes for hot query paths
 
 Revision ID: b1c2d3e4f5a6
-Revises: 3979d4be8acf
+Revises: a8c9d0e1f2a3
 Create Date: 2026-04-18 00:00:00.000000
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = 'b1c2d3e4f5a6'
-down_revision = '3979d4be8acf'
+down_revision = 'a8c9d0e1f2a3'
 branch_labels = None
 depends_on = None
 
