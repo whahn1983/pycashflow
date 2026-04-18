@@ -1396,6 +1396,50 @@ body.modal-open {
 .insight-card-list {
   display: grid;
   gap: 0.75rem;
+  max-height: 40rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59, 130, 246, 0.4) transparent;
+}
+
+.insight-card-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.insight-card-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.insight-card-list::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.4);
+  border-radius: 4px;
+}
+
+.insight-card-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.65);
+}
+
+.insight-card-list-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.5rem 0.25rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.insight-card-list-status {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 768px) {
+  .insight-card-list {
+    max-height: 32rem;
+  }
 }
 
 .insight-data-card {

@@ -56,7 +56,7 @@
             </button>
         </div>
     </div>
-    <div class="insight-card-list">
+    <div class="insight-card-list" data-paginate>
         {% for user in global_admins %}
         <div class="insight-data-card insight-data-card--admin">
             <div class="rc-cell rc-primary">{{user.name}}</div>
@@ -230,7 +230,7 @@
             Account Owners & Guests
         </h2>
     </div>
-    <div class="insight-card-list">
+    <div class="insight-card-list" data-paginate>
         {% for owner in account_owners %}
         <div class="insight-data-card insight-data-card--admin">
             <div class="rc-cell rc-primary">{{owner.name}}</div>
