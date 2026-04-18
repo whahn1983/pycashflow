@@ -77,17 +77,21 @@ class Scenario(db.Model):
 
 class Balance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     amount = db.Column(db.Numeric(10, 2))
     date = db.Column(db.Date)
 
     # Relationships
     user = db.relationship('User', backref='balances')
 
+    __table_args__ = (
+        db.Index('ix_balance_user_id_date_id', 'user_id', 'date', 'id'),
+    )
+
 
 class Hold(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     amount = db.Column(db.Numeric(10, 2))
     name = db.Column(db.String(100))
     type = db.Column(db.String(100))
@@ -98,7 +102,7 @@ class Hold(db.Model):
 
 class Skip(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     name = db.Column(db.String(100))
     date = db.Column(db.Date)
     amount = db.Column(db.Numeric(10, 2))
@@ -132,7 +136,7 @@ class TextSettings(db.Model):
 
 class Email(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     email = db.Column(db.String(100), nullable=False)
     password = db.Column(db.String(500))
     server = db.Column(db.String(100))
