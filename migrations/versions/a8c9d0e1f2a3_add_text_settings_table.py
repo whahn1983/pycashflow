@@ -17,6 +17,11 @@ depends_on = None
 
 
 def upgrade():
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if inspector.has_table('text_settings'):
+        return
+
     op.create_table(
         'text_settings',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -28,4 +33,7 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_table('text_settings')
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if inspector.has_table('text_settings'):
+        op.drop_table('text_settings')
