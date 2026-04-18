@@ -69,17 +69,18 @@ def index():
     # query the latest balance information for this user
     balance = Balance.query.filter_by(user_id=user_id).order_by(desc(Balance.date), desc(Balance.id)).first()
 
-    try:
-        float(balance.amount)
-        db.session.query(Balance).filter_by(user_id=user_id).delete()
-        balance = Balance(amount=balance.amount, date=datetime.today(), user_id=user_id)
-        db.session.add(balance)
-        db.session.commit()
-    except (ValueError, TypeError, AttributeError) as exc:
-        logger.warning("Invalid balance for user %s (%s), resetting to 0: %s", user_id, type(exc).__name__, exc)
+    if balance is None:
         balance = Balance(amount='0', date=datetime.today(), user_id=user_id)
         db.session.add(balance)
         db.session.commit()
+    else:
+        try:
+            float(balance.amount)
+        except (ValueError, TypeError, AttributeError) as exc:
+            logger.warning("Invalid balance for user %s (%s), resetting to 0: %s", user_id, type(exc).__name__, exc)
+            balance.amount = '0'
+            balance.date = datetime.today()
+            db.session.commit()
 
     # Pre-filter data by user before passing to cashflow
     schedules = Schedule.query.filter_by(user_id=user_id).all()

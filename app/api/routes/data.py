@@ -5,7 +5,7 @@ import json
 
 from sqlalchemy import desc
 
-from flask import request
+from flask import request, g
 
 from app import db
 from app.models import Schedule, Scenario, Balance, Hold, Skip, AISettings
@@ -123,6 +123,13 @@ def _validate_balance_payload(body: dict) -> dict:
 
 
 def _project_data(user_id: int):
+    cache = getattr(g, "_project_data_cache", None)
+    if cache is None:
+        cache = {}
+        g._project_data_cache = cache
+    if user_id in cache:
+        return cache[user_id]
+
     balance = _latest_balance(user_id)
     try:
         balance_amount = float(balance.amount)
@@ -135,7 +142,9 @@ def _project_data(user_id: int):
     scenarios = Scenario.query.filter_by(user_id=user_id).all()
 
     trans, run, run_scenario = update_cash(balance_amount, schedules, holds, skips, scenarios, commit=False)
-    return balance, balance_amount, trans, run, run_scenario
+    result = (balance, balance_amount, trans, run, run_scenario)
+    cache[user_id] = result
+    return result
 
 
 @api.route("/dashboard", methods=["GET"])
@@ -207,11 +216,15 @@ def api_schedules():
         return validation_error(errors)
 
     query = Schedule.query.filter_by(user_id=user_id).order_by(Schedule.id.asc())
-    total = query.count()
     if limit is not None:
+        total = query.count()
         query = query.limit(limit).offset(offset)
+    else:
+        total = None
 
     items = [serialize_schedule(s) for s in query.all()]
+    if total is None:
+        total = len(items)
     return api_list(items, total=total, limit=limit, offset=offset)
 
 
@@ -316,11 +329,16 @@ def api_scenarios():
         return validation_error(errors)
 
     query = Scenario.query.filter_by(user_id=user_id).order_by(Scenario.id.asc())
-    total = query.count()
     if limit is not None:
+        total = query.count()
         query = query.limit(limit).offset(offset)
+    else:
+        total = None
 
-    return api_list([serialize_scenario(s) for s in query.all()], total=total, limit=limit, offset=offset)
+    items = [serialize_scenario(s) for s in query.all()]
+    if total is None:
+        total = len(items)
+    return api_list(items, total=total, limit=limit, offset=offset)
 
 
 @api.route("/scenarios", methods=["POST"])
@@ -409,11 +427,16 @@ def api_holds():
         return validation_error(errors)
 
     query = Hold.query.filter_by(user_id=user_id).order_by(Hold.id.asc())
-    total = query.count()
     if limit is not None:
+        total = query.count()
         query = query.limit(limit).offset(offset)
+    else:
+        total = None
 
-    return api_list([serialize_hold(h) for h in query.all()], total=total, limit=limit, offset=offset)
+    items = [serialize_hold(h) for h in query.all()]
+    if total is None:
+        total = len(items)
+    return api_list(items, total=total, limit=limit, offset=offset)
 
 
 @api.route("/holds", methods=["POST"])
@@ -474,11 +497,16 @@ def api_skips():
         return validation_error(errors)
 
     query = Skip.query.filter_by(user_id=user_id).order_by(Skip.id.asc())
-    total = query.count()
     if limit is not None:
+        total = query.count()
         query = query.limit(limit).offset(offset)
+    else:
+        total = None
 
-    return api_list([serialize_skip(s) for s in query.all()], total=total, limit=limit, offset=offset)
+    items = [serialize_skip(s) for s in query.all()]
+    if total is None:
+        total = len(items)
+    return api_list(items, total=total, limit=limit, offset=offset)
 
 
 @api.route("/skips", methods=["POST"])
@@ -493,11 +521,7 @@ def api_create_skip():
     if transaction_index is None:
         return validation_error({"transaction_index": "transaction_index is required"})
 
-    _balance, balance_amount, _t, _r, _rs = _project_data(user_id)
-    schedules = Schedule.query.filter_by(user_id=user_id).all()
-    holds = Hold.query.filter_by(user_id=user_id).all()
-    skips = Skip.query.filter_by(user_id=user_id).all()
-    trans, _run, _run_scenario = update_cash(balance_amount, schedules, holds, skips, commit=False)
+    _balance, _balance_amount, trans, _run, _run_scenario = _project_data(user_id)
 
     try:
         tx = trans.loc[int(transaction_index)]
@@ -628,11 +652,16 @@ def api_balance_history():
         return validation_error(errors)
 
     query = Balance.query.filter_by(user_id=user_id).order_by(desc(Balance.date), desc(Balance.id))
-    total = query.count()
     if limit is not None:
+        total = query.count()
         query = query.limit(limit).offset(offset)
+    else:
+        total = None
 
-    return api_list([serialize_balance(b) for b in query.all()], total=total, limit=limit, offset=offset)
+    items = [serialize_balance(b) for b in query.all()]
+    if total is None:
+        total = len(items)
+    return api_list(items, total=total, limit=limit, offset=offset)
 
 
 @api.route("/settings", methods=["GET"])

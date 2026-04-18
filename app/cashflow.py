@@ -122,6 +122,7 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
 
     # Loop through schedules — rows go into BOTH dicts
     todaydate = datetime.today().date()
+    today_weekday = datetime.today().weekday()
     for i in df.itertuples(index=False):
         format = '%Y-%m-%d'
         name = i.name
@@ -137,7 +138,6 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
             firstdate_val = datetime.strptime(startdate, format).date()
             if commit:
                 existing.firstdate = firstdate_val
-                db.session.commit()
             firstdate = firstdate_val.strftime(format)
         if frequency == 'Monthly':
             startdate = _fast_forward_start(
@@ -155,7 +155,7 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                                 futuredate = futuredate.replace(day=futuredateday)
                     except ValueError:
                         pass
-                if futuredate <= todaydate and datetime.today().weekday() < 5:
+                if futuredate <= todaydate and today_weekday < 5:
                     if commit:
                         existing.startdate = futuredate + relativedelta(months=1)
                         daycheckdate = futuredate + relativedelta(months=1)
@@ -193,7 +193,7 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 relativedelta(weeks=1), todaydate)
             for k in range(weeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
-                if futuredate <= todaydate and datetime.today().weekday() < 5:
+                if futuredate <= todaydate and today_weekday < 5:
                     if commit:
                         existing.startdate = futuredate + relativedelta(weeks=1)
                 new_row = {
@@ -210,7 +210,7 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 relativedelta(years=1), todaydate)
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
-                if futuredate <= todaydate and datetime.today().weekday() < 5:
+                if futuredate <= todaydate and today_weekday < 5:
                     if commit:
                         existing.startdate = futuredate + relativedelta(years=1)
                 new_row = {
@@ -237,7 +237,7 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                                 futuredate = futuredate.replace(day=futuredateday)
                     except ValueError:
                         pass
-                if futuredate <= todaydate and datetime.today().weekday() < 5:
+                if futuredate <= todaydate and today_weekday < 5:
                     if commit:
                         existing.startdate = futuredate + relativedelta(months=3)
                         daycheckdate = futuredate + relativedelta(months=3)
@@ -264,7 +264,7 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 relativedelta(weeks=2), todaydate)
             for k in range(biweeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
-                if futuredate <= todaydate and datetime.today().weekday() < 5:
+                if futuredate <= todaydate and today_weekday < 5:
                     if commit:
                         existing.startdate = futuredate + relativedelta(weeks=2)
                 new_row = {
@@ -309,7 +309,6 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
             firstdate_val = datetime.strptime(startdate, format).date()
             if commit:
                 existing.firstdate = firstdate_val
-                db.session.commit()
             firstdate = firstdate_val.strftime(format)
         if frequency == 'Monthly':
             startdate = _fast_forward_start(
@@ -327,7 +326,7 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                                 futuredate = futuredate.replace(day=futuredateday)
                     except ValueError:
                         pass
-                if futuredate <= todaydate and datetime.today().weekday() < 5:
+                if futuredate <= todaydate and today_weekday < 5:
                     if commit:
                         existing.startdate = futuredate + relativedelta(months=1)
                         daycheckdate = futuredate + relativedelta(months=1)
@@ -363,7 +362,7 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 relativedelta(weeks=1), todaydate)
             for k in range(weeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=k)
-                if futuredate <= todaydate and datetime.today().weekday() < 5:
+                if futuredate <= todaydate and today_weekday < 5:
                     if commit:
                         existing.startdate = futuredate + relativedelta(weeks=1)
                 new_row = {
@@ -379,7 +378,7 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 relativedelta(years=1), todaydate)
             for k in range(years):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(years=k)
-                if futuredate <= todaydate and datetime.today().weekday() < 5:
+                if futuredate <= todaydate and today_weekday < 5:
                     if commit:
                         existing.startdate = futuredate + relativedelta(years=1)
                 new_row = {
@@ -405,7 +404,7 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                                 futuredate = futuredate.replace(day=futuredateday)
                     except ValueError:
                         pass
-                if futuredate <= todaydate and datetime.today().weekday() < 5:
+                if futuredate <= todaydate and today_weekday < 5:
                     if commit:
                         existing.startdate = futuredate + relativedelta(months=3)
                         daycheckdate = futuredate + relativedelta(months=3)
@@ -431,7 +430,7 @@ def calc_schedule(schedules, holds, skips, scenarios=None, commit=True):
                 relativedelta(weeks=2), todaydate)
             for k in range(biweeks):
                 futuredate = datetime.strptime(startdate, format).date() + relativedelta(weeks=2 * k)
-                if futuredate <= todaydate and datetime.today().weekday() < 5:
+                if futuredate <= todaydate and today_weekday < 5:
                     if commit:
                         existing.startdate = futuredate + relativedelta(weeks=2)
                 new_row = {
@@ -519,9 +518,7 @@ def calc_transactions(balance, total):
 
     df = df.copy()
     df['amount'] = df['amount'].astype(float)
-    for idx in df.index:
-        if df.loc[idx, 'type'] == 'Expense':
-            df.loc[idx, 'amount'] = df.loc[idx, 'amount'] * -1
+    df['amount'] = np.where(df['type'] == 'Expense', -df['amount'], df['amount'])
 
     df = df.groupby("date")['amount'].sum().reset_index()
 
