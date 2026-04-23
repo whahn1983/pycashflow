@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import StoreKit
 
 @MainActor
@@ -107,7 +108,7 @@ final class StoreKitSubscriptionManager: ObservableObject {
                 product_id: transaction.productID,
                 purchase_date: Self.isoDate(transaction.purchaseDate),
                 expiry_date: expiryISO,
-                signed_transaction_info: transaction.jwsRepresentation
+                signed_transaction_info: nil
             )
         )
 

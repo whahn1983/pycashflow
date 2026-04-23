@@ -28,8 +28,8 @@ final class SessionManager: ObservableObject {
     @Published var user: UserDTO?
     @Published var billingStatus: BillingStatusDTO?
     @Published var accessState: AccessState = .unknown
-    @Published var appMode: AppMode = Self.loadMode()
-    @Published var selfHostedBaseURLText: String = Self.loadSelfHostedURL().absoluteString
+    @Published var appMode: AppMode = SessionManager.loadMode()
+    @Published var selfHostedBaseURLText: String = SessionManager.loadSelfHostedURL().absoluteString
 
     var isAuthenticated: Bool { token != nil }
     var currentBaseURL: URL { APIClient.shared.baseURL }
