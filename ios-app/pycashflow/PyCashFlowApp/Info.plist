@@ -38,7 +38,7 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>API_BASE_URL</key>
-	<string>https://app.pycashflow.com</string>
+	<string>https://app.pycashflow.com/api/v1</string>
 	<key>SELF_HOSTED_API_BASE_URL</key>
 	<string>http://localhost:5000/api/v1</string>
 	<key>APP_STORE_PRODUCT_IDS</key>
