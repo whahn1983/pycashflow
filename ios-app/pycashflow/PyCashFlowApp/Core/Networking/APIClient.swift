@@ -79,7 +79,7 @@ private struct AnyEncodable: Encodable {
 enum AppEnvironment {
     static let cloudAPIBaseURL: URL = {
         normalizedAPIBaseURL(from: AppConfig.apiBaseURL)
-            ?? URL(string: "https://cloud.pycashflow.com/api/v1")!
+            ?? URL(string: "https://app.pycashflow.com/api/v1")!
     }()
 
     static let defaultSelfHostedAPIBaseURL: URL = {
@@ -99,10 +99,19 @@ enum AppEnvironment {
             return nil
         }
 
-        if candidate.path.isEmpty || candidate.path == "/" {
-            return candidate.appending(path: "api/v1")
+        var normalized = candidate
+        if candidate.host?.lowercased() == "cloud.pycashflow.com",
+           var components = URLComponents(url: candidate, resolvingAgainstBaseURL: false) {
+            components.host = "app.pycashflow.com"
+            if let migrated = components.url {
+                normalized = migrated
+            }
         }
 
-        return candidate
+        if normalized.path.isEmpty || normalized.path == "/" {
+            return normalized.appending(path: "api/v1")
+        }
+
+        return normalized
     }
 }

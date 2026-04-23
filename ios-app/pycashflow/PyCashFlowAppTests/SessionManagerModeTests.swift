@@ -41,4 +41,26 @@ final class SessionManagerModeTests: XCTestCase {
         let ok = session.updateSelfHostedBaseURL("not-a-url")
         XCTAssertFalse(ok)
     }
+
+    func testLegacyCloudHostIsCanonicalizedForSelfHostedURL() async {
+        let session = SessionManager()
+
+        let ok = session.updateSelfHostedBaseURL("https://cloud.pycashflow.com/api/v1")
+
+        XCTAssertTrue(ok)
+        XCTAssertEqual(session.selfHostedBaseURLText, "https://app.pycashflow.com/api/v1")
+    }
+
+    func testLegacyCloudHostStoredInDefaultsIsMigratedOnLoad() async {
+        UserDefaults.standard.set("https://cloud.pycashflow.com/api/v1", forKey: "SELF_HOSTED_API_BASE_URL")
+        UserDefaults.standard.set("selfHosted", forKey: "APP_MODE")
+
+        let session = SessionManager()
+
+        XCTAssertEqual(session.currentBaseURL.absoluteString, "https://app.pycashflow.com/api/v1")
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: "SELF_HOSTED_API_BASE_URL"),
+            "https://app.pycashflow.com/api/v1"
+        )
+    }
 }
