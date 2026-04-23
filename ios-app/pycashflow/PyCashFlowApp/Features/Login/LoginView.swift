@@ -1,6 +1,13 @@
 import SwiftUI
 
 struct LoginView: View {
+    private enum Field: Hashable {
+        case email
+        case password
+        case twoFACode
+        case selfHostedURL
+    }
+
     @EnvironmentObject var session: SessionManager
     @State private var email = ""
     @State private var password = ""
@@ -9,6 +16,7 @@ struct LoginView: View {
     @State private var selfHostedURL = ""
     @State private var errorText: String?
     @State private var isLoading = false
+    @FocusState private var focusedField: Field?
 
     var body: some View {
         ScrollView {
@@ -37,11 +45,20 @@ struct LoginView: View {
                         TextField("Email", text: $email)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            .submitLabel(.next)
+                            .focused($focusedField, equals: .email)
+                            .onSubmit { focusedField = .password }
                             .padding(12)
                             .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
                             .foregroundStyle(AppTheme.textPrimary)
 
                         SecureField("Password", text: $password)
+                            .submitLabel(.go)
+                            .focused($focusedField, equals: .password)
+                            .onSubmit {
+                                focusedField = nil
+                                Task { await submit() }
+                            }
                             .padding(12)
                             .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
                             .foregroundStyle(AppTheme.textPrimary)
@@ -49,6 +66,12 @@ struct LoginView: View {
                         TextField("6-digit code or backup code", text: $twoFACode)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            .submitLabel(.go)
+                            .focused($focusedField, equals: .twoFACode)
+                            .onSubmit {
+                                focusedField = nil
+                                Task { await submit() }
+                            }
                             .padding(12)
                             .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
                             .foregroundStyle(AppTheme.textPrimary)
@@ -61,6 +84,7 @@ struct LoginView: View {
                     }
 
                     Button(challenge == nil ? "Login" : "Verify 2FA") {
+                        focusedField = nil
                         Task { await submit() }
                     }
                     .buttonStyle(PrimaryButtonStyle())
@@ -75,6 +99,8 @@ struct LoginView: View {
                         TextField("https://your-server.example.com/api/v1", text: $selfHostedURL)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            .submitLabel(.done)
+                            .focused($focusedField, equals: .selfHostedURL)
                             .padding(12)
                             .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
                             .foregroundStyle(AppTheme.textPrimary)
@@ -106,6 +132,7 @@ struct LoginView: View {
         .appBackground()
         .navigationTitle("Login")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
         .onAppear {
             selfHostedURL = session.selfHostedBaseURLText
         }
