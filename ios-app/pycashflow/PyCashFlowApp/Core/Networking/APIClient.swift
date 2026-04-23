@@ -70,24 +70,18 @@ enum AppEnvironment {
         let key = "API_BASE_URL"
 
         if let plistValue = Bundle.main.object(forInfoDictionaryKey: key) as? String,
-           let url = URL(string: plistValue),
-           !plistValue.isEmpty {
-            return url
-        }
-
-        if let defaultsValue = UserDefaults.standard.string(forKey: key),
-           let url = URL(string: defaultsValue),
-           !defaultsValue.isEmpty {
+           !plistValue.isEmpty,
+           let url = normalizedAPIBaseURL(from: plistValue) {
             return url
         }
 
         if let envValue = ProcessInfo.processInfo.environment[key],
-           let url = URL(string: envValue),
-           !envValue.isEmpty {
+           !envValue.isEmpty,
+           let url = normalizedAPIBaseURL(from: envValue) {
             return url
         }
 
-        return URL(string: "https://example.com/api/v1")!
+        return normalizedAPIBaseURL(from: "https://app.pycashflow.com")!
     }()
 
     static let defaultSelfHostedAPIBaseURL: URL = {
@@ -107,6 +101,19 @@ enum AppEnvironment {
 
         return URL(string: "http://localhost:5000/api/v1")!
     }()
+
+
+    private static func normalizedAPIBaseURL(from rawValue: String) -> URL? {
+        guard let candidate = URL(string: rawValue.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            return nil
+        }
+
+        if candidate.path.isEmpty || candidate.path == "/" {
+            return candidate.appending(path: "api/v1")
+        }
+
+        return candidate
+    }
 
     static let appStoreProductIDs: [String] = {
         let key = "APP_STORE_PRODUCT_IDS"
