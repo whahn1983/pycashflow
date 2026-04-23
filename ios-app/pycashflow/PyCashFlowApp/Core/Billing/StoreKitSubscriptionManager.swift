@@ -100,7 +100,7 @@ final class StoreKitSubscriptionManager: ObservableObject {
                 product_id: transaction.productID,
                 purchase_date: Self.isoDate(transaction.purchaseDate),
                 expiry_date: expiryISO,
-                signed_transaction_info: transaction.jwsRepresentation
+                signed_transaction_info: Self.signedTransactionInfo(transaction)
             )
         )
 
@@ -123,6 +123,10 @@ final class StoreKitSubscriptionManager: ObservableObject {
         case .verified(let safe):
             return safe
         }
+    }
+
+    private static func signedTransactionInfo(_ transaction: StoreKit.Transaction) -> String? {
+        String(data: transaction.jsonRepresentation, encoding: .utf8)
     }
 
     private static func isoDate(_ date: Date) -> String {
