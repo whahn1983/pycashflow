@@ -32,38 +32,6 @@ struct LoginView: View {
                 }
                 .surfaceCard()
 
-                if session.appMode == .selfHosted {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Self-Hosted API Base URL")
-                            .foregroundStyle(AppTheme.textPrimary)
-                        TextField("https://your-server.example.com/api/v1", text: $selfHostedURL)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .padding(12)
-                            .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
-                            .foregroundStyle(AppTheme.textPrimary)
-                        Button("Save Server URL") {
-                            if !session.updateSelfHostedBaseURL(selfHostedURL) {
-                                errorText = "Please enter a valid URL, including /api/v1."
-                            } else {
-                                errorText = nil
-                            }
-                        }
-                        .buttonStyle(PrimaryButtonStyle())
-                    }
-                    .surfaceCard()
-                } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Using PyCashFlow Cloud hosted service.")
-                            .foregroundStyle(AppTheme.textSecondary)
-                        NavigationLink("Activate or Restore Cloud Subscription") {
-                            SubscriptionPaywallView(message: "Use App Store subscription to activate or restore your hosted PyCashFlow Cloud account.")
-                        }
-                        .buttonStyle(PrimaryButtonStyle())
-                    }
-                    .surfaceCard()
-                }
-
                 VStack(spacing: 12) {
                     if challenge == nil {
                         TextField("Email", text: $email)
@@ -99,11 +67,45 @@ struct LoginView: View {
                     .disabled(isLoading)
                 }
                 .surfaceCard()
+
+                if session.appMode == .selfHosted {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Self-Hosted API Base URL")
+                            .foregroundStyle(AppTheme.textPrimary)
+                        TextField("https://your-server.example.com/api/v1", text: $selfHostedURL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .padding(12)
+                            .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+                            .foregroundStyle(AppTheme.textPrimary)
+                        Button("Save Server URL") {
+                            if !session.updateSelfHostedBaseURL(selfHostedURL) {
+                                errorText = "Please enter a valid URL, including /api/v1."
+                            } else {
+                                errorText = nil
+                            }
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                    }
+                    .surfaceCard()
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Using PyCashFlow Cloud hosted service.")
+                            .foregroundStyle(AppTheme.textSecondary)
+                        NavigationLink("Activate or Restore Cloud Subscription") {
+                            SubscriptionPaywallView(message: "Use App Store subscription to activate or restore your hosted PyCashFlow Cloud account.")
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                    }
+                    .surfaceCard()
+                }
+
             }
             .padding(20)
         }
         .appBackground()
         .navigationTitle("Login")
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             selfHostedURL = session.selfHostedBaseURLText
         }
