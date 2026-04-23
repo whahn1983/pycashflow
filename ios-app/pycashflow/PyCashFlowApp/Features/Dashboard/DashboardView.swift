@@ -13,14 +13,14 @@ struct DashboardView: View {
                     .foregroundStyle(AppTheme.textPrimary)
 
                 if let dashboard {
-                    HStack {
+                    metricsGrid {
                         statCard(title: "Balance", value: "$\(dashboard.balance)")
                         statCard(title: "Min (90d)", value: "$\(dashboard.min_balance)")
                     }
                     if let risk = dashboard.risk_v2 {
-                        HStack {
-                            statCard(title: "Risk", value: "\(risk.score) · \(risk.status)")
-                            statCard(title: "Runway", value: "\(risk.runway_days) days")
+                        metricsGrid {
+                            statCard(title: "Risk", value: "\(risk.score ?? 0) · \(risk.status ?? "Unknown")")
+                            statCard(title: "Runway", value: "\(risk.runway_days ?? 0) days")
                         }
                     }
 
@@ -59,6 +59,17 @@ struct DashboardView: View {
         .refreshable { await loadDashboard() }
         .appBackground()
         .navigationTitle("Dashboard")
+    }
+
+    private func metricsGrid<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                content()
+            }
+            VStack(spacing: 10) {
+                content()
+            }
+        }
     }
 
     private func statCard(title: String, value: String) -> some View {
