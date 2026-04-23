@@ -42,7 +42,18 @@ final class APIClient {
         let decoder = JSONDecoder()
 
         if (200..<300).contains(code) {
-            if code == 204 { return EmptyResponse() as! T }
+            if code == 204 {
+                if T.self == EmptyResponse.self,
+                   let empty = EmptyResponse() as? T {
+                    return empty
+                }
+                throw APIErrorEnvelope(
+                    error: "Unexpected empty response body",
+                    code: "empty_response_body",
+                    status: code,
+                    fields: nil
+                )
+            }
             return try decoder.decode(T.self, from: data)
         }
 
@@ -67,11 +78,13 @@ private struct AnyEncodable: Encodable {
 
 enum AppEnvironment {
     static let cloudAPIBaseURL: URL = {
-        normalizedAPIBaseURL(from: AppConfig.apiBaseURL)!
+        normalizedAPIBaseURL(from: AppConfig.apiBaseURL)
+            ?? URL(string: "https://cloud.pycashflow.com/api/v1")!
     }()
 
     static let defaultSelfHostedAPIBaseURL: URL = {
-        normalizedAPIBaseURL(from: AppConfig.selfHostedAPIBaseURL)!
+        normalizedAPIBaseURL(from: AppConfig.selfHostedAPIBaseURL)
+            ?? URL(string: "https://localhost:5000/api/v1")!
     }()
 
     static let appStoreProductIDs: [String] = {
