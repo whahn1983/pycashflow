@@ -76,15 +76,20 @@ struct SettingsView: View {
     private func load() async {
         guard let token = session.token else { return }
         do {
-            async let settingsCall: APIEnvelope<SettingsDTO> = APIClient.shared.request("settings", token: token, as: APIEnvelope<SettingsDTO>.self)
-            async let insightsCall: APIEnvelope<InsightsDTO> = APIClient.shared.request("insights", token: token, as: APIEnvelope<InsightsDTO>.self)
-            let (settingsRes, insightsRes) = try await (settingsCall, insightsCall)
-            await MainActor.run {
-                settings = settingsRes.data
-                insights = insightsRes.data
-            }
+            let settingsResponse: APIEnvelope<SettingsDTO> = try await APIClient.shared.request(
+                "settings",
+                token: token,
+                as: APIEnvelope<SettingsDTO>.self
+            )
+            let insightsResponse: APIEnvelope<InsightsDTO> = try await APIClient.shared.request(
+                "insights",
+                token: token,
+                as: APIEnvelope<InsightsDTO>.self
+            )
+            settings = settingsResponse.data
+            insights = insightsResponse.data
         } catch {
-            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to load settings" }
+            errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to load settings"
         }
     }
 
@@ -92,9 +97,9 @@ struct SettingsView: View {
         guard let token = session.token else { return }
         do {
             let response: APIEnvelope<InsightsDTO> = try await APIClient.shared.request("insights/refresh", method: "POST", token: token, as: APIEnvelope<InsightsDTO>.self)
-            await MainActor.run { insights = response.data }
+            insights = response.data
         } catch {
-            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to refresh insights" }
+            errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to refresh insights"
         }
     }
 
@@ -109,22 +114,20 @@ struct SettingsView: View {
                 body: Payload(current_password: currentPassword, new_password: newPassword),
                 as: APIEnvelope<[String: String]>.self
             )
-            await MainActor.run {
-                currentPassword = ""
-                newPassword = ""
-                session.clear()
-            }
+            currentPassword = ""
+            newPassword = ""
+            session.clear()
         } catch {
-            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to change password" }
+            errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to change password"
         }
     }
 
     private func logout() async {
         guard let token = session.token else {
-            await MainActor.run { session.clear() }
+            session.clear()
             return
         }
         _ = try? await APIClient.shared.request("auth/logout", method: "POST", token: token, as: APIEnvelope<[String: String]>.self)
-        await MainActor.run { session.clear() }
+        session.clear()
     }
 }
