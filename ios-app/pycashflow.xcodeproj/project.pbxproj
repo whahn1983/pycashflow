@@ -30,6 +30,7 @@
 		1C456D2F2F9AAFE200B2B374 /* Exceptions for "pycashflow" folder in "pycashflow" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				PyCashFlowApp/Info.plist,
 				PyCashFlowAppTests/BillingStatusTests.swift,
 				PyCashFlowAppTests/SessionManagerModeTests.swift,
 			);
