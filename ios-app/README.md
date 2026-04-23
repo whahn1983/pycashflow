@@ -42,10 +42,10 @@ The iOS app supports **Apple App Store** purchase flow only. Stripe is intention
 - App Store status is not treated as a universal entitlement for all app usage.
 
 ## Runtime configuration
-Set these values via Info.plist (or environment for debug tooling):
+These values are hardcoded in `PyCashFlowApp/Core/Config/Config.swift`:
 
-- `API_BASE_URL` => hosted cloud API URL, e.g. `https://cloud.pycashflow.com/api/v1`
-- `SELF_HOSTED_API_BASE_URL` => default self-hosted API URL shown in app config
-- `APP_STORE_PRODUCT_IDS` => comma-separated product IDs, e.g. `com.pycashflow.premium.monthly`
+- `API_BASE_URL` => `https://cloud.pycashflow.com/api/v1`
+- `SELF_HOSTED_API_BASE_URL` => `https://localhost:5000`
+- `APP_STORE_PRODUCT_IDS` => empty string for now
 
-`APIClient` will not default to localhost.
+`APIClient` normalizes base URLs so host-only values automatically use `/api/v1`.
