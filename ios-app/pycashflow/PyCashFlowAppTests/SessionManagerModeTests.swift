@@ -1,5 +1,5 @@
 import XCTest
-@testable import PyCashFlowApp
+@testable import pycashflow
 
 @MainActor
 final class SessionManagerModeTests: XCTestCase {

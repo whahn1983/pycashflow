@@ -1,0 +1,23 @@
+{
+  "configurations" : [
+    {
+      "id" : "317B0A90-04EF-4594-AA6B-D505B48C8BC7",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:pycashflow.xcodeproj",
+      "identifier" : "1C456C1D2F9AA52700B2B374",
+      "name" : "pycashflow"
+    },
+    "testTimeoutsEnabled" : true
+  },
+  "testTargets" : [
+
+  ],
+  "version" : 1
+}
