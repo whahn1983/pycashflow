@@ -52,8 +52,12 @@ struct AccountsView: View {
     private func load() async {
         guard let token = session.token else { return }
         do {
-            async let current: APIEnvelope<BalanceDTO> = APIClient.shared.request("balance", token: token, as: APIEnvelope<BalanceDTO>.self)
-            async let list: APIListEnvelope<BalanceDTO> = APIClient.shared.request(
+            let current: APIEnvelope<BalanceDTO> = try await APIClient.shared.request(
+                "balance",
+                token: token,
+                as: APIEnvelope<BalanceDTO>.self
+            )
+            let list: APIListEnvelope<BalanceDTO> = try await APIClient.shared.request(
                 "balance/history",
                 queryItems: [
                     URLQueryItem(name: "limit", value: "20"),
@@ -62,13 +66,10 @@ struct AccountsView: View {
                 token: token,
                 as: APIListEnvelope<BalanceDTO>.self
             )
-            let (currentRes, listRes) = try await (current, list)
-            await MainActor.run {
-                balance = currentRes.data
-                history = listRes.data
-            }
+            balance = current.data
+            history = list.data
         } catch {
-            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to load balances" }
+            errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to load balances"
         }
     }
 
@@ -78,9 +79,9 @@ struct AccountsView: View {
             struct Payload: Encodable { let amount: String }
             _ = try await APIClient.shared.request("balance", method: "POST", token: token, body: Payload(amount: newAmount), as: APIEnvelope<BalanceDTO>.self)
             await load()
-            await MainActor.run { newAmount = "" }
+            newAmount = ""
         } catch {
-            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to save balance" }
+            errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to save balance"
         }
     }
 }

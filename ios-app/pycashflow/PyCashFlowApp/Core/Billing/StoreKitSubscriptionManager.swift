@@ -89,18 +89,10 @@ final class StoreKitSubscriptionManager: ObservableObject {
     }
 
     private func submit(transaction: StoreKit.Transaction, email: String, token: String?) async throws {
-        let receiptData: String
-        if let receiptURL = Bundle.main.appStoreReceiptURL,
-           let data = try? Data(contentsOf: receiptURL) {
-            receiptData = data.base64EncodedString()
-        } else {
-            receiptData = ""
-        }
-
         let expiryISO = transaction.expirationDate.map(Self.isoDate)
         let payload = AppStoreVerificationPayload(
             email: email,
-            receipt_data: receiptData,
+            receipt_data: "",
             expiry_date: expiryISO,
             transaction: .init(
                 id: String(transaction.id),
@@ -108,7 +100,7 @@ final class StoreKitSubscriptionManager: ObservableObject {
                 product_id: transaction.productID,
                 purchase_date: Self.isoDate(transaction.purchaseDate),
                 expiry_date: expiryISO,
-                signed_transaction_info: nil
+                signed_transaction_info: transaction.jwsRepresentation
             )
         )
 
