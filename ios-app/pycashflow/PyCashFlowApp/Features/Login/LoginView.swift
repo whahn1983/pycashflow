@@ -14,7 +14,8 @@ struct LoginView: View {
     @State private var challenge: String?
     @State private var twoFACode = ""
     @State private var selfHostedURL = ""
-    @State private var errorText: String?
+    @State private var authErrorText: String?
+    @State private var selfHostedErrorText: String?
     @State private var isLoading = false
     @FocusState private var focusedField: Field?
 
@@ -37,6 +38,8 @@ struct LoginView: View {
                 }
                 .onChange(of: session.appMode) { _, newValue in
                     session.switchMode(newValue)
+                    authErrorText = nil
+                    selfHostedErrorText = nil
                 }
                 .surfaceCard()
 
@@ -77,8 +80,8 @@ struct LoginView: View {
                             .foregroundStyle(AppTheme.textPrimary)
                     }
 
-                    if let errorText {
-                        Text(errorText)
+                    if let authErrorText {
+                        Text(authErrorText)
                             .foregroundStyle(AppTheme.danger)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -106,12 +109,18 @@ struct LoginView: View {
                             .foregroundStyle(AppTheme.textPrimary)
                         Button("Save Server URL") {
                             if !session.updateSelfHostedBaseURL(selfHostedURL) {
-                                errorText = "Please enter a valid URL, including /api/v1."
+                                selfHostedErrorText = "Please enter a valid URL, including /api/v1."
                             } else {
-                                errorText = nil
+                                selfHostedErrorText = nil
                             }
                         }
                         .buttonStyle(PrimaryButtonStyle())
+
+                        if let selfHostedErrorText {
+                            Text(selfHostedErrorText)
+                                .foregroundStyle(AppTheme.danger)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                     .surfaceCard()
                 } else {
@@ -139,7 +148,10 @@ struct LoginView: View {
     }
 
     private func submit() async {
-        await MainActor.run { isLoading = true; errorText = nil }
+        await MainActor.run {
+            isLoading = true
+            authErrorText = nil
+        }
         if challenge == nil {
             await login()
         } else {
@@ -163,12 +175,12 @@ struct LoginView: View {
                 return
             }
             guard let token = response.data.token else {
-                await MainActor.run { errorText = "Login token missing" }
+                await MainActor.run { authErrorText = "Login token missing" }
                 return
             }
             await session.establishSession(token: token, user: response.data.user)
         } catch {
-            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Login failed" }
+            await MainActor.run { authErrorText = (error as? APIErrorEnvelope)?.error ?? "Login failed" }
         }
     }
 
@@ -183,12 +195,12 @@ struct LoginView: View {
                 as: APIEnvelope<LoginResponseDTO>.self
             )
             guard let token = response.data.token else {
-                await MainActor.run { errorText = "2FA login token missing" }
+                await MainActor.run { authErrorText = "2FA login token missing" }
                 return
             }
             await session.establishSession(token: token, user: response.data.user)
         } catch {
-            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "2FA failed" }
+            await MainActor.run { authErrorText = (error as? APIErrorEnvelope)?.error ?? "2FA failed" }
         }
     }
 }
