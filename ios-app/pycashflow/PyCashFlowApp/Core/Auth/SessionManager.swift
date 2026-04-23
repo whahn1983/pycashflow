@@ -119,10 +119,11 @@ final class SessionManager: ObservableObject {
         guard let parsed = URL(string: trimmed), parsed.scheme != nil, parsed.host != nil else {
             return false
         }
-        selfHostedBaseURLText = parsed.absoluteString
-        UserDefaults.standard.set(parsed.absoluteString, forKey: Self.selfHostedURLKey)
+        let canonical = Self.canonicalizedHostedURL(parsed)
+        selfHostedBaseURLText = canonical.absoluteString
+        UserDefaults.standard.set(canonical.absoluteString, forKey: Self.selfHostedURLKey)
         if appMode == .selfHosted {
-            APIClient.shared.baseURL = parsed
+            APIClient.shared.baseURL = canonical
         }
         return true
     }
@@ -149,9 +150,22 @@ final class SessionManager: ObservableObject {
            let url = URL(string: raw),
            url.scheme != nil,
            url.host != nil {
-            return url
+            let canonical = canonicalizedHostedURL(url)
+            if canonical != url {
+                UserDefaults.standard.set(canonical.absoluteString, forKey: selfHostedURLKey)
+            }
+            return canonical
         }
         return AppEnvironment.defaultSelfHostedAPIBaseURL
+    }
+
+    private static func canonicalizedHostedURL(_ url: URL) -> URL {
+        guard url.host?.lowercased() == "cloud.pycashflow.com",
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+        components.host = "app.pycashflow.com"
+        return components.url ?? url
     }
 }
 
