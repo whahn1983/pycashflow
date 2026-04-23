@@ -67,41 +67,19 @@ private struct AnyEncodable: Encodable {
 
 enum AppEnvironment {
     static let cloudAPIBaseURL: URL = {
-        let key = "API_BASE_URL"
-
-        if let plistValue = Bundle.main.object(forInfoDictionaryKey: key) as? String,
-           !plistValue.isEmpty,
-           let url = normalizedAPIBaseURL(from: plistValue) {
-            return url
-        }
-
-        if let envValue = ProcessInfo.processInfo.environment[key],
-           !envValue.isEmpty,
-           let url = normalizedAPIBaseURL(from: envValue) {
-            return url
-        }
-
-        return normalizedAPIBaseURL(from: "https://app.pycashflow.com")!
+        normalizedAPIBaseURL(from: AppConfig.apiBaseURL)!
     }()
 
     static let defaultSelfHostedAPIBaseURL: URL = {
-        let key = "SELF_HOSTED_API_BASE_URL"
-
-        if let plistValue = Bundle.main.object(forInfoDictionaryKey: key) as? String,
-           let url = URL(string: plistValue),
-           !plistValue.isEmpty {
-            return url
-        }
-
-        if let defaultsValue = UserDefaults.standard.string(forKey: key),
-           let url = URL(string: defaultsValue),
-           !defaultsValue.isEmpty {
-            return url
-        }
-
-        return URL(string: "http://localhost:5000/api/v1")!
+        normalizedAPIBaseURL(from: AppConfig.selfHostedAPIBaseURL)!
     }()
 
+    static let appStoreProductIDs: [String] = {
+        AppConfig.appStoreProductIDs
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }()
 
     private static func normalizedAPIBaseURL(from rawValue: String) -> URL? {
         guard let candidate = URL(string: rawValue.trimmingCharacters(in: .whitespacesAndNewlines)) else {
@@ -114,30 +92,4 @@ enum AppEnvironment {
 
         return candidate
     }
-
-    static let appStoreProductIDs: [String] = {
-        let key = "APP_STORE_PRODUCT_IDS"
-
-        if let plistValue = Bundle.main.object(forInfoDictionaryKey: key) as? String {
-            let ids = plistValue
-                .split(separator: ",")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-            if !ids.isEmpty {
-                return ids
-            }
-        }
-
-        if let envValue = ProcessInfo.processInfo.environment[key] {
-            let ids = envValue
-                .split(separator: ",")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-            if !ids.isEmpty {
-                return ids
-            }
-        }
-
-        return []
-    }()
 }
