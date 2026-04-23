@@ -84,10 +84,10 @@ struct DashboardDTO: Decodable {
 }
 
 struct RiskScoreDTO: Decodable {
-    let score: Int
-    let status: String
-    let runway_days: Int
-    let lowest_balance: String
+    let score: Int?
+    let status: String?
+    let runway_days: Int?
+    let lowest_balance: String?
 }
 
 struct TransactionDTO: Decodable, Identifiable {

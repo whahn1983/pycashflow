@@ -14,11 +14,12 @@ struct SchedulesView: View {
     private let frequencies = ["Monthly", "Quarterly", "Yearly", "Weekly", "BiWeekly", "Onetime"]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+        List {
+            Section {
                 Text("Schedules")
                     .font(.title2.bold())
                     .foregroundStyle(AppTheme.textPrimary)
+                    .listRowBackground(Color.clear)
 
                 VStack(spacing: 8) {
                     TextField("Name", text: $name).fieldStyle()
@@ -30,26 +31,45 @@ struct SchedulesView: View {
                         .buttonStyle(PrimaryButtonStyle())
                 }
                 .surfaceCard()
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Color.clear)
 
-                if let errorText { Text(errorText).foregroundStyle(AppTheme.danger) }
-
-                ForEach(schedules) { schedule in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(schedule.name).foregroundStyle(AppTheme.textPrimary)
-                            Text("\(schedule.frequency) · \(schedule.start_date)").font(.caption).foregroundStyle(AppTheme.textMuted)
-                        }
-                        Spacer()
-                        Text("$\(schedule.amount)")
-                        Button(role: .destructive) { Task { await deleteSchedule(schedule.id) } } label: {
-                            Image(systemName: "trash")
-                        }
-                    }
-                    .surfaceCard()
+                if let errorText {
+                    Text(errorText)
+                        .foregroundStyle(AppTheme.danger)
+                        .listRowBackground(Color.clear)
                 }
             }
-            .padding(20)
+
+            Section("Existing Schedules") {
+                if schedules.isEmpty {
+                    Text("No schedules yet.")
+                        .foregroundStyle(AppTheme.textMuted)
+                }
+
+                ForEach(schedules) { schedule in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 14) {
+                            VStack(alignment: .leading) {
+                                Text(schedule.name).foregroundStyle(AppTheme.textPrimary)
+                                Text("\(schedule.frequency) · \(schedule.start_date)").font(.caption).foregroundStyle(AppTheme.textMuted)
+                            }
+                            Spacer(minLength: 16)
+                            Text("$\(schedule.amount)")
+                                .foregroundStyle(schedule.type == "Expense" ? AppTheme.danger : AppTheme.success)
+                            Button(role: .destructive) { Task { await deleteSchedule(schedule.id) } } label: {
+                                Image(systemName: "trash")
+                            }
+                        }
+                        .frame(minWidth: 340, alignment: .leading)
+                    }
+                    .surfaceCard()
+                    .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                    .listRowBackground(Color.clear)
+                }
+            }
         }
+        .listStyle(.plain)
         .task { await load() }
         .refreshable { await load() }
         .appBackground()

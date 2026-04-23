@@ -14,11 +14,12 @@ struct ScenariosView: View {
     private let frequencies = ["Monthly", "Quarterly", "Yearly", "Weekly", "BiWeekly", "Onetime"]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+        List {
+            Section {
                 Text("Scenarios")
                     .font(.title2.bold())
                     .foregroundStyle(AppTheme.textPrimary)
+                    .listRowBackground(Color.clear)
 
                 VStack(spacing: 8) {
                     TextField("Name", text: $name).fieldStyle()
@@ -30,26 +31,45 @@ struct ScenariosView: View {
                         .buttonStyle(PrimaryButtonStyle())
                 }
                 .surfaceCard()
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Color.clear)
 
-                if let errorText { Text(errorText).foregroundStyle(AppTheme.danger) }
-
-                ForEach(scenarios) { scenario in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(scenario.name).foregroundStyle(AppTheme.textPrimary)
-                            Text("\(scenario.frequency) · \(scenario.start_date)").font(.caption).foregroundStyle(AppTheme.textMuted)
-                        }
-                        Spacer()
-                        Text("$\(scenario.amount)")
-                        Button(role: .destructive) { Task { await deleteScenario(scenario.id) } } label: {
-                            Image(systemName: "trash")
-                        }
-                    }
-                    .surfaceCard()
+                if let errorText {
+                    Text(errorText)
+                        .foregroundStyle(AppTheme.danger)
+                        .listRowBackground(Color.clear)
                 }
             }
-            .padding(20)
+
+            Section("Existing Scenarios") {
+                if scenarios.isEmpty {
+                    Text("No scenarios yet.")
+                        .foregroundStyle(AppTheme.textMuted)
+                }
+
+                ForEach(scenarios) { scenario in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 14) {
+                            VStack(alignment: .leading) {
+                                Text(scenario.name).foregroundStyle(AppTheme.textPrimary)
+                                Text("\(scenario.frequency) · \(scenario.start_date)").font(.caption).foregroundStyle(AppTheme.textMuted)
+                            }
+                            Spacer(minLength: 16)
+                            Text("$\(scenario.amount)")
+                                .foregroundStyle(scenario.type == "Expense" ? AppTheme.danger : AppTheme.success)
+                            Button(role: .destructive) { Task { await deleteScenario(scenario.id) } } label: {
+                                Image(systemName: "trash")
+                            }
+                        }
+                        .frame(minWidth: 340, alignment: .leading)
+                    }
+                    .surfaceCard()
+                    .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                    .listRowBackground(Color.clear)
+                }
+            }
         }
+        .listStyle(.plain)
         .task { await load() }
         .refreshable { await load() }
         .appBackground()
