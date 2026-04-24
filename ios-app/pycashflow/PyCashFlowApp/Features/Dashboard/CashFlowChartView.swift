@@ -14,8 +14,10 @@ struct CashFlowChartView: View {
     private var hasScenario: Bool { !scenarioPoints.isEmpty }
 
     private static let horizonDays = 90
+    private static let visibleDays = 45
+    private static let nearTermDays = 30
 
-    @State private var selectedPoint: SelectedChartPoint?
+    @State private var selectedDate: Date?
 
     private var xDomain: ClosedRange<Date> {
         var calendar = Calendar(identifier: .gregorian)
@@ -23,6 +25,10 @@ struct CashFlowChartView: View {
         let today = calendar.startOfDay(for: Date())
         let end = calendar.date(byAdding: .day, value: Self.horizonDays, to: today) ?? today
         return today...end
+    }
+
+    private var visibleXDomainLength: TimeInterval {
+        TimeInterval(Self.visibleDays * 24 * 60 * 60)
     }
 
     private var allPointsInHorizon: [CashFlowPoint] {
@@ -40,6 +46,39 @@ struct CashFlowChartView: View {
         return lower...upper
     }
 
+    /// Visible Y length based on the near-term window so the user can scroll
+    /// vertically to follow the line when the projection trends sharply up or
+    /// down, matching the horizontal scroll behaviour.
+    private var visibleYDomainLength: Double {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? calendar.timeZone
+        let today = calendar.startOfDay(for: Date())
+        let nearEnd = calendar.date(byAdding: .day, value: Self.nearTermDays, to: today) ?? today
+        let nearValues = allPointsInHorizon
+            .filter { $0.date <= nearEnd }
+            .map(\.amount)
+        let full = yDomain.upperBound - yDomain.lowerBound
+        guard let nearMin = nearValues.min(), let nearMax = nearValues.max(), full > 0 else {
+            return full
+        }
+        let nearSpan = max(nearMax - nearMin, full * 0.25)
+        let padded = nearSpan * 1.2
+        return min(max(padded, full * 0.25), full)
+    }
+
+    private var selectedPoint: SelectedChartPoint? {
+        guard let selectedDate else { return nil }
+        let candidates: [(point: CashFlowPoint, series: SelectedChartPoint.Series)] = [
+            nearestPoint(to: selectedDate, in: schedulePoints).map { ($0, .schedule) },
+            nearestPoint(to: selectedDate, in: scenarioPoints).map { ($0, .scenario) }
+        ].compactMap { $0 }
+        guard let best = candidates.min(by: {
+            abs($0.point.date.timeIntervalSince(selectedDate))
+                < abs($1.point.date.timeIntervalSince(selectedDate))
+        }) else { return nil }
+        return SelectedChartPoint(point: best.point, series: best.series)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
@@ -48,10 +87,12 @@ struct CashFlowChartView: View {
                 Text("Cash Flow")
                     .font(.headline)
                     .foregroundStyle(AppTheme.textPrimary)
-                Spacer()
-                if hasScenario {
-                    legend()
-                }
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+
+            if hasScenario {
+                legend()
             }
 
             if schedulePoints.isEmpty && scenarioPoints.isEmpty {
@@ -114,6 +155,11 @@ struct CashFlowChartView: View {
         }
         .chartXScale(domain: xDomain)
         .chartYScale(domain: yDomain)
+        .chartScrollableAxes([.horizontal, .vertical])
+        .chartXVisibleDomain(length: visibleXDomainLength)
+        .chartYVisibleDomain(length: visibleYDomainLength)
+        .chartScrollPosition(initialX: xDomain.lowerBound)
+        .chartXSelection(value: $selectedDate)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine().foregroundStyle(AppTheme.border.opacity(0.5))
@@ -134,63 +180,10 @@ struct CashFlowChartView: View {
                 }
             }
         }
-        .chartOverlay { proxy in
-            GeometryReader { geo in
-                Rectangle()
-                    .fill(Color.clear)
-                    .contentShape(Rectangle())
-                    .onTapGesture { location in
-                        updateSelection(location: location, proxy: proxy, geometry: geo)
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                updateSelection(location: value.location, proxy: proxy, geometry: geo)
-                            }
-                    )
-            }
-        }
-    }
-
-    private func updateSelection(location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
-        guard let plotFrameAnchor = proxy.plotFrame else { return }
-        let plotFrame = geometry[plotFrameAnchor]
-        let x = location.x - plotFrame.origin.x
-        let y = location.y - plotFrame.origin.y
-        guard x >= 0, x <= plotFrame.width else { return }
-        guard let date: Date = proxy.value(atX: x) else { return }
-
-        // Consider the nearest candidate from each series and pick whichever
-        // is closer to the tap in screen space, so both lines remain
-        // independently selectable when scenario data is present.
-        let tap = CGPoint(x: x, y: y)
-        let candidates: [(point: CashFlowPoint, series: SelectedChartPoint.Series)] = [
-            nearestPoint(to: date, in: schedulePoints).map { ($0, .schedule) },
-            nearestPoint(to: date, in: scenarioPoints).map { ($0, .scenario) }
-        ].compactMap { $0 }
-
-        guard let best = candidates.min(by: {
-            screenDistance(from: tap, to: $0.point, proxy: proxy)
-                < screenDistance(from: tap, to: $1.point, proxy: proxy)
-        }) else {
-            selectedPoint = nil
-            return
-        }
-        selectedPoint = SelectedChartPoint(point: best.point, series: best.series)
     }
 
     private func nearestPoint(to date: Date, in points: [CashFlowPoint]) -> CashFlowPoint? {
         points.min(by: { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) })
-    }
-
-    private func screenDistance(from tap: CGPoint, to point: CashFlowPoint, proxy: ChartProxy) -> CGFloat {
-        guard let px = proxy.position(forX: point.date),
-              let py = proxy.position(forY: point.amount) else {
-            return .greatestFiniteMagnitude
-        }
-        let dx = tap.x - px
-        let dy = tap.y - py
-        return sqrt(dx * dx + dy * dy)
     }
 
     private func tooltip(for selection: SelectedChartPoint) -> some View {
@@ -233,6 +226,8 @@ struct CashFlowChartView: View {
             LegendSwatch(color: color, dashed: dashed)
                 .frame(width: 18, height: 2)
             Text(label)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
     }
 
