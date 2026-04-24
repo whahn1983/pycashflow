@@ -262,6 +262,114 @@ credential-validation oracle attacks.
 
 ---
 
+### POST /api/v1/auth/passkey/options
+
+Begin a passkey (WebAuthn) login flow. Returns the challenge parameters and a
+signed `challenge_token` that must be echoed back to
+`POST /api/v1/auth/passkey/verify`.
+
+**Auth required:** No
+
+**Rate limit:** 10/minute
+
+**Request:**
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `email` | string | Yes | Trimmed and lowercased server-side |
+
+**Response `200 OK`:**
+
+```json
+{
+  "data": {
+    "challenge_token": "<opaque signed token>",
+    "options": {
+      "challenge": "<base64url>",
+      "rpId": "app.pycashflow.com",
+      "allowCredentials": [
+        { "id": "<base64url>", "type": "public-key" }
+      ],
+      "userVerification": "required",
+      "timeout": 60000
+    }
+  }
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `challenge_token` | string | Opaque, server-signed. Store in memory and pass verbatim to `/verify`. TTL 5 minutes, single-use. |
+| `options` | object | WebAuthn `PublicKeyCredentialRequestOptions`. Pass its `challenge` and `allowCredentials` to the platform authenticator (e.g. `ASAuthorizationPlatformPublicKeyCredentialProvider` on iOS). |
+
+**Response `401 Unauthorized`:**
+
+Returned — with a deliberately generic message — when the account does not exist,
+is inactive, has no registered passkeys, or when passkey auth is not enabled on
+the server.
+
+```json
+{
+  "error": "Unable to start passkey login",
+  "code": "unauthorized",
+  "status": 401
+}
+```
+
+---
+
+### POST /api/v1/auth/passkey/verify
+
+Finish a passkey login. On success returns a Bearer token identical in shape to
+`POST /api/v1/auth/login`.
+
+**Auth required:** No
+
+**Rate limit:** 10/minute
+
+**Request:**
+
+```json
+{
+  "challenge_token": "<value from /options>",
+  "credential": {
+    "id": "<base64url credential id>",
+    "rawId": "<base64url credential id>",
+    "type": "public-key",
+    "response": {
+      "authenticatorData": "<base64url>",
+      "clientDataJSON": "<base64url>",
+      "signature": "<base64url>",
+      "userHandle": "<base64url, optional>"
+    }
+  }
+}
+```
+
+**Response `200 OK`:**
+
+```json
+{
+  "data": {
+    "token": "<bearer token>",
+    "user": { "...": "same shape as /auth/login" }
+  }
+}
+```
+
+**Response `401 Unauthorized`:**
+
+Returned when the challenge is expired, already consumed, or the assertion
+fails WebAuthn verification.
+
+---
+
 ### POST /api/v1/auth/logout
 
 Revoke the Bearer token used in this request.

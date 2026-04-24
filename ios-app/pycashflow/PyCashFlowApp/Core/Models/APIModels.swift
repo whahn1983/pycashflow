@@ -33,6 +33,25 @@ struct LoginResponseDTO: Decodable {
     let user: UserDTO
 }
 
+struct PasskeyLoginOptionsDTO: Decodable {
+    struct Options: Decodable {
+        struct AllowCredential: Decodable {
+            let id: String
+            let type: String?
+            let transports: [String]?
+        }
+
+        let challenge: String
+        let rpId: String?
+        let timeout: Int?
+        let userVerification: String?
+        let allowCredentials: [AllowCredential]?
+    }
+
+    let challenge_token: String
+    let options: Options
+}
+
 struct BillingStatusDTO: Decodable {
     let user_id: Int?
     let is_active: Bool?
