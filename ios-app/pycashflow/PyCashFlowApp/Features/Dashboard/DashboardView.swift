@@ -77,7 +77,6 @@ struct DashboardView: View {
     private var navItems: [FloatingNavItem] {
         [
             FloatingNavItem(title: "Accounts", systemImage: "creditcard") { AccountsView() },
-            FloatingNavItem(title: "Projections", systemImage: "chart.line.uptrend.xyaxis") { ProjectionsView() },
             FloatingNavItem(title: "Schedules", systemImage: "calendar") { SchedulesView() },
             FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3") { ScenariosView() },
             FloatingNavItem(title: "AI Insights", systemImage: "sparkles") { AIInsightsView() },
