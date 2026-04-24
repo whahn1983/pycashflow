@@ -26,13 +26,18 @@ struct FloatingNavBar: View {
                 .fill(.ultraThinMaterial)
                 .overlay(
                     Capsule(style: .continuous)
-                        .stroke(AppTheme.border.opacity(0.6), lineWidth: 1)
+                        .fill(AppTheme.primaryDark.opacity(0.25))
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(AppTheme.border.opacity(0.5), lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(0.35), radius: 18, x: 0, y: 8)
+                .opacity(0.85)
         )
         .clipShape(Capsule(style: .continuous))
         .padding(.horizontal, 16)
-        .padding(.bottom, 8)
+        .padding(.bottom, 0)
     }
 }
 

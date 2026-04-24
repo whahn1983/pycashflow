@@ -14,8 +14,6 @@ struct CashFlowChartView: View {
     private var hasScenario: Bool { !scenarioPoints.isEmpty }
 
     private static let horizonDays = 90
-    private static let visibleDays = 90
-    private static let nearTermDays = 30
 
     @State private var selectedPoint: SelectedChartPoint?
 
@@ -25,10 +23,6 @@ struct CashFlowChartView: View {
         let today = calendar.startOfDay(for: Date())
         let end = calendar.date(byAdding: .day, value: Self.horizonDays, to: today) ?? today
         return today...end
-    }
-
-    private var visibleXDomainLength: TimeInterval {
-        TimeInterval(Self.visibleDays * 24 * 60 * 60)
     }
 
     private var allPointsInHorizon: [CashFlowPoint] {
@@ -44,26 +38,6 @@ struct CashFlowChartView: View {
         let lower = rawMin >= 0 ? 0 : rawMin * 1.1
         let upper = max(rawMax * 1.1, lower + 1)
         return lower...upper
-    }
-
-    /// Visible Y length based on the near-term window so that when the projection
-    /// trends sharply up or down across the horizon the user can scroll vertically
-    /// to follow the line, matching the horizontal scroll behaviour.
-    private var visibleYDomainLength: Double {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC") ?? calendar.timeZone
-        let today = calendar.startOfDay(for: Date())
-        let nearEnd = calendar.date(byAdding: .day, value: Self.nearTermDays, to: today) ?? today
-        let nearValues = allPointsInHorizon
-            .filter { $0.date <= nearEnd }
-            .map(\.amount)
-        let full = yDomain.upperBound - yDomain.lowerBound
-        guard let nearMin = nearValues.min(), let nearMax = nearValues.max(), full > 0 else {
-            return full
-        }
-        let nearSpan = max(nearMax - nearMin, full * 0.25)
-        let padded = nearSpan * 1.2
-        return min(max(padded, full * 0.25), full)
     }
 
     var body: some View {
@@ -122,27 +96,24 @@ struct CashFlowChartView: View {
                 RuleMark(x: .value("Selected", selected.point.date))
                     .foregroundStyle(AppTheme.textMuted.opacity(0.5))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                    .annotation(
-                        position: annotationPosition(for: selected.point.date),
-                        alignment: .center,
-                        spacing: 6
-                    ) {
-                        tooltip(for: selected)
-                    }
                 PointMark(
                     x: .value("Date", selected.point.date),
                     y: .value("Balance", selected.point.amount)
                 )
                 .symbolSize(90)
                 .foregroundStyle(selected.series == .scenario ? Self.scenarioColor : Self.scheduleColor)
+                .annotation(
+                    position: .top,
+                    alignment: .center,
+                    spacing: 6,
+                    overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))
+                ) {
+                    tooltip(for: selected)
+                }
             }
         }
         .chartXScale(domain: xDomain)
         .chartYScale(domain: yDomain)
-        .chartScrollableAxes([.horizontal, .vertical])
-        .chartXVisibleDomain(length: visibleXDomainLength)
-        .chartYVisibleDomain(length: visibleYDomainLength)
-        .chartScrollPosition(initialX: xDomain.lowerBound)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine().foregroundStyle(AppTheme.border.opacity(0.5))
@@ -171,16 +142,10 @@ struct CashFlowChartView: View {
                     .onTapGesture { location in
                         updateSelection(location: location, proxy: proxy, geometry: geo)
                     }
-                    // Require a brief hold before drag-to-scrub activates so
-                    // regular drags fall through to the chart's horizontal
-                    // and vertical scroll gestures.
-                    .simultaneousGesture(
-                        LongPressGesture(minimumDuration: 0.2)
-                            .sequenced(before: DragGesture(minimumDistance: 0))
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
                             .onChanged { value in
-                                if case .second(true, let drag?) = value {
-                                    updateSelection(location: drag.location, proxy: proxy, geometry: geo)
-                                }
+                                updateSelection(location: value.location, proxy: proxy, geometry: geo)
                             }
                     )
             }
@@ -226,11 +191,6 @@ struct CashFlowChartView: View {
         let dx = tap.x - px
         let dy = tap.y - py
         return sqrt(dx * dx + dy * dy)
-    }
-
-    private func annotationPosition(for date: Date) -> AnnotationPosition {
-        let midpoint = xDomain.lowerBound.addingTimeInterval(visibleXDomainLength / 2)
-        return date > midpoint ? .topLeading : .topTrailing
     }
 
     private func tooltip(for selection: SelectedChartPoint) -> some View {
