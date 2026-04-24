@@ -144,12 +144,16 @@ struct DashboardView: View {
     }
 
     private func loadProjections() async {
-        guard let token = session.token else { return }
+        guard let token = session.token else {
+            await MainActor.run { projections = nil }
+            return
+        }
         do {
             let response: APIEnvelope<ProjectionsDTO> = try await APIClient.shared.request("projections", token: token, as: APIEnvelope<ProjectionsDTO>.self)
             await MainActor.run { projections = response.data }
         } catch {
-            // Chart silently hides if projections fail; dashboard error surfaces other issues.
+            // Clear stale data so the chart hides silently; dashboard error surfaces other issues.
+            await MainActor.run { projections = nil }
         }
     }
 
