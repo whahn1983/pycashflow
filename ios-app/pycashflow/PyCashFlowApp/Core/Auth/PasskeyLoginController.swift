@@ -133,7 +133,10 @@ final class PasskeyLoginController: NSObject, ASAuthorizationControllerDelegate,
         if let scene = scenes.first {
             return UIWindow(windowScene: scene)
         }
-        preconditionFailure("No connected window scenes available to anchor passkey UI")
+        // No connected scenes (e.g. backgrounded or mid-lifecycle transition).
+        // Return a detached window so ASAuthorizationController surfaces a
+        // normal auth error instead of crashing the app.
+        return ASPresentationAnchor()
     }
 }
 
