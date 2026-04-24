@@ -16,6 +16,7 @@ enum AppTheme {
 
     static let success = Color(red: 16/255, green: 185/255, blue: 129/255)        // #10b981
     static let danger = Color(red: 239/255, green: 68/255, blue: 68/255)          // #ef4444
+    static let warning = Color(red: 245/255, green: 158/255, blue: 11/255)        // #f59e0b
 
     static let textPrimary = Color(red: 241/255, green: 245/255, blue: 249/255)   // #f1f5f9
     static let textSecondary = Color(red: 203/255, green: 213/255, blue: 225/255) // #cbd5e1

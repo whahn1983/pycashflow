@@ -114,6 +114,21 @@ struct ScheduleDTO: Decodable, Identifiable {
     let start_date: String
 }
 
+struct HoldDTO: Decodable, Identifiable {
+    let id: Int
+    let name: String
+    let amount: String
+    let type: String
+}
+
+struct SkipDTO: Decodable, Identifiable {
+    let id: Int
+    let name: String
+    let amount: String
+    let type: String
+    let date: String?
+}
+
 struct ScenarioDTO: Decodable, Identifiable {
     let id: Int
     let name: String
