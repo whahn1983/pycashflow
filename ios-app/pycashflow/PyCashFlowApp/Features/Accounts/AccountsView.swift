@@ -10,10 +10,6 @@ struct AccountsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Accounts")
-                    .font(.title2.bold())
-                    .foregroundStyle(AppTheme.textPrimary)
-
                 if let balance {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Current Balance")

@@ -9,10 +9,6 @@ struct ProjectionsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Projections")
-                    .font(.title2.bold())
-                    .foregroundStyle(AppTheme.textPrimary)
-
                 Text("Schedule projection points: \(scheduleSeries.count)")
                     .foregroundStyle(AppTheme.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)

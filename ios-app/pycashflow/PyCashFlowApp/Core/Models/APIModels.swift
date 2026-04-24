@@ -86,7 +86,7 @@ struct DashboardDTO: Decodable {
 struct RiskScoreDTO: Decodable {
     let score: Int?
     let status: String?
-    let runway_days: Int?
+    let runway_days: Double?
     let lowest_balance: String?
 }
 
@@ -160,9 +160,43 @@ struct SettingsDTO: Decodable {
     let ai: SettingsAIDTO
 }
 
+struct InsightItemDTO: Decodable, Identifiable {
+    let type: String?
+    let severity: String?
+    let title: String?
+    let description: String?
+
+    var id: String { "\(title ?? "")-\(description ?? "")" }
+}
+
 struct InsightsDTO: Decodable {
     let configured: Bool
-    let insights: [String]?
+    let insights: [InsightItemDTO]?
     let last_updated: String?
     let model: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case configured, insights, last_updated, model
+    }
+
+    private struct InsightsWrapper: Decodable {
+        let insights: [InsightItemDTO]?
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        configured = try container.decodeIfPresent(Bool.self, forKey: .configured) ?? false
+        last_updated = try container.decodeIfPresent(String.self, forKey: .last_updated)
+        model = try container.decodeIfPresent(String.self, forKey: .model)
+
+        // The backend stores insights as either an array of objects or the
+        // OpenAI-shaped wrapper {"insights": [...]}; accept either form.
+        if let flat = try? container.decodeIfPresent([InsightItemDTO].self, forKey: .insights) {
+            insights = flat
+        } else if let wrapped = try? container.decodeIfPresent(InsightsWrapper.self, forKey: .insights) {
+            insights = wrapped.insights
+        } else {
+            insights = nil
+        }
+    }
 }
