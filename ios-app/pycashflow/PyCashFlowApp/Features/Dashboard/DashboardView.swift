@@ -62,8 +62,7 @@ struct DashboardView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 96)
+            .padding(.vertical, 20)
         }
         .task { await loadAll() }
         .refreshable { await loadAll() }
