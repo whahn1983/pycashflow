@@ -14,8 +14,6 @@ struct CashFlowChartView: View {
     private var hasScenario: Bool { !scenarioPoints.isEmpty }
 
     private static let horizonDays = 90
-    private static let visibleDays = 90
-    private static let nearTermDays = 30
 
     @State private var selectedDate: Date?
     @State private var selectedAmount: Double?
@@ -28,10 +26,6 @@ struct CashFlowChartView: View {
         return today...end
     }
 
-    private var visibleXDomainLength: TimeInterval {
-        TimeInterval(Self.visibleDays * 24 * 60 * 60)
-    }
-
     private var allPointsInHorizon: [CashFlowPoint] {
         let end = xDomain.upperBound
         return (schedulePoints + scenarioPoints).filter { $0.date <= end }
@@ -42,29 +36,9 @@ struct CashFlowChartView: View {
         guard let rawMin = values.min(), let rawMax = values.max() else {
             return 0...1
         }
-        let lower = rawMin >= 0 ? 0 : rawMin * 1.1
+        let lower = min(rawMin, 0)
         let upper = max(rawMax * 1.1, lower + 1)
         return lower...upper
-    }
-
-    /// Visible Y length based on the near-term window so the user can scroll
-    /// vertically to follow the line when the projection trends sharply up or
-    /// down, matching the horizontal scroll behaviour.
-    private var visibleYDomainLength: Double {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC") ?? calendar.timeZone
-        let today = calendar.startOfDay(for: Date())
-        let nearEnd = calendar.date(byAdding: .day, value: Self.nearTermDays, to: today) ?? today
-        let nearValues = allPointsInHorizon
-            .filter { $0.date <= nearEnd }
-            .map(\.amount)
-        let full = yDomain.upperBound - yDomain.lowerBound
-        guard let nearMin = nearValues.min(), let nearMax = nearValues.max(), full > 0 else {
-            return full
-        }
-        let nearSpan = max(nearMax - nearMin, full * 0.25)
-        let padded = nearSpan * 1.2
-        return min(max(padded, full * 0.25), full)
     }
 
     private var selectedPoint: SelectedChartPoint? {
@@ -162,10 +136,6 @@ struct CashFlowChartView: View {
         }
         .chartXScale(domain: xDomain)
         .chartYScale(domain: yDomain)
-        .chartScrollableAxes([.horizontal, .vertical])
-        .chartXVisibleDomain(length: visibleXDomainLength)
-        .chartYVisibleDomain(length: visibleYDomainLength)
-        .chartScrollPosition(initialX: xDomain.lowerBound)
         .chartXSelection(value: $selectedDate)
         .chartYSelection(value: $selectedAmount)
         .chartXAxis {
