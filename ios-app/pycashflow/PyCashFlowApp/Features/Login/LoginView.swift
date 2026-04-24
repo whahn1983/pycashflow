@@ -144,7 +144,13 @@ struct LoginView: View {
         .appBackground()
         .navigationTitle("Login")
         .navigationBarTitleDisplayMode(.inline)
-        .scrollDismissesKeyboard(.interactively)
+        // Interactive dismissal installs a pan recognizer that competes with
+        // the system home-indicator gesture while the keyboard is visible;
+        // when the gesture gate times out iOS hands the swipe to SpringBoard,
+        // which manifests as the app "dropping to the home screen" while the
+        // user is typing. `.immediately` keeps scroll-to-dismiss UX without
+        // the conflicting drag recognizer.
+        .scrollDismissesKeyboard(.immediately)
         .onAppear {
             selfHostedURL = session.selfHostedBaseURLText
         }
