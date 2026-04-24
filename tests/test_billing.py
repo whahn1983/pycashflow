@@ -653,6 +653,92 @@ def test_subscription_webhook_update_without_email_uses_existing_subscription_id
         assert user.is_active is True
 
 
+def test_guest_of_global_admin_is_subscription_exempt(flask_app, client):
+    original_toggle = flask_app.config["PAYMENTS_ENABLED"]
+    with flask_app.app_context():
+        flask_app.config["PAYMENTS_ENABLED"] = True
+        admin = User(
+            email="gadmin-owner@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="GlobalAdmin",
+            admin=True,
+            is_global_admin=True,
+            is_active=True,
+            subscription_status="expired",
+            subscription_source="none",
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+        guest = User(
+            email="gadmin-guest@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Guest",
+            admin=False,
+            is_active=True,
+            account_owner_id=admin.id,
+            owner_user_id=admin.id,
+            is_account_owner=False,
+            subscription_status="inactive",
+            subscription_source="none",
+        )
+        db.session.add(guest)
+        db.session.commit()
+
+        raw, _ = create_token_for_user(guest)
+
+    resp = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {raw}"})
+    assert resp.status_code == 200
+
+    with flask_app.app_context():
+        guest_db = User.query.filter_by(email="gadmin-guest@test.local").first()
+        assert guest_db.is_active is True
+        flask_app.config["PAYMENTS_ENABLED"] = original_toggle
+
+
+def test_inactive_guest_of_global_admin_is_reactivated(flask_app, client):
+    original_toggle = flask_app.config["PAYMENTS_ENABLED"]
+    with flask_app.app_context():
+        flask_app.config["PAYMENTS_ENABLED"] = True
+        admin = User(
+            email="gadmin-owner2@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="GlobalAdmin",
+            admin=True,
+            is_global_admin=True,
+            is_active=True,
+            subscription_status="expired",
+            subscription_source="none",
+        )
+        db.session.add(admin)
+        db.session.commit()
+
+        guest = User(
+            email="gadmin-guest-inactive@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Guest",
+            admin=False,
+            is_active=False,
+            account_owner_id=admin.id,
+            owner_user_id=admin.id,
+            is_account_owner=False,
+            subscription_status="inactive",
+            subscription_source="none",
+        )
+        db.session.add(guest)
+        db.session.commit()
+
+        raw, _ = create_token_for_user(guest)
+
+    resp = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {raw}"})
+    assert resp.status_code == 200
+
+    with flask_app.app_context():
+        guest_db = User.query.filter_by(email="gadmin-guest-inactive@test.local").first()
+        assert guest_db.is_active is True
+        flask_app.config["PAYMENTS_ENABLED"] = original_toggle
+
+
 def test_global_admin_is_subscription_exempt(flask_app, client):
     with flask_app.app_context():
         admin = User(

@@ -136,6 +136,15 @@ def enforce_user_access(user: User | None) -> bool:
     if owner is None:
         return False
 
+    if owner.is_global_admin:
+        changed = False
+        if not user.is_active:
+            user.is_active = True
+            changed = True
+        if changed:
+            db.session.commit()
+        return True
+
     if subscription_is_current(owner):
         changed = False
         if not owner.is_global_admin and not owner.is_active:

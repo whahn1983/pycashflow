@@ -332,15 +332,17 @@ def api_billing_status():
     user = get_api_user()
     owner = owner_for_user(user)
 
+    owner_is_global_admin = bool(owner and owner.is_global_admin)
+
     if not user.is_global_admin and not user.is_active:
         # Keep manual/admin deactivation checks, but allow expired users to
         # retrieve billing status when payments enforcement is enabled.
-        if not payments_enabled() or subscription_is_current(owner):
+        if not payments_enabled() or owner_is_global_admin or subscription_is_current(owner):
             return unauthorized("Invalid credentials or account is not active")
 
     owner_id = user.owner_user_id or user.account_owner_id
 
-    effective_is_active = bool(user.is_global_admin)
+    effective_is_active = bool(user.is_global_admin) or owner_is_global_admin
     if not effective_is_active:
         if payments_enabled():
             effective_is_active = subscription_is_current(owner)
