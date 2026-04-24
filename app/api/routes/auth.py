@@ -1,5 +1,7 @@
 """API v1 authentication routes."""
 
+import json
+import logging
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 
@@ -8,8 +10,8 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import limiter, db
-from app.models import User, UserToken
-from app.auth import _DUMMY_HASH
+from app.models import PasskeyCredential, User, UserToken
+from app.auth import _DUMMY_HASH, _passkey_enabled
 from app.password_setup import consume_password_setup_token
 from app.totp_utils import decrypt_totp_secret, verify_totp, verify_and_consume_backup_code
 from app.subscription import enforce_user_access
@@ -25,6 +27,38 @@ from app.api.auth_utils import (
 from app.api.errors import unauthorized, validation_error, forbidden
 from app.api.responses import api_ok
 from app.api.serializers import serialize_user
+
+
+logger = logging.getLogger(__name__)
+
+
+try:
+    from webauthn import (
+        generate_authentication_options,
+        verify_authentication_response,
+        options_to_json,
+    )
+    from webauthn.helpers.base64url_to_bytes import base64url_to_bytes
+    from webauthn.helpers.bytes_to_base64url import bytes_to_base64url
+    from webauthn.helpers.structs import (
+        PublicKeyCredentialDescriptor,
+        UserVerificationRequirement,
+    )
+    _WEBAUTHN_AVAILABLE = True
+except Exception:  # pragma: no cover - webauthn is an optional dependency
+    _WEBAUTHN_AVAILABLE = False
+    generate_authentication_options = None
+    verify_authentication_response = None
+    options_to_json = None
+    base64url_to_bytes = None
+    bytes_to_base64url = None
+    PublicKeyCredentialDescriptor = None
+    UserVerificationRequirement = None
+
+
+_PASSKEY_CHALLENGE_MAX_AGE_SECONDS = 300
+_CONSUMED_PASSKEY_CHALLENGES: dict[str, datetime] = {}
+_CONSUMED_PASSKEY_CHALLENGES_LOCK = Lock()
 
 
 _TWOFA_CHALLENGE_MAX_AGE_SECONDS = 300
@@ -276,3 +310,176 @@ def api_complete_password_setup():
     user.is_active = True
     db.session.commit()
     return api_ok({"message": "Password setup complete"})
+
+
+def _api_passkey_enabled() -> bool:
+    return bool(_WEBAUTHN_AVAILABLE and _passkey_enabled())
+
+
+def _passkey_challenge_serializer() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="api-login-passkey")
+
+
+def _purge_expired_consumed_passkey_challenges(now: datetime | None = None) -> None:
+    now = now or datetime.now(timezone.utc)
+    expired = [
+        token
+        for token, expires_at in _CONSUMED_PASSKEY_CHALLENGES.items()
+        if expires_at <= now
+    ]
+    for token in expired:
+        _CONSUMED_PASSKEY_CHALLENGES.pop(token, None)
+
+
+def _is_passkey_challenge_consumed(challenge_token: str) -> bool:
+    with _CONSUMED_PASSKEY_CHALLENGES_LOCK:
+        _purge_expired_consumed_passkey_challenges()
+        return challenge_token in _CONSUMED_PASSKEY_CHALLENGES
+
+
+def _try_mark_passkey_challenge_consumed(challenge_token: str) -> bool:
+    now = datetime.now(timezone.utc)
+    with _CONSUMED_PASSKEY_CHALLENGES_LOCK:
+        _purge_expired_consumed_passkey_challenges(now)
+        if challenge_token in _CONSUMED_PASSKEY_CHALLENGES:
+            return False
+        _CONSUMED_PASSKEY_CHALLENGES[challenge_token] = now + timedelta(
+            seconds=_PASSKEY_CHALLENGE_MAX_AGE_SECONDS
+        )
+        return True
+
+
+def _build_passkey_challenge_token(user: User, challenge_b64url: str) -> str:
+    payload = {
+        "uid": user.id,
+        "email": user.email,
+        "challenge": challenge_b64url,
+        "nonce": hash_token(f"{user.id}:{datetime.now(timezone.utc).isoformat()}"),
+    }
+    return _passkey_challenge_serializer().dumps(payload)
+
+
+def _decode_passkey_challenge_token(challenge_token: str) -> dict | None:
+    try:
+        payload = _passkey_challenge_serializer().loads(
+            challenge_token,
+            max_age=_PASSKEY_CHALLENGE_MAX_AGE_SECONDS,
+        )
+    except (BadSignature, SignatureExpired):
+        return None
+
+    if (
+        not isinstance(payload, dict)
+        or not isinstance(payload.get("uid"), int)
+        or not isinstance(payload.get("challenge"), str)
+    ):
+        return None
+    return payload
+
+
+@api.route("/auth/passkey/options", methods=["POST"])
+@limiter.limit("10 per minute", exempt_when=lambda: current_app.testing)
+def api_passkey_login_options():
+    if not _api_passkey_enabled():
+        return unauthorized("Passkey authentication is not enabled")
+
+    body = request.get_json(silent=True) or {}
+    email_raw = body.get("email")
+    email = email_raw.strip().lower() if isinstance(email_raw, str) else ""
+
+    errors: dict = {}
+    if not email:
+        errors["email"] = "Email is required"
+    if errors:
+        return validation_error(errors)
+
+    user = User.query.filter_by(email=email).first()
+    if (
+        user is None
+        or not enforce_user_access(user)
+        or not user.passkey_credentials
+    ):
+        # Generic message to avoid revealing whether an account exists.
+        return unauthorized("Unable to start passkey login")
+
+    allow_credentials = [
+        PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
+        for c in user.passkey_credentials
+    ]
+    options = generate_authentication_options(
+        rp_id=current_app.config["PASSKEY_RP_ID"],
+        allow_credentials=allow_credentials,
+        user_verification=UserVerificationRequirement.REQUIRED,
+    )
+    challenge_b64url = bytes_to_base64url(options.challenge)
+    challenge_token = _build_passkey_challenge_token(user, challenge_b64url)
+
+    return api_ok({
+        "challenge_token": challenge_token,
+        "options": json.loads(options_to_json(options)),
+    })
+
+
+@api.route("/auth/passkey/verify", methods=["POST"])
+@limiter.limit("10 per minute", exempt_when=lambda: current_app.testing)
+def api_passkey_login_verify():
+    if not _api_passkey_enabled():
+        return unauthorized("Passkey authentication is not enabled")
+
+    body = request.get_json(silent=True) or {}
+
+    errors: dict = {}
+    challenge_token_raw = body.get("challenge_token")
+    challenge_token = (
+        challenge_token_raw.strip() if isinstance(challenge_token_raw, str) else ""
+    )
+    if not challenge_token:
+        errors["challenge_token"] = "Challenge token is required"
+    credential = body.get("credential")
+    if not isinstance(credential, dict) or not credential.get("id"):
+        errors["credential"] = "Credential is required"
+    if errors:
+        return validation_error(errors)
+
+    payload = _decode_passkey_challenge_token(challenge_token)
+    if payload is None or _is_passkey_challenge_consumed(challenge_token):
+        return unauthorized("Invalid or expired passkey challenge")
+
+    user = db.session.get(User, payload["uid"])
+    if user is None or not enforce_user_access(user):
+        return unauthorized("Invalid or expired passkey challenge")
+
+    raw_credential_id = credential.get("id")
+    stored_credential = PasskeyCredential.query.filter_by(
+        credential_id=raw_credential_id,
+        user_id=user.id,
+    ).first()
+    if stored_credential is None:
+        return unauthorized("Passkey not recognized for this account")
+
+    try:
+        verification = verify_authentication_response(
+            credential=credential,
+            expected_challenge=base64url_to_bytes(payload["challenge"]),
+            expected_origin=current_app.config["PASSKEY_ORIGIN"],
+            expected_rp_id=current_app.config["PASSKEY_RP_ID"],
+            credential_public_key=base64url_to_bytes(stored_credential.public_key),
+            credential_current_sign_count=stored_credential.sign_count,
+            require_user_verification=True,
+        )
+    except Exception as exc:
+        logger.warning("API passkey login verification failed: %s", exc)
+        return unauthorized("Passkey verification failed")
+
+    if not _try_mark_passkey_challenge_consumed(challenge_token):
+        return unauthorized("Invalid or expired passkey challenge")
+
+    stored_credential.sign_count = verification.new_sign_count
+    stored_credential.last_used_at = datetime.now(timezone.utc)
+    db.session.commit()
+
+    raw_token, _record = create_token_for_user(user)
+    return api_ok({
+        "token": raw_token,
+        "user": serialize_user(user),
+    })

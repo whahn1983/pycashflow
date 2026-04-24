@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 struct LoginView: View {
     private enum Field: Hashable {
@@ -17,6 +18,7 @@ struct LoginView: View {
     @State private var authErrorText: String?
     @State private var selfHostedErrorText: String?
     @State private var isLoading = false
+    @State private var isPasskeyLoading = false
     @FocusState private var focusedField: Field?
 
     var body: some View {
@@ -89,7 +91,20 @@ struct LoginView: View {
                         submitFromKeyboard()
                     }
                     .buttonStyle(PrimaryButtonStyle())
-                    .disabled(isLoading)
+                    .disabled(isLoading || isPasskeyLoading)
+
+                    if challenge == nil {
+                        Button {
+                            startPasskeyLogin()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.badge.key.fill")
+                                Text(isPasskeyLoading ? "Signing in…" : "Sign in with Passkey")
+                            }
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .disabled(isLoading || isPasskeyLoading || email.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
                 }
                 .surfaceCard()
 
@@ -204,6 +219,116 @@ struct LoginView: View {
             await session.establishSession(token: token, user: response.data.user)
         } catch {
             await MainActor.run { authErrorText = (error as? APIErrorEnvelope)?.error ?? "Login failed" }
+        }
+    }
+
+    private func startPasskeyLogin() {
+        dismissKeyboard()
+        focusedField = nil
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedEmail.isEmpty else { return }
+        guard !isPasskeyLoading, !isLoading else { return }
+        Task { @MainActor in
+            isPasskeyLoading = true
+            defer { isPasskeyLoading = false }
+            authErrorText = nil
+            await passkeyLogin(email: trimmedEmail)
+        }
+    }
+
+    @MainActor
+    private func passkeyLogin(email: String) async {
+        let optionsResponse: PasskeyLoginOptionsDTO
+        do {
+            struct Payload: Encodable { let email: String }
+            let envelope: APIEnvelope<PasskeyLoginOptionsDTO> = try await APIClient.shared.request(
+                "auth/passkey/options",
+                method: "POST",
+                body: Payload(email: email),
+                as: APIEnvelope<PasskeyLoginOptionsDTO>.self
+            )
+            optionsResponse = envelope.data
+        } catch {
+            authErrorText = (error as? APIErrorEnvelope)?.error ?? "Unable to start passkey sign-in"
+            return
+        }
+
+        guard let challengeData = Base64URL.decode(optionsResponse.options.challenge) else {
+            authErrorText = "Server returned an invalid passkey challenge"
+            return
+        }
+
+        let rpId = optionsResponse.options.rpId ?? APIClient.shared.baseURL.host ?? ""
+        guard !rpId.isEmpty else {
+            authErrorText = "Passkey sign-in is not available for this server"
+            return
+        }
+
+        let allowedCredentialIDs: [Data] = (optionsResponse.options.allowCredentials ?? [])
+            .compactMap { Base64URL.decode($0.id) }
+
+        let controller = PasskeyLoginController()
+        let assertion: ASAuthorizationPlatformPublicKeyCredentialAssertion
+        do {
+            assertion = try await controller.performAssertion(
+                relyingPartyIdentifier: rpId,
+                challenge: challengeData,
+                allowedCredentialIDs: allowedCredentialIDs
+            )
+        } catch PasskeyLoginError.cancelled {
+            return
+        } catch {
+            authErrorText = (error as? LocalizedError)?.errorDescription ?? "Passkey sign-in failed"
+            return
+        }
+
+        do {
+            struct CredentialResponse: Encodable {
+                let authenticatorData: String
+                let clientDataJSON: String
+                let signature: String
+                let userHandle: String?
+            }
+            struct Credential: Encodable {
+                let id: String
+                let rawId: String
+                let type: String
+                let response: CredentialResponse
+            }
+            struct VerifyPayload: Encodable {
+                let challenge_token: String
+                let credential: Credential
+            }
+
+            let credentialID = Base64URL.encode(assertion.credentialID)
+            let payload = VerifyPayload(
+                challenge_token: optionsResponse.challenge_token,
+                credential: Credential(
+                    id: credentialID,
+                    rawId: credentialID,
+                    type: "public-key",
+                    response: CredentialResponse(
+                        authenticatorData: Base64URL.encode(assertion.rawAuthenticatorData),
+                        clientDataJSON: Base64URL.encode(assertion.rawClientDataJSON),
+                        signature: Base64URL.encode(assertion.signature),
+                        userHandle: assertion.userID.map { Base64URL.encode($0) }
+                    )
+                )
+            )
+
+            let response: APIEnvelope<LoginResponseDTO> = try await APIClient.shared.request(
+                "auth/passkey/verify",
+                method: "POST",
+                body: payload,
+                as: APIEnvelope<LoginResponseDTO>.self
+            )
+            guard let token = response.data.token else {
+                authErrorText = "Passkey sign-in token missing"
+                return
+            }
+            await session.establishSession(token: token, user: response.data.user)
+        } catch {
+            authErrorText = (error as? APIErrorEnvelope)?.error ?? "Passkey sign-in failed"
         }
     }
 
