@@ -38,6 +38,11 @@ struct SettingsView: View {
                 }
                 .surfaceCard()
 
+                if let moreSettingsURL {
+                    Link("More Settings", destination: moreSettingsURL)
+                        .buttonStyle(PrimaryButtonStyle())
+                }
+
                 Button("Refresh Subscription Status") { Task { await session.refreshSubscriptionState(forceProfileRefresh: true) } }
                     .buttonStyle(PrimaryButtonStyle())
 
@@ -63,6 +68,16 @@ struct SettingsView: View {
         .refreshable { await load() }
         .appBackground()
         .navigationTitle("Settings")
+    }
+
+    private var moreSettingsURL: URL? {
+        guard var components = URLComponents(url: session.currentBaseURL, resolvingAgainstBaseURL: false) else {
+            return nil
+        }
+        components.path = "/settings"
+        components.query = nil
+        components.fragment = nil
+        return components.url
     }
 
     private func infoRow(label: String, value: String) -> some View {
