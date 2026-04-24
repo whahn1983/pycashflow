@@ -3,12 +3,20 @@ import SwiftUI
 struct SchedulesView: View {
     @EnvironmentObject var session: SessionManager
     @State private var schedules: [ScheduleDTO] = []
+    @State private var showAddForm = false
     @State private var name = ""
     @State private var amount = ""
     @State private var type = "Expense"
     @State private var frequency = "Monthly"
-    @State private var startDate = "2026-01-01"
+    @State private var startDate = defaultStartDate()
+    @State private var editingID: Int?
+    @State private var editName = ""
+    @State private var editAmount = ""
+    @State private var editType = "Expense"
+    @State private var editFrequency = "Monthly"
+    @State private var editStartDate = defaultStartDate()
     @State private var errorText: String?
+    @State private var statusText: String?
 
     private let types = ["Expense", "Income"]
     private let frequencies = ["Monthly", "Quarterly", "Yearly", "Weekly", "BiWeekly", "Onetime"]
@@ -16,22 +24,47 @@ struct SchedulesView: View {
     var body: some View {
         List {
             Section {
-                VStack(spacing: 8) {
-                    TextField("Name", text: $name).fieldStyle()
-                    TextField("Amount", text: $amount).keyboardType(.decimalPad).fieldStyle()
-                    pickerRow(label: "Type", selection: $type, options: types)
-                    pickerRow(label: "Frequency", selection: $frequency, options: frequencies)
-                    TextField("Start date (YYYY-MM-DD)", text: $startDate).fieldStyle()
-                    Button("Add Schedule") { Task { await addSchedule() } }
-                        .buttonStyle(PrimaryButtonStyle())
+                Button {
+                    withAnimation {
+                        showAddForm.toggle()
+                        if !showAddForm { resetAddForm() }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: showAddForm ? "xmark.circle" : "plus.circle.fill")
+                        Text(showAddForm ? "Cancel" : "Add Schedule")
+                    }
                 }
-                .surfaceCard()
+                .buttonStyle(PrimaryButtonStyle())
                 .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                 .listRowBackground(Color.clear)
+
+                if showAddForm {
+                    VStack(spacing: 8) {
+                        TextField("Name", text: $name).fieldStyle()
+                        TextField("Amount", text: $amount).keyboardType(.decimalPad).fieldStyle()
+                        pickerRow(label: "Type", selection: $type, options: types)
+                        pickerRow(label: "Frequency", selection: $frequency, options: frequencies)
+                        TextField("Start date (YYYY-MM-DD)", text: $startDate).fieldStyle()
+                        Button("Save Schedule") { Task { await addSchedule() } }
+                            .buttonStyle(PrimaryButtonStyle())
+                    }
+                    .surfaceCard()
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    .listRowBackground(Color.clear)
+                }
 
                 if let errorText {
                     Text(errorText)
                         .foregroundStyle(AppTheme.danger)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .listRowBackground(Color.clear)
+                }
+
+                if let statusText {
+                    Text(statusText)
+                        .foregroundStyle(AppTheme.success)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .listRowBackground(Color.clear)
@@ -45,30 +78,59 @@ struct SchedulesView: View {
                 }
 
                 ForEach(schedules) { schedule in
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(schedule.name)
-                                .foregroundStyle(AppTheme.textPrimary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                            Text("\(schedule.frequency) · \(schedule.start_date)")
-                                .font(.caption)
-                                .foregroundStyle(AppTheme.textMuted)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.85)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(schedule.name)
+                                    .foregroundStyle(AppTheme.textPrimary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                Text("\(schedule.frequency) · \(schedule.start_date)")
+                                    .font(.caption)
+                                    .foregroundStyle(AppTheme.textMuted)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Text("$\(schedule.amount)")
-                            .foregroundStyle(schedule.type == "Expense" ? AppTheme.danger : AppTheme.success)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .layoutPriority(1)
-
-                        Button(role: .destructive) { Task { await deleteSchedule(schedule.id) } } label: {
-                            Image(systemName: "trash")
+                            Text("$\(schedule.amount)")
+                                .foregroundStyle(schedule.type == "Expense" ? AppTheme.danger : AppTheme.success)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .layoutPriority(1)
                         }
-                        .buttonStyle(.borderless)
+
+                        HStack(spacing: 16) {
+                            iconButton(systemName: "pencil", color: AppTheme.accent, label: "Edit") {
+                                beginEdit(schedule)
+                            }
+                            iconButton(systemName: "pause.fill", color: AppTheme.warning, label: "Hold") {
+                                Task { await addHold(schedule.id) }
+                            }
+                            iconButton(systemName: "forward.fill", color: AppTheme.warning, label: "Skip") {
+                                Task { await addSkip(schedule.id) }
+                            }
+                            iconButton(systemName: "trash", color: AppTheme.danger, label: "Delete") {
+                                Task { await deleteSchedule(schedule.id) }
+                            }
+                        }
+
+                        if editingID == schedule.id {
+                            VStack(spacing: 8) {
+                                TextField("Name", text: $editName).fieldStyle()
+                                TextField("Amount", text: $editAmount).keyboardType(.decimalPad).fieldStyle()
+                                pickerRow(label: "Type", selection: $editType, options: types)
+                                pickerRow(label: "Frequency", selection: $editFrequency, options: frequencies)
+                                TextField("Start date (YYYY-MM-DD)", text: $editStartDate).fieldStyle()
+                                HStack(spacing: 8) {
+                                    Button("Save") { Task { await saveEdit(schedule.id) } }
+                                        .buttonStyle(PrimaryButtonStyle())
+                                    Button("Cancel") { editingID = nil }
+                                        .buttonStyle(PrimaryButtonStyle())
+                                }
+                            }
+                            .padding(.top, 4)
+                        }
                     }
                     .surfaceCard()
                     .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
@@ -81,6 +143,20 @@ struct SchedulesView: View {
         .refreshable { await load() }
         .appBackground()
         .navigationTitle("Schedules")
+    }
+
+    private func iconButton(systemName: String, color: Color, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Image(systemName: systemName)
+                    .font(.system(size: 16, weight: .semibold))
+                Text(label)
+                    .font(.caption2)
+            }
+            .foregroundStyle(color)
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderless)
     }
 
     private func pickerRow(label: String, selection: Binding<String>, options: [String]) -> some View {
@@ -100,6 +176,30 @@ struct SchedulesView: View {
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private static func defaultStartDate() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
+    }
+
+    private func resetAddForm() {
+        name = ""
+        amount = ""
+        type = "Expense"
+        frequency = "Monthly"
+        startDate = Self.defaultStartDate()
+        errorText = nil
+    }
+
+    private func beginEdit(_ schedule: ScheduleDTO) {
+        editingID = schedule.id
+        editName = schedule.name
+        editAmount = schedule.amount
+        editType = schedule.type
+        editFrequency = schedule.frequency
+        editStartDate = schedule.start_date
     }
 
     private func load() async {
@@ -138,9 +238,36 @@ struct SchedulesView: View {
                 as: APIEnvelope<ScheduleDTO>.self
             )
             await load()
-            await MainActor.run { name = ""; amount = "" }
+            await MainActor.run {
+                resetAddForm()
+                showAddForm = false
+            }
         } catch {
             await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to add schedule" }
+        }
+    }
+
+    private func saveEdit(_ id: Int) async {
+        guard let token = session.token else { return }
+        do {
+            struct Payload: Encodable {
+                let name: String
+                let amount: String
+                let type: String
+                let frequency: String
+                let start_date: String
+            }
+            _ = try await APIClient.shared.request(
+                "schedules/\(id)",
+                method: "PUT",
+                token: token,
+                body: Payload(name: editName, amount: editAmount, type: editType, frequency: editFrequency, start_date: editStartDate),
+                as: APIEnvelope<ScheduleDTO>.self
+            )
+            await load()
+            await MainActor.run { editingID = nil }
+        } catch {
+            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to update schedule" }
         }
     }
 
@@ -151,6 +278,40 @@ struct SchedulesView: View {
             await load()
         } catch {
             await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to delete schedule" }
+        }
+    }
+
+    private func addHold(_ scheduleID: Int) async {
+        guard let token = session.token else { return }
+        do {
+            struct Payload: Encodable { let schedule_id: Int }
+            let _: APIEnvelope<HoldDTO> = try await APIClient.shared.request(
+                "holds",
+                method: "POST",
+                token: token,
+                body: Payload(schedule_id: scheduleID),
+                as: APIEnvelope<HoldDTO>.self
+            )
+            await MainActor.run { statusText = "Added to Holds"; errorText = nil }
+        } catch {
+            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to add hold"; statusText = nil }
+        }
+    }
+
+    private func addSkip(_ scheduleID: Int) async {
+        guard let token = session.token else { return }
+        do {
+            struct Payload: Encodable { let schedule_id: Int }
+            let _: APIEnvelope<SkipDTO> = try await APIClient.shared.request(
+                "skips",
+                method: "POST",
+                token: token,
+                body: Payload(schedule_id: scheduleID),
+                as: APIEnvelope<SkipDTO>.self
+            )
+            await MainActor.run { statusText = "Added to Skips"; errorText = nil }
+        } catch {
+            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to add skip"; statusText = nil }
         }
     }
 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct AccountsView: View {
+struct BalanceView: View {
     @EnvironmentObject var session: SessionManager
     @State private var balance: BalanceDTO?
     @State private var history: [BalanceDTO] = []
@@ -73,7 +73,7 @@ struct AccountsView: View {
         .task { await load() }
         .refreshable { await load() }
         .appBackground()
-        .navigationTitle("Accounts")
+        .navigationTitle("Balance")
     }
 
     private func load() async {

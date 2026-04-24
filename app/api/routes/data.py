@@ -518,15 +518,29 @@ def api_create_skip():
     user_id = _effective_user_id()
     body = request.get_json(silent=True) or {}
     transaction_index = body.get("transaction_index")
-    if transaction_index is None:
-        return validation_error({"transaction_index": "transaction_index is required"})
+    schedule_id = body.get("schedule_id")
+    if transaction_index is None and schedule_id is None:
+        return validation_error(
+            {"transaction_index": "transaction_index or schedule_id is required"}
+        )
 
     _balance, _balance_amount, trans, _run, _run_scenario = _project_data(user_id)
 
-    try:
-        tx = trans.loc[int(transaction_index)]
-    except Exception:
-        return validation_error({"transaction_index": "transaction index not found"})
+    if schedule_id is not None:
+        schedule = Schedule.query.filter_by(user_id=user_id, id=schedule_id).first()
+        if not schedule:
+            return not_found("Schedule not found")
+        matches = trans[trans["name"] == schedule.name]
+        if matches.empty:
+            return validation_error(
+                {"schedule_id": "No upcoming transaction found for this schedule"}
+            )
+        tx = matches.iloc[0]
+    else:
+        try:
+            tx = trans.loc[int(transaction_index)]
+        except Exception:
+            return validation_error({"transaction_index": "transaction index not found"})
 
     trans_type = "Income" if tx["type"] == "Expense" else "Expense"
     skip = Skip(

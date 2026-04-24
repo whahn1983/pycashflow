@@ -78,7 +78,7 @@ struct DashboardView: View {
 
     private var navItems: [FloatingNavItem] {
         [
-            FloatingNavItem(title: "Accounts", systemImage: "creditcard") { AccountsView() },
+            FloatingNavItem(title: "Balance", systemImage: "dollarsign.circle") { BalanceView() },
             FloatingNavItem(title: "Schedules", systemImage: "calendar") { SchedulesView() },
             FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3") { ScenariosView() },
             FloatingNavItem(title: "AI Insights", systemImage: "sparkles") { AIInsightsView() },
