@@ -14,10 +14,11 @@ struct CashFlowChartView: View {
     private var hasScenario: Bool { !scenarioPoints.isEmpty }
 
     private static let horizonDays = 90
-    private static let visibleDays = 45
+    private static let visibleDays = 90
     private static let nearTermDays = 30
 
     @State private var selectedDate: Date?
+    @State private var selectedAmount: Double?
 
     private var xDomain: ClosedRange<Date> {
         var calendar = Calendar(identifier: .gregorian)
@@ -72,9 +73,15 @@ struct CashFlowChartView: View {
             nearestPoint(to: selectedDate, in: schedulePoints).map { ($0, .schedule) },
             nearestPoint(to: selectedDate, in: scenarioPoints).map { ($0, .scenario) }
         ].compactMap { $0 }
-        guard let best = candidates.min(by: {
-            abs($0.point.date.timeIntervalSince(selectedDate))
-                < abs($1.point.date.timeIntervalSince(selectedDate))
+        guard let best = candidates.min(by: { lhs, rhs in
+            let lhsX = abs(lhs.point.date.timeIntervalSince(selectedDate))
+            let rhsX = abs(rhs.point.date.timeIntervalSince(selectedDate))
+            if lhsX != rhsX { return lhsX < rhsX }
+            // Tie-break by y-proximity so a tap near the scenario line
+            // selects it even when schedule has a point on the same date.
+            guard let selectedAmount else { return false }
+            return abs(lhs.point.amount - selectedAmount)
+                < abs(rhs.point.amount - selectedAmount)
         }) else { return nil }
         return SelectedChartPoint(point: best.point, series: best.series)
     }
@@ -160,6 +167,7 @@ struct CashFlowChartView: View {
         .chartYVisibleDomain(length: visibleYDomainLength)
         .chartScrollPosition(initialX: xDomain.lowerBound)
         .chartXSelection(value: $selectedDate)
+        .chartYSelection(value: $selectedAmount)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine().foregroundStyle(AppTheme.border.opacity(0.5))
