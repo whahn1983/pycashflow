@@ -15,21 +15,23 @@ struct ProjectionsView: View {
 
                 Text("Schedule projection points: \(scheduleSeries.count)")
                     .foregroundStyle(AppTheme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Text("Scenario projection points: \(scenarioSeries.count)")
                     .foregroundStyle(AppTheme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let point = scheduleSeries.first {
-                    Text("Next Schedule Point: \(point.date) · $\(point.amount)")
-                        .surfaceCard()
+                    projectionRow(title: "Next Schedule Point", date: point.date, amount: point.amount)
                 }
                 if let point = scenarioSeries.first {
-                    Text("Next Scenario Point: \(point.date) · $\(point.amount)")
-                        .surfaceCard()
+                    projectionRow(title: "Next Scenario Point", date: point.date, amount: point.amount)
                 }
 
                 if let errorText {
                     Text(errorText)
                         .foregroundStyle(AppTheme.danger)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -39,6 +41,26 @@ struct ProjectionsView: View {
         .refreshable { await load() }
         .appBackground()
         .navigationTitle("Projections")
+    }
+
+    private func projectionRow(title: String, date: String, amount: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(AppTheme.textMuted)
+            HStack(spacing: 8) {
+                Text(date)
+                    .foregroundStyle(AppTheme.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 8)
+                Text("$\(amount)")
+                    .foregroundStyle(AppTheme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .cardRow()
     }
 
     private func load() async {

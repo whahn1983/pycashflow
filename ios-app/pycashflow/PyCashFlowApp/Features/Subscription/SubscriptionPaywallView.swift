@@ -17,42 +17,47 @@ struct SubscriptionPaywallView: View {
 
                 Text("App Store subscription is only for PyCashFlow Cloud account activation and maintenance.")
                     .foregroundStyle(AppTheme.textSecondary)
-                    .surfaceCard()
+                    .cardRow()
 
                 Text(message)
                     .foregroundStyle(AppTheme.textSecondary)
-                    .surfaceCard()
+                    .cardRow()
 
                 TextField("Cloud account email", text: $cloudEmail)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
                     .foregroundStyle(AppTheme.textPrimary)
 
                 if let status = session.billingStatus {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Status: \(status.subscription_status ?? "inactive")")
-                        Text("Source: \(status.subscription_source ?? "none")")
+                    VStack(alignment: .leading, spacing: 8) {
+                        statusLine(label: "Status", value: status.subscription_status ?? "inactive")
+                        statusLine(label: "Source", value: status.subscription_source ?? "none")
                         if let expiry = status.subscription_expiry {
-                            Text("Expires: \(expiry)")
+                            statusLine(label: "Expires", value: expiry)
                         }
                     }
-                    .foregroundStyle(AppTheme.textSecondary)
-                    .surfaceCard()
+                    .cardRow()
                 }
 
                 if manager.availableProducts.isEmpty {
                     Text("No App Store products available.")
                         .foregroundStyle(AppTheme.textMuted)
-                        .surfaceCard()
+                        .cardRow()
                 } else {
                     ForEach(manager.availableProducts, id: \.id) { product in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(product.displayName)
+                                .font(.headline)
                                 .foregroundStyle(AppTheme.textPrimary)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.85)
+                                .fixedSize(horizontal: false, vertical: true)
                             Text(product.description)
                                 .foregroundStyle(AppTheme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
                             Button("Subscribe • \(product.displayPrice)") {
                                 Task {
                                     await manager.purchase(
@@ -68,7 +73,7 @@ struct SubscriptionPaywallView: View {
                             .buttonStyle(PrimaryButtonStyle())
                             .disabled(manager.isBusy)
                         }
-                        .surfaceCard()
+                        .cardRow()
                     }
                 }
 
@@ -92,11 +97,15 @@ struct SubscriptionPaywallView: View {
                 if let statusMessage = manager.statusMessage {
                     Text(statusMessage)
                         .foregroundStyle(AppTheme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 if let errorMessage = manager.errorMessage {
                     Text(errorMessage)
                         .foregroundStyle(AppTheme.danger)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Button("Logout", role: .destructive) {
@@ -123,5 +132,18 @@ struct SubscriptionPaywallView: View {
 
     private var resolvedEmail: String {
         cloudEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func statusLine(label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(label)
+                .foregroundStyle(AppTheme.textMuted)
+            Text(value)
+                .foregroundStyle(AppTheme.textSecondary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
     }
 }

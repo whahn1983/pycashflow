@@ -69,7 +69,17 @@ extension View {
     func fieldStyle() -> some View {
         self
             .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
             .foregroundStyle(AppTheme.textPrimary)
+    }
+
+    /// Ensures content fills the available row width and wraps vertically
+    /// rather than forcing the parent to grow horizontally on narrow iPhones.
+    func cardRow() -> some View {
+        self
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .surfaceCard()
     }
 }
