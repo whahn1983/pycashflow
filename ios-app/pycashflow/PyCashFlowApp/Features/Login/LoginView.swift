@@ -158,9 +158,10 @@ struct LoginView: View {
         dismissKeyboard()
         focusedField = nil
         guard !isLoading else { return }
-        isLoading = true
         Task { @MainActor in
             await Task.yield()
+            guard !isLoading else { return }
+            isLoading = true
             await submit()
         }
     }
