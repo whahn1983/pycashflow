@@ -26,9 +26,18 @@ struct CashFlowChartView: View {
         return today...end
     }
 
+    private var visibleSchedulePoints: [CashFlowPoint] {
+        let domain = xDomain
+        return schedulePoints.filter { domain.contains($0.date) }
+    }
+
+    private var visibleScenarioPoints: [CashFlowPoint] {
+        let domain = xDomain
+        return scenarioPoints.filter { domain.contains($0.date) }
+    }
+
     private var allPointsInHorizon: [CashFlowPoint] {
-        let end = xDomain.upperBound
-        return (schedulePoints + scenarioPoints).filter { $0.date <= end }
+        visibleSchedulePoints + visibleScenarioPoints
     }
 
     private var yDomain: ClosedRange<Double> {
@@ -44,8 +53,8 @@ struct CashFlowChartView: View {
     private var selectedPoint: SelectedChartPoint? {
         guard let selectedDate else { return nil }
         let candidates: [(point: CashFlowPoint, series: SelectedChartPoint.Series)] = [
-            nearestPoint(to: selectedDate, in: schedulePoints).map { ($0, .schedule) },
-            nearestPoint(to: selectedDate, in: scenarioPoints).map { ($0, .scenario) }
+            nearestPoint(to: selectedDate, in: visibleSchedulePoints).map { ($0, .schedule) },
+            nearestPoint(to: selectedDate, in: visibleScenarioPoints).map { ($0, .scenario) }
         ].compactMap { $0 }
         guard let best = candidates.min(by: { lhs, rhs in
             let lhsX = abs(lhs.point.date.timeIntervalSince(selectedDate))
@@ -83,16 +92,18 @@ struct CashFlowChartView: View {
                     .frame(maxWidth: .infinity, minHeight: 180, alignment: .center)
             } else {
                 chart
+                    .frame(maxWidth: .infinity)
                     .frame(height: 240)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .surfaceCard()
     }
 
     @ViewBuilder
     private var chart: some View {
         Chart {
-            ForEach(scenarioPoints) { point in
+            ForEach(visibleScenarioPoints) { point in
                 LineMark(
                     x: .value("Date", point.date),
                     y: .value("Balance", point.amount),
@@ -103,7 +114,7 @@ struct CashFlowChartView: View {
                 .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 4]))
             }
 
-            ForEach(schedulePoints) { point in
+            ForEach(visibleSchedulePoints) { point in
                 LineMark(
                     x: .value("Date", point.date),
                     y: .value("Balance", point.amount),
