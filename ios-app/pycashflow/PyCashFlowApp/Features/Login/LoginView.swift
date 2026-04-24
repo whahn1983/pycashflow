@@ -33,20 +33,29 @@ struct LoginView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                Picker("App Mode", selection: $session.appMode) {
+                Picker("App Mode", selection: Binding(
+                    get: { session.appMode },
+                    set: { newValue in
+                        // Route through `switchMode` directly instead of a
+                        // `$session.appMode` two-way binding + `.onChange`: the
+                        // binding pattern mutates `appMode` before `onChange`
+                        // fires, so `switchMode`'s equality guard would
+                        // short-circuit and leave the base URL pointed at the
+                        // previous environment.
+                        guard newValue != session.appMode else { return }
+                        // Resign any active text field before the self-hosted
+                        // card appears/disappears; otherwise the keyboard layout
+                        // constraints conflict with the view hierarchy change.
+                        dismissKeyboard()
+                        focusedField = nil
+                        session.switchMode(newValue)
+                        authErrorText = nil
+                        selfHostedErrorText = nil
+                    }
+                )) {
                     ForEach(SessionManager.AppMode.allCases) { mode in
                         Text(mode.label).tag(mode)
                     }
-                }
-                .onChange(of: session.appMode) { _, newValue in
-                    // Resign any active text field before the self-hosted
-                    // card appears/disappears; otherwise the keyboard layout
-                    // constraints conflict with the view hierarchy change.
-                    dismissKeyboard()
-                    focusedField = nil
-                    session.switchMode(newValue)
-                    authErrorText = nil
-                    selfHostedErrorText = nil
                 }
                 .surfaceCard()
 

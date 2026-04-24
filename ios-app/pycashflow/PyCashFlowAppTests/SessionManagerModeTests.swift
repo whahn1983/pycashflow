@@ -36,6 +36,18 @@ final class SessionManagerModeTests: XCTestCase {
         XCTAssertFalse(session.isAuthenticated)
     }
 
+    func testSwitchBackToCloudResetsBaseURLFromSelfHosted() async {
+        let session = SessionManager()
+        _ = session.updateSelfHostedBaseURL("https://self-hosted.example.com/api/v1")
+        session.switchMode(.selfHosted)
+        XCTAssertEqual(session.currentBaseURL.absoluteString, "https://self-hosted.example.com/api/v1")
+
+        session.switchMode(.cloud)
+
+        XCTAssertEqual(session.appMode, .cloud)
+        XCTAssertEqual(session.currentBaseURL, AppEnvironment.cloudAPIBaseURL)
+    }
+
     func testInvalidSelfHostedURLRejected() async {
         let session = SessionManager()
         let ok = session.updateSelfHostedBaseURL("not-a-url")
