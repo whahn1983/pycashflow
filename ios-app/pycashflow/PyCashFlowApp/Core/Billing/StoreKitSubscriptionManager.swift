@@ -30,7 +30,11 @@ final class StoreKitSubscriptionManager: ObservableObject {
 
     func purchase(_ product: Product, email: String, token: String?) async {
         guard !email.isEmpty else {
-            errorMessage = "Email is required to activate a hosted cloud account."
+            errorMessage = "Please enter an email address before activating your subscription."
+            return
+        }
+        guard Self.isValidEmail(email) else {
+            errorMessage = "Please enter a valid email address to activate your subscription."
             return
         }
 
@@ -62,7 +66,11 @@ final class StoreKitSubscriptionManager: ObservableObject {
 
     func restorePurchases(email: String, token: String?) async {
         guard !email.isEmpty else {
-            errorMessage = "Email is required to restore a hosted cloud account."
+            errorMessage = "Please enter an email address before restoring your subscription."
+            return
+        }
+        guard Self.isValidEmail(email) else {
+            errorMessage = "Please enter a valid email address to restore your subscription."
             return
         }
 
@@ -123,6 +131,11 @@ final class StoreKitSubscriptionManager: ObservableObject {
         case .verified(let safe):
             return safe
         }
+    }
+
+    private static func isValidEmail(_ email: String) -> Bool {
+        let pattern = #"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$"#
+        return email.range(of: pattern, options: .regularExpression) != nil
     }
 
     private static func signedTransactionInfo(_ transaction: StoreKit.Transaction) -> String? {
