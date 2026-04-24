@@ -60,22 +60,29 @@ struct DashboardView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-
-                VStack(spacing: 10) {
-                    navRow("Accounts", systemImage: "creditcard", destination: AccountsView())
-                    navRow("Projections", systemImage: "chart.line.uptrend.xyaxis", destination: ProjectionsView())
-                    navRow("Schedules", systemImage: "calendar", destination: SchedulesView())
-                    navRow("Scenarios", systemImage: "slider.horizontal.3", destination: ScenariosView())
-                    navRow("AI Insights", systemImage: "sparkles", destination: AIInsightsView())
-                    navRow("Settings", systemImage: "gearshape", destination: SettingsView())
-                }
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 96)
         }
         .task { await loadAll() }
         .refreshable { await loadAll() }
         .appBackground()
         .navigationTitle("Dashboard")
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            FloatingNavBar(items: navItems)
+        }
+    }
+
+    private var navItems: [FloatingNavItem] {
+        [
+            FloatingNavItem(title: "Accounts", systemImage: "creditcard") { AccountsView() },
+            FloatingNavItem(title: "Projections", systemImage: "chart.line.uptrend.xyaxis") { ProjectionsView() },
+            FloatingNavItem(title: "Schedules", systemImage: "calendar") { SchedulesView() },
+            FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3") { ScenariosView() },
+            FloatingNavItem(title: "AI Insights", systemImage: "sparkles") { AIInsightsView() },
+            FloatingNavItem(title: "Settings", systemImage: "gearshape") { SettingsView() }
+        ]
     }
 
     private func metricsGrid<Content: View>(@ViewBuilder content: () -> Content) -> some View {
@@ -157,26 +164,4 @@ struct DashboardView: View {
         }
     }
 
-    private func navRow<Destination: View>(
-        _ title: String,
-        systemImage: String,
-        destination: Destination
-    ) -> some View {
-        NavigationLink(destination: destination) {
-            HStack(spacing: 12) {
-                Image(systemName: systemImage)
-                    .foregroundStyle(AppTheme.accent)
-                    .frame(width: 20)
-                Text(title)
-                    .foregroundStyle(AppTheme.textPrimary)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.textMuted)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .surfaceCard()
-        }
-    }
 }

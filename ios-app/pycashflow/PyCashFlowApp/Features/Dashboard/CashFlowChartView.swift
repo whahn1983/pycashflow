@@ -14,7 +14,10 @@ struct CashFlowChartView: View {
     private var hasScenario: Bool { !scenarioPoints.isEmpty }
 
     private static let horizonDays = 90
-    private static let visibleDays = 30
+    private static let visibleDays = 90
+    private static let nearTermDays = 30
+
+    @State private var selectedPoint: SelectedChartPoint?
 
     private var xDomain: ClosedRange<Date> {
         var calendar = Calendar(identifier: .gregorian)
@@ -24,20 +27,43 @@ struct CashFlowChartView: View {
         return today...end
     }
 
-    private var visibleDomainLength: TimeInterval {
+    private var visibleXDomainLength: TimeInterval {
         TimeInterval(Self.visibleDays * 24 * 60 * 60)
     }
 
+    private var allPointsInHorizon: [CashFlowPoint] {
+        let end = xDomain.upperBound
+        return (schedulePoints + scenarioPoints).filter { $0.date <= end }
+    }
+
     private var yDomain: ClosedRange<Double> {
-        let horizonEnd = xDomain.upperBound
-        let inWindow: (CashFlowPoint) -> Bool = { $0.date <= horizonEnd }
-        let values = (schedulePoints + scenarioPoints).filter(inWindow).map(\.amount)
+        let values = allPointsInHorizon.map(\.amount)
         guard let rawMin = values.min(), let rawMax = values.max() else {
             return 0...1
         }
         let lower = rawMin >= 0 ? 0 : rawMin * 1.1
         let upper = max(rawMax * 1.1, lower + 1)
         return lower...upper
+    }
+
+    /// Visible Y length based on the near-term window so that when the projection
+    /// trends sharply up or down across the horizon the user can scroll vertically
+    /// to follow the line, matching the horizontal scroll behaviour.
+    private var visibleYDomainLength: Double {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? calendar.timeZone
+        let today = calendar.startOfDay(for: Date())
+        let nearEnd = calendar.date(byAdding: .day, value: Self.nearTermDays, to: today) ?? today
+        let nearValues = allPointsInHorizon
+            .filter { $0.date <= nearEnd }
+            .map(\.amount)
+        let full = yDomain.upperBound - yDomain.lowerBound
+        guard let nearMin = nearValues.min(), let nearMax = nearValues.max(), full > 0 else {
+            return full
+        }
+        let nearSpan = max(nearMax - nearMin, full * 0.25)
+        let padded = nearSpan * 1.2
+        return min(max(padded, full * 0.25), full)
     }
 
     var body: some View {
@@ -61,7 +87,7 @@ struct CashFlowChartView: View {
                     .frame(maxWidth: .infinity, minHeight: 180, alignment: .center)
             } else {
                 chart
-                    .frame(height: 220)
+                    .frame(height: 240)
             }
         }
         .surfaceCard()
@@ -91,11 +117,31 @@ struct CashFlowChartView: View {
                 .foregroundStyle(Self.scheduleColor)
                 .lineStyle(StrokeStyle(lineWidth: 2))
             }
+
+            if let selected = selectedPoint {
+                RuleMark(x: .value("Selected", selected.point.date))
+                    .foregroundStyle(AppTheme.textMuted.opacity(0.5))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    .annotation(
+                        position: annotationPosition(for: selected.point.date),
+                        alignment: .center,
+                        spacing: 6
+                    ) {
+                        tooltip(for: selected)
+                    }
+                PointMark(
+                    x: .value("Date", selected.point.date),
+                    y: .value("Balance", selected.point.amount)
+                )
+                .symbolSize(90)
+                .foregroundStyle(selected.series == .scenario ? Self.scenarioColor : Self.scheduleColor)
+            }
         }
         .chartXScale(domain: xDomain)
         .chartYScale(domain: yDomain)
-        .chartScrollableAxes(.horizontal)
-        .chartXVisibleDomain(length: visibleDomainLength)
+        .chartScrollableAxes([.horizontal, .vertical])
+        .chartXVisibleDomain(length: visibleXDomainLength)
+        .chartYVisibleDomain(length: visibleYDomainLength)
         .chartScrollPosition(initialX: xDomain.lowerBound)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
@@ -117,6 +163,72 @@ struct CashFlowChartView: View {
                 }
             }
         }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                updateSelection(location: value.location, proxy: proxy, geometry: geo)
+                            }
+                    )
+                    .onTapGesture { location in
+                        updateSelection(location: location, proxy: proxy, geometry: geo)
+                    }
+            }
+        }
+    }
+
+    private func updateSelection(location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let plotFrameAnchor = proxy.plotFrame else { return }
+        let plotFrame = geometry[plotFrameAnchor]
+        let x = location.x - plotFrame.origin.x
+        guard x >= 0, x <= plotFrame.width else { return }
+        guard let date: Date = proxy.value(atX: x) else { return }
+
+        let preferScenario = hasScenario
+        let candidates = preferScenario ? scenarioPoints : schedulePoints
+        let series: SelectedChartPoint.Series = preferScenario ? .scenario : .schedule
+        guard let nearest = nearestPoint(to: date, in: candidates) else {
+            selectedPoint = nil
+            return
+        }
+        selectedPoint = SelectedChartPoint(point: nearest, series: series)
+    }
+
+    private func nearestPoint(to date: Date, in points: [CashFlowPoint]) -> CashFlowPoint? {
+        points.min(by: { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) })
+    }
+
+    private func annotationPosition(for date: Date) -> AnnotationPosition {
+        let midpoint = xDomain.lowerBound.addingTimeInterval(visibleXDomainLength / 2)
+        return date > midpoint ? .topLeading : .topTrailing
+    }
+
+    private func tooltip(for selection: SelectedChartPoint) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(Self.tooltipDateFormatter.string(from: selection.point.date))
+                .font(.caption2)
+                .foregroundStyle(AppTheme.textMuted)
+            Text(currencyTooltipLabel(selection.point.amount))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppTheme.textPrimary)
+            Text(selection.series == .scenario ? "With Scenarios" : "Schedule")
+                .font(.caption2)
+                .foregroundStyle(selection.series == .scenario ? Self.scenarioColor : Self.scheduleColor)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(AppTheme.primaryDark.opacity(0.95))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(AppTheme.border, lineWidth: 1)
+        )
     }
 
     private func legend() -> some View {
@@ -150,11 +262,38 @@ struct CashFlowChartView: View {
         return "\(sign)$\(Int(absValue.rounded()))"
     }
 
+    private func currencyTooltipLabel(_ amount: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: amount)) ?? "$\(amount)"
+    }
+
     private func formatNumber(_ value: Double) -> String {
         if value >= 10 || value.rounded() == value {
             return String(format: "%.0f", value)
         }
         return String(format: "%.1f", value)
+    }
+
+    private static let tooltipDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter
+    }()
+}
+
+private struct SelectedChartPoint: Equatable {
+    enum Series { case schedule, scenario }
+    let point: CashFlowPoint
+    let series: Series
+
+    static func == (lhs: SelectedChartPoint, rhs: SelectedChartPoint) -> Bool {
+        lhs.point.date == rhs.point.date && lhs.series == rhs.series
     }
 }
 
@@ -177,7 +316,7 @@ private struct LegendSwatch: View {
     }
 }
 
-struct CashFlowPoint: Identifiable {
+struct CashFlowPoint: Identifiable, Equatable {
     let date: Date
     let amount: Double
     var id: Date { date }
