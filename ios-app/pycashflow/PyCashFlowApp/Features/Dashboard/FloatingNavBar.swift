@@ -37,7 +37,6 @@ struct FloatingNavBar: View {
         )
         .clipShape(Capsule(style: .continuous))
         .padding(.horizontal, 16)
-        .padding(.bottom, 0)
     }
 }
 
