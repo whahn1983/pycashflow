@@ -530,12 +530,16 @@ def api_create_skip():
         schedule = Schedule.query.filter_by(user_id=user_id, id=schedule_id).first()
         if not schedule:
             return not_found("Schedule not found")
-        matches = trans[trans["name"] == schedule.name]
-        if matches.empty:
+        # Project this schedule in isolation so a matching hold (same name/type/amount)
+        # or other user data can't be selected as the skip target.
+        schedule_trans, _run, _run_scenario = update_cash(
+            0.0, [schedule], [], [], [], commit=False
+        )
+        if schedule_trans.empty:
             return validation_error(
                 {"schedule_id": "No upcoming transaction found for this schedule"}
             )
-        tx = matches.iloc[0]
+        tx = schedule_trans.iloc[0]
     else:
         try:
             tx = trans.loc[int(transaction_index)]
