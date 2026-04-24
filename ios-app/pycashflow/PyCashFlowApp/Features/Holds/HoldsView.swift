@@ -5,14 +5,30 @@ struct HoldsView: View {
     @State private var holds: [HoldDTO] = []
     @State private var skips: [SkipDTO] = []
     @State private var selectedTab: Tab = .holds
-    @State private var errorText: String?
-    @State private var statusText: String?
+    @State private var holdsError: String?
+    @State private var skipsError: String?
+    @State private var holdsStatus: String?
+    @State private var skipsStatus: String?
 
     private enum Tab: String, CaseIterable, Identifiable {
         case holds = "Holds"
         case skips = "Skips"
 
         var id: String { rawValue }
+    }
+
+    private var currentError: String? {
+        switch selectedTab {
+        case .holds: return holdsError
+        case .skips: return skipsError
+        }
+    }
+
+    private var currentStatus: String? {
+        switch selectedTab {
+        case .holds: return holdsStatus
+        case .skips: return skipsStatus
+        }
     }
 
     var body: some View {
@@ -27,16 +43,16 @@ struct HoldsView: View {
             .padding(.top, 12)
 
             List {
-                if let errorText {
-                    Text(errorText)
+                if let currentError {
+                    Text(currentError)
                         .foregroundStyle(AppTheme.danger)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .listRowBackground(Color.clear)
                 }
 
-                if let statusText {
-                    Text(statusText)
+                if let currentStatus {
+                    Text(currentStatus)
                         .foregroundStyle(AppTheme.success)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -164,13 +180,14 @@ struct HoldsView: View {
     }
 
     private func load() async {
-        async let holdsTask: Void = loadHolds()
-        async let skipsTask: Void = loadSkips()
+        async let holdsTask = loadHolds()
+        async let skipsTask = loadSkips()
         _ = await (holdsTask, skipsTask)
     }
 
-    private func loadHolds() async {
-        guard let token = session.token else { return }
+    @discardableResult
+    private func loadHolds() async -> Bool {
+        guard let token = session.token else { return false }
         do {
             let response: APIListEnvelope<HoldDTO> = try await APIClient.shared.request(
                 "holds",
@@ -183,15 +200,20 @@ struct HoldsView: View {
             )
             await MainActor.run {
                 holds = response.data
-                errorText = nil
+                holdsError = nil
             }
+            return true
         } catch {
-            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to load holds" }
+            await MainActor.run {
+                holdsError = (error as? APIErrorEnvelope)?.error ?? "Failed to load holds"
+            }
+            return false
         }
     }
 
-    private func loadSkips() async {
-        guard let token = session.token else { return }
+    @discardableResult
+    private func loadSkips() async -> Bool {
+        guard let token = session.token else { return false }
         do {
             let response: APIListEnvelope<SkipDTO> = try await APIClient.shared.request(
                 "skips",
@@ -204,10 +226,14 @@ struct HoldsView: View {
             )
             await MainActor.run {
                 skips = response.data
-                errorText = nil
+                skipsError = nil
             }
+            return true
         } catch {
-            await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to load skips" }
+            await MainActor.run {
+                skipsError = (error as? APIErrorEnvelope)?.error ?? "Failed to load skips"
+            }
+            return false
         }
     }
 
@@ -220,15 +246,18 @@ struct HoldsView: View {
                 token: token,
                 as: EmptyResponse.self
             )
-            await loadHolds()
+            let refreshed = await loadHolds()
             await MainActor.run {
-                statusText = "Hold removed"
-                errorText = nil
+                if refreshed {
+                    holdsStatus = "Hold removed"
+                } else {
+                    holdsStatus = nil
+                }
             }
         } catch {
             await MainActor.run {
-                errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to delete hold"
-                statusText = nil
+                holdsError = (error as? APIErrorEnvelope)?.error ?? "Failed to delete hold"
+                holdsStatus = nil
             }
         }
     }
@@ -242,15 +271,18 @@ struct HoldsView: View {
                 token: token,
                 as: EmptyResponse.self
             )
-            await loadSkips()
+            let refreshed = await loadSkips()
             await MainActor.run {
-                statusText = "Skip removed"
-                errorText = nil
+                if refreshed {
+                    skipsStatus = "Skip removed"
+                } else {
+                    skipsStatus = nil
+                }
             }
         } catch {
             await MainActor.run {
-                errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to delete skip"
-                statusText = nil
+                skipsError = (error as? APIErrorEnvelope)?.error ?? "Failed to delete skip"
+                skipsStatus = nil
             }
         }
     }
