@@ -1,5 +1,7 @@
 """API v1 authentication routes."""
 
+import hashlib
+import hmac
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -349,24 +351,15 @@ def _try_mark_passkey_challenge_consumed(challenge_token: str) -> bool:
         return True
 
 
-def _build_passkey_challenge_token(user: User, challenge_b64url: str) -> str:
+def _build_passkey_challenge_token(email: str, challenge_b64url: str) -> str:
+    # The payload is identical in shape for real and ineligible emails so a
+    # caller cannot distinguish the two by decoding the (signed, not encrypted)
+    # token. /auth/passkey/verify re-resolves the user by email and still
+    # requires a matching stored credential, so ineligible emails fail there.
     payload = {
-        "uid": user.id,
-        "email": user.email,
-        "challenge": challenge_b64url,
-        "nonce": hash_token(f"{user.id}:{datetime.now(timezone.utc).isoformat()}"),
-    }
-    return _passkey_challenge_serializer().dumps(payload)
-
-
-def _build_decoy_passkey_challenge_token(email: str, challenge_b64url: str) -> str:
-    # uid=0 never matches a real user, so /auth/passkey/verify naturally
-    # rejects this token without revealing whether the email exists.
-    payload = {
-        "uid": 0,
         "email": email,
         "challenge": challenge_b64url,
-        "nonce": hash_token(f"decoy:{email}:{datetime.now(timezone.utc).isoformat()}"),
+        "nonce": hash_token(f"{email}:{datetime.now(timezone.utc).isoformat()}"),
     }
     return _passkey_challenge_serializer().dumps(payload)
 
@@ -382,11 +375,23 @@ def _decode_passkey_challenge_token(challenge_token: str) -> dict | None:
 
     if (
         not isinstance(payload, dict)
-        or not isinstance(payload.get("uid"), int)
+        or not isinstance(payload.get("email"), str)
         or not isinstance(payload.get("challenge"), str)
     ):
         return None
     return payload
+
+
+def _derive_decoy_credential_id(email: str) -> str:
+    # HMAC with SECRET_KEY so the decoy id is unpredictable to callers but
+    # stable across retries for the same email, matching the shape of a real
+    # PasskeyCredential.credential_id (base64url of 32 bytes).
+    digest = hmac.new(
+        current_app.config["SECRET_KEY"].encode("utf-8"),
+        f"passkey-decoy:{email}".encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    return bytes_to_base64url(digest)
 
 
 @api.route("/auth/passkey/options", methods=["POST"])
@@ -414,15 +419,22 @@ def api_passkey_login_options():
 
     # Always return a success-shaped response so an unauthenticated caller
     # cannot enumerate which emails have passkey-enabled accounts. For
-    # ineligible emails we issue a decoy challenge token that will fail
-    # at /auth/passkey/verify.
+    # ineligible emails we fill allow_credentials with a deterministic decoy
+    # descriptor so the response shape matches a real user with a single
+    # passkey (the common case), and issue a challenge_token whose payload
+    # is structurally identical to a real one. Verification naturally fails
+    # at /auth/passkey/verify because no stored credential matches.
     if eligible:
         allow_credentials = [
             PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
             for c in user.passkey_credentials
         ]
     else:
-        allow_credentials = []
+        allow_credentials = [
+            PublicKeyCredentialDescriptor(
+                id=base64url_to_bytes(_derive_decoy_credential_id(email))
+            )
+        ]
 
     options = generate_authentication_options(
         rp_id=current_app.config["PASSKEY_RP_ID"],
@@ -430,10 +442,7 @@ def api_passkey_login_options():
         user_verification=UserVerificationRequirement.REQUIRED,
     )
     challenge_b64url = bytes_to_base64url(options.challenge)
-    if eligible:
-        challenge_token = _build_passkey_challenge_token(user, challenge_b64url)
-    else:
-        challenge_token = _build_decoy_passkey_challenge_token(email, challenge_b64url)
+    challenge_token = _build_passkey_challenge_token(email, challenge_b64url)
 
     return api_ok({
         "challenge_token": challenge_token,
@@ -466,7 +475,7 @@ def api_passkey_login_verify():
     if payload is None or _is_passkey_challenge_consumed(challenge_token):
         return unauthorized("Invalid or expired passkey challenge")
 
-    user = db.session.get(User, payload["uid"])
+    user = User.query.filter_by(email=payload["email"]).first()
     if user is None or not enforce_user_access(user):
         return unauthorized("Invalid or expired passkey challenge")
 
