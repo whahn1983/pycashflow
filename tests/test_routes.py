@@ -16,6 +16,7 @@ status codes, redirects, and flash messages where they are easy to assert.
 
 import pytest
 import importlib
+import json
 from datetime import datetime, timezone
 from werkzeug.security import generate_password_hash
 
@@ -47,6 +48,20 @@ class TestUnauthenticatedAccess:
         assert "login" in location.lower(), (
             f"GET {path} should redirect to login page, got location: {location}"
         )
+
+    def test_apple_app_site_association_is_public_json(self, client):
+        resp = client.get("/.well-known/apple-app-site-association", follow_redirects=False)
+        assert resp.status_code == 200
+        assert resp.content_type.startswith("application/json")
+
+        payload = json.loads(resp.data.decode("utf-8"))
+        assert payload == {
+            "webcredentials": {
+                "apps": [
+                    "JFTUN6NUAB.com.h3consultingpartners.pycashflow",
+                ]
+            }
+        }
 
 
 # ── Tests: authenticated GET routes ──────────────────────────────────────────

@@ -540,6 +540,15 @@ def appleicon():
                                'apple-touch-icon.png', mimetype='image/png')
 
 
+@main.route('/.well-known/apple-app-site-association', methods=['GET'])
+def apple_app_site_association():
+    return send_from_directory(
+        os.path.join(main.root_path, '.well-known'),
+        'apple-app-site-association',
+        mimetype='application/json',
+    )
+
+
 @main.route('/balance', methods=('GET', 'POST'))
 @login_required
 @admin_required
