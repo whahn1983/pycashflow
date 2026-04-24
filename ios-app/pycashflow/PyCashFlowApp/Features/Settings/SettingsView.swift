@@ -12,7 +12,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 if let settings {
                     infoRow(label: "Signed in as", value: settings.user.email)
-                    infoRow(label: "App Version", value: settings.app.version)
+                    infoRow(label: "Backend Version", value: settings.app.version)
                     infoRow(label: "AI Configured", value: settings.ai.configured ? "Yes" : "No")
                 }
 
