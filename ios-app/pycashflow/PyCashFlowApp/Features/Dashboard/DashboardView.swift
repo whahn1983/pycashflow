@@ -69,7 +69,11 @@ struct DashboardView: View {
         .appBackground()
         .navigationTitle("Dashboard")
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            FloatingNavBar(items: navItems)
+            if session.user?.is_guest == true {
+                GuestSettingsButton()
+            } else {
+                FloatingNavBar(items: navItems)
+            }
         }
     }
 

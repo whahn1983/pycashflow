@@ -26,6 +26,28 @@ struct FloatingNavBar: View {
     }
 }
 
+/// Small circular Liquid Glass button anchored to the bottom-right, used
+/// as the only navigation affordance for guest users (Settings access).
+struct GuestSettingsButton: View {
+    var body: some View {
+        HStack {
+            Spacer()
+            NavigationLink {
+                SettingsView()
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(AppTheme.textPrimary)
+                    .frame(width: 48, height: 48)
+            }
+            .buttonStyle(FloatingNavButtonStyle())
+            .glassEffect(.regular.interactive(), in: Circle())
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+    }
+}
+
 struct FloatingNavItem: Identifiable {
     let id = UUID()
     let title: String
