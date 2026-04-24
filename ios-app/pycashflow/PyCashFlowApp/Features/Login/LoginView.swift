@@ -103,7 +103,7 @@ struct LoginView: View {
                             }
                         }
                         .buttonStyle(PrimaryButtonStyle())
-                        .disabled(isLoading || isPasskeyLoading || email.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(isLoading || isPasskeyLoading)
                     }
                 }
                 .surfaceCard()
@@ -226,7 +226,10 @@ struct LoginView: View {
         dismissKeyboard()
         focusedField = nil
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedEmail.isEmpty else { return }
+        guard !trimmedEmail.isEmpty else {
+            authErrorText = "Please enter your email first, then select Sign in with Passkey."
+            return
+        }
         guard !isPasskeyLoading, !isLoading else { return }
         Task { @MainActor in
             isPasskeyLoading = true
