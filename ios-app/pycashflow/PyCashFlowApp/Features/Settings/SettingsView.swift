@@ -11,10 +11,6 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Settings")
-                    .font(.title2.bold())
-                    .foregroundStyle(AppTheme.textPrimary)
-
                 if let settings {
                     infoRow(label: "Signed in as", value: settings.user.email)
                     infoRow(label: "App Version", value: settings.app.version)

@@ -8,10 +8,6 @@ struct DashboardView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Dashboard")
-                    .font(.largeTitle.bold())
-                    .foregroundStyle(AppTheme.textPrimary)
-
                 if let dashboard {
                     metricsGrid {
                         statCard(title: "Balance", value: "$\(dashboard.balance)")

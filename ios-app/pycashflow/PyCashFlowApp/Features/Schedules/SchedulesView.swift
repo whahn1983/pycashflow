@@ -16,11 +16,6 @@ struct SchedulesView: View {
     var body: some View {
         List {
             Section {
-                Text("Schedules")
-                    .font(.title2.bold())
-                    .foregroundStyle(AppTheme.textPrimary)
-                    .listRowBackground(Color.clear)
-
                 VStack(spacing: 8) {
                     TextField("Name", text: $name).fieldStyle()
                     TextField("Amount", text: $amount).keyboardType(.decimalPad).fieldStyle()
