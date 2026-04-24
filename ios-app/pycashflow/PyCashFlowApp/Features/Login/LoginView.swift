@@ -37,6 +37,11 @@ struct LoginView: View {
                     }
                 }
                 .onChange(of: session.appMode) { _, newValue in
+                    // Resign any active text field before the self-hosted
+                    // card appears/disappears; otherwise the keyboard layout
+                    // constraints conflict with the view hierarchy change.
+                    dismissKeyboard()
+                    focusedField = nil
                     session.switchMode(newValue)
                     authErrorText = nil
                     selfHostedErrorText = nil
@@ -58,10 +63,7 @@ struct LoginView: View {
                         SecureField("Password", text: $password)
                             .submitLabel(.go)
                             .focused($focusedField, equals: .password)
-                            .onSubmit {
-                                focusedField = nil
-                                Task { await submit() }
-                            }
+                            .onSubmit { submitFromKeyboard() }
                             .padding(12)
                             .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
                             .foregroundStyle(AppTheme.textPrimary)
@@ -71,10 +73,7 @@ struct LoginView: View {
                             .autocorrectionDisabled()
                             .submitLabel(.go)
                             .focused($focusedField, equals: .twoFACode)
-                            .onSubmit {
-                                focusedField = nil
-                                Task { await submit() }
-                            }
+                            .onSubmit { submitFromKeyboard() }
                             .padding(12)
                             .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
                             .foregroundStyle(AppTheme.textPrimary)
@@ -87,8 +86,7 @@ struct LoginView: View {
                     }
 
                     Button(challenge == nil ? "Login" : "Verify 2FA") {
-                        focusedField = nil
-                        Task { await submit() }
+                        submitFromKeyboard()
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(isLoading)
@@ -111,6 +109,8 @@ struct LoginView: View {
                             .font(.caption)
                             .foregroundStyle(AppTheme.textMuted)
                         Button("Save Server URL") {
+                            dismissKeyboard()
+                            focusedField = nil
                             if !session.updateSelfHostedBaseURL(selfHostedURL) {
                                 selfHostedErrorText = "Please enter a valid URL, including /api/v1."
                             } else {
@@ -150,17 +150,29 @@ struct LoginView: View {
         }
     }
 
-    private func submit() async {
-        await MainActor.run {
-            isLoading = true
-            authErrorText = nil
+    /// Dismiss the keyboard up front, then launch the submit task on the
+    /// next runloop tick so SwiftUI can finish applying the focus state
+    /// mutation before `isLoading` triggers another view update. Doing both
+    /// in the same tick is what triggers `UIKeyboardTaskQueue` timeouts.
+    private func submitFromKeyboard() {
+        dismissKeyboard()
+        focusedField = nil
+        Task { @MainActor in
+            await Task.yield()
+            await submit()
         }
+    }
+
+    @MainActor
+    private func submit() async {
+        isLoading = true
+        authErrorText = nil
         if challenge == nil {
             await login()
         } else {
             await completeTwoFA()
         }
-        await MainActor.run { isLoading = false }
+        isLoading = false
     }
 
     private func login() async {

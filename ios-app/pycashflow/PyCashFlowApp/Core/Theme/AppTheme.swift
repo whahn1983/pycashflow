@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Shared visual style aligned to the web app's `improved.css` palette.
 enum AppTheme {
@@ -82,4 +85,19 @@ extension View {
             .fixedSize(horizontal: false, vertical: true)
             .surfaceCard()
     }
+}
+
+/// Resigns the active text input via UIKit's responder chain. This runs
+/// synchronously and bypasses SwiftUI's `@FocusState` update cycle, which
+/// avoids races with `UIKeyboardTaskQueue` when a submit handler mutates
+/// other state (e.g. toggling `isLoading`) in the same tick.
+func dismissKeyboard() {
+#if canImport(UIKit)
+    UIApplication.shared.sendAction(
+        #selector(UIResponder.resignFirstResponder),
+        to: nil,
+        from: nil,
+        for: nil
+    )
+#endif
 }
