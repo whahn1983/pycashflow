@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1C456D2B2F9AAB5700B2B374 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C456D2A2F9AAB5700B2B374 /* XCTest.framework */; platformFilter = ios; };
+		1CAB64CB2F9B9B6A0092E2AE /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 1CAB64CA2F9B9B6A0092E2AE /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -24,6 +25,7 @@
 		1C456C1E2F9AA52700B2B374 /* pycashflow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = pycashflow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C456D202F9AA98B00B2B374 /* pycashflowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = pycashflowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C456D2A2F9AAB5700B2B374 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/iPhoneOS.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
+		1CAB64CA2F9B9B6A0092E2AE /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -84,6 +86,7 @@
 		1C456C152F9AA52700B2B374 = {
 			isa = PBXGroup;
 			children = (
+				1CAB64CA2F9B9B6A0092E2AE /* LaunchScreen.storyboard */,
 				1C456C202F9AA52700B2B374 /* pycashflow */,
 				1C456D212F9AA98B00B2B374 /* pycashflowTests */,
 				1C456D292F9AAB5600B2B374 /* Frameworks */,
@@ -200,6 +203,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1CAB64CB2F9B9B6A0092E2AE /* LaunchScreen.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -371,6 +375,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -400,6 +405,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
