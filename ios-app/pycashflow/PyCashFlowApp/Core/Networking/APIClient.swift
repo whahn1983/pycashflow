@@ -84,7 +84,7 @@ enum AppEnvironment {
 
     static let defaultSelfHostedAPIBaseURL: URL = {
         normalizedAPIBaseURL(from: AppConfig.selfHostedAPIBaseURL)
-            ?? URL(string: "https://localhost:5000/api/v1")!
+            ?? URL(string: "http://127.0.0.1:5000/api/v1")!
     }()
 
     static let appStoreProductIDs: [String] = {

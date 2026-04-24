@@ -48,20 +48,27 @@ struct SchedulesView: View {
                 }
 
                 ForEach(schedules) { schedule in
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 14) {
-                            VStack(alignment: .leading) {
-                                Text(schedule.name).foregroundStyle(AppTheme.textPrimary)
-                                Text("\(schedule.frequency) · \(schedule.start_date)").font(.caption).foregroundStyle(AppTheme.textMuted)
-                            }
-                            Spacer(minLength: 16)
-                            Text("$\(schedule.amount)")
-                                .foregroundStyle(schedule.type == "Expense" ? AppTheme.danger : AppTheme.success)
-                            Button(role: .destructive) { Task { await deleteSchedule(schedule.id) } } label: {
-                                Image(systemName: "trash")
-                            }
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(schedule.name)
+                                .foregroundStyle(AppTheme.textPrimary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                            Text("\(schedule.frequency) · \(schedule.start_date)")
+                                .font(.caption)
+                                .foregroundStyle(AppTheme.textMuted)
+                                .lineLimit(1)
                         }
-                        .frame(minWidth: 340, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Text("$\(schedule.amount)")
+                            .foregroundStyle(schedule.type == "Expense" ? AppTheme.danger : AppTheme.success)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.9)
+
+                        Button(role: .destructive) { Task { await deleteSchedule(schedule.id) } } label: {
+                            Image(systemName: "trash")
+                        }
                     }
                     .surfaceCard()
                     .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
