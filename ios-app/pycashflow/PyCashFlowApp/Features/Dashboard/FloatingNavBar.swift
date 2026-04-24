@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Floating bottom navigation bar styled after iOS pill-shaped controls
-/// (think Apple News' Today / News+ / Sports / Audio tray). The bar
-/// horizontally scrolls when buttons do not fit within the available width.
+/// Floating bottom navigation bar rendered with the iOS 26 Liquid Glass
+/// material so it matches the translucent back button SwiftUI renders in
+/// the navigation bar. Scrolls horizontally when buttons overflow.
 struct FloatingNavBar: View {
     let items: [FloatingNavItem]
 
@@ -21,21 +21,7 @@ struct FloatingNavBar: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
         }
-        .background(
-            Capsule(style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    Capsule(style: .continuous)
-                        .fill(AppTheme.primaryDark.opacity(0.25))
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(AppTheme.border.opacity(0.5), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.35), radius: 18, x: 0, y: 8)
-                .opacity(0.85)
-        )
-        .clipShape(Capsule(style: .continuous))
+        .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
         .padding(.horizontal, 16)
     }
 }
