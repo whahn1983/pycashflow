@@ -63,17 +63,15 @@ struct DashboardView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
-            .padding(.bottom, 110)
+            .padding(.bottom, 96)
         }
         .task { await loadAll() }
         .refreshable { await loadAll() }
         .appBackground()
         .navigationTitle("Dashboard")
-        .overlay(alignment: .bottom) {
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             FloatingNavBar(items: navItems)
-                .padding(.bottom, 10)
         }
-        .ignoresSafeArea(.container, edges: .bottom)
     }
 
     private var navItems: [FloatingNavItem] {
