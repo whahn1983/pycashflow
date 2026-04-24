@@ -16,25 +16,39 @@ struct SettingsView: View {
                     .foregroundStyle(AppTheme.textPrimary)
 
                 if let settings {
-                    Text("Signed in as: \(settings.user.email)").surfaceCard()
-                    Text("App Version: \(settings.app.version)").surfaceCard()
-                    Text("AI Configured: \(settings.ai.configured ? "Yes" : "No")").surfaceCard()
+                    infoRow(label: "Signed in as", value: settings.user.email)
+                    infoRow(label: "App Version", value: settings.app.version)
+                    infoRow(label: "AI Configured", value: settings.ai.configured ? "Yes" : "No")
                 }
 
-                Text("Mode: \(session.appMode.label)").surfaceCard()
-                Text("API: \(session.currentBaseURL.absoluteString)").surfaceCard()
+                infoRow(label: "Mode", value: session.appMode.label)
+                infoRow(label: "API", value: session.currentBaseURL.absoluteString)
 
                 if let billing = session.billingStatus {
-                    Text("Subscription: \(billing.subscription_status ?? "inactive") via \(billing.subscription_source ?? "none")")
-                        .surfaceCard()
+                    infoRow(
+                        label: "Subscription",
+                        value: "\(billing.subscription_status ?? "inactive") via \(billing.subscription_source ?? "none")"
+                    )
                     if let expiry = billing.subscription_expiry {
-                        Text("Subscription expiry: \(expiry)").surfaceCard()
+                        infoRow(label: "Subscription expiry", value: expiry)
                     }
                 }
 
-                if let insights {
-                    Text("Insights: \((insights.insights ?? []).joined(separator: "\n• "))")
-                        .surfaceCard()
+                if let insights, let items = insights.insights, !items.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Insights")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.textMuted)
+                        ForEach(Array(items.enumerated()), id: \.offset) { _, line in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("•").foregroundStyle(AppTheme.textMuted)
+                                Text(line)
+                                    .foregroundStyle(AppTheme.textPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .cardRow()
                 }
 
                 Button("Refresh AI Insights") { Task { await refreshInsights() } }
@@ -61,7 +75,10 @@ struct SettingsView: View {
                     .buttonStyle(PrimaryButtonStyle())
 
                 if let errorText {
-                    Text(errorText).foregroundStyle(AppTheme.danger)
+                    Text(errorText)
+                        .foregroundStyle(AppTheme.danger)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -71,6 +88,19 @@ struct SettingsView: View {
         .refreshable { await load() }
         .appBackground()
         .navigationTitle("Settings")
+    }
+
+    private func infoRow(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(AppTheme.textMuted)
+            Text(value)
+                .foregroundStyle(AppTheme.textPrimary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .cardRow()
     }
 
     private func load() async {

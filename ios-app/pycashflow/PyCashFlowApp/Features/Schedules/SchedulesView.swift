@@ -24,8 +24,8 @@ struct SchedulesView: View {
                 VStack(spacing: 8) {
                     TextField("Name", text: $name).fieldStyle()
                     TextField("Amount", text: $amount).keyboardType(.decimalPad).fieldStyle()
-                    Picker("Type", selection: $type) { ForEach(types, id: \.self, content: Text.init) }
-                    Picker("Frequency", selection: $frequency) { ForEach(frequencies, id: \.self, content: Text.init) }
+                    pickerRow(label: "Type", selection: $type, options: types)
+                    pickerRow(label: "Frequency", selection: $frequency, options: frequencies)
                     TextField("Start date (YYYY-MM-DD)", text: $startDate).fieldStyle()
                     Button("Add Schedule") { Task { await addSchedule() } }
                         .buttonStyle(PrimaryButtonStyle())
@@ -37,6 +37,8 @@ struct SchedulesView: View {
                 if let errorText {
                     Text(errorText)
                         .foregroundStyle(AppTheme.danger)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                         .listRowBackground(Color.clear)
                 }
             }
@@ -58,17 +60,20 @@ struct SchedulesView: View {
                                 .font(.caption)
                                 .foregroundStyle(AppTheme.textMuted)
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.85)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         Text("$\(schedule.amount)")
                             .foregroundStyle(schedule.type == "Expense" ? AppTheme.danger : AppTheme.success)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.9)
+                            .minimumScaleFactor(0.7)
+                            .layoutPriority(1)
 
                         Button(role: .destructive) { Task { await deleteSchedule(schedule.id) } } label: {
                             Image(systemName: "trash")
                         }
+                        .buttonStyle(.borderless)
                     }
                     .surfaceCard()
                     .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
@@ -81,6 +86,25 @@ struct SchedulesView: View {
         .refreshable { await load() }
         .appBackground()
         .navigationTitle("Schedules")
+    }
+
+    private func pickerRow(label: String, selection: Binding<String>, options: [String]) -> some View {
+        HStack(spacing: 8) {
+            Text(label)
+                .foregroundStyle(AppTheme.textSecondary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Picker(label, selection: selection) {
+                ForEach(options, id: \.self, content: Text.init)
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .tint(AppTheme.textPrimary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private func load() async {

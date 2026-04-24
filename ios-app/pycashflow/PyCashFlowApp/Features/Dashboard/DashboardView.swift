@@ -28,21 +28,33 @@ struct DashboardView: View {
                         .font(.headline)
                         .foregroundStyle(AppTheme.textPrimary)
                     ForEach(dashboard.upcoming_transactions.prefix(5)) { tx in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(tx.name).foregroundStyle(AppTheme.textPrimary)
-                                Text(tx.date).font(.caption).foregroundStyle(AppTheme.textMuted)
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(tx.name)
+                                    .foregroundStyle(AppTheme.textPrimary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                Text(tx.date)
+                                    .font(.caption)
+                                    .foregroundStyle(AppTheme.textMuted)
+                                    .lineLimit(1)
                             }
-                            Spacer()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
                             Text("$\(tx.amount)")
                                 .foregroundStyle(tx.type == "Expense" ? AppTheme.danger : AppTheme.success)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                         }
                         .surfaceCard()
                     }
                 }
 
                 if let errorText {
-                    Text(errorText).foregroundStyle(AppTheme.danger)
+                    Text(errorText)
+                        .foregroundStyle(AppTheme.danger)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 VStack(spacing: 10) {
@@ -88,8 +100,16 @@ struct DashboardView: View {
 
     private func statCard(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption).foregroundStyle(AppTheme.textMuted)
-            Text(value).font(.headline).foregroundStyle(AppTheme.textPrimary)
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(AppTheme.textMuted)
+                .lineLimit(1)
+            Text(value)
+                .font(.headline)
+                .foregroundStyle(AppTheme.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .truncationMode(.tail)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .surfaceCard()
@@ -120,11 +140,13 @@ struct DashboardView: View {
                     .frame(width: 20)
                 Text(title)
                     .foregroundStyle(AppTheme.textPrimary)
-                Spacer()
+                    .lineLimit(1)
+                Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppTheme.textMuted)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .surfaceCard()
         }
     }
