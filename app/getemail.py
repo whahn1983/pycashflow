@@ -251,17 +251,32 @@ def process_email_balances():
                 new_balance = email_content[subjectstr][start_index:end_index].replace(',', '')
                 new_balance = new_balance.replace('$', '')
                 new_balance = float(new_balance)
+                balance_date = datetime.today().date()
 
-                # Insert balance WITH user_id using SQLAlchemy ORM
-                balance = Balance(
+                existing_balance = Balance.query.filter_by(
+                    user_id=user_id,
+                    date=balance_date,
                     amount=new_balance,
-                    date=datetime.today().date(),
-                    user_id=user_id
-                )
-                db.session.add(balance)
-                db.session.commit()
-                balance_updated = True
-                logger.info("Balance updated successfully for user %s", user_id)
+                ).first()
+
+                if existing_balance:
+                    logger.info(
+                        "Duplicate balance ignored for user %s (date=%s, amount=%s)",
+                        user_id,
+                        balance_date.isoformat(),
+                        f"{new_balance:.2f}",
+                    )
+                else:
+                    # Insert balance WITH user_id using SQLAlchemy ORM
+                    balance = Balance(
+                        amount=new_balance,
+                        date=balance_date,
+                        user_id=user_id
+                    )
+                    db.session.add(balance)
+                    db.session.commit()
+                    balance_updated = True
+                    logger.info("Balance updated successfully for user %s", user_id)
             except KeyError:
                 # No email with the specified subject found
                 pass
@@ -271,7 +286,11 @@ def process_email_balances():
                 logger.error("Failed to save balance for user %s: %s", user_id, exc)
 
             if not balance_updated:
-                logger.info("Balance was not updated for user %s (no matching email found)", user_id)
+                logger.info(
+                    "Balance was not updated for user %s "
+                    "(no matching email found or duplicate balance)",
+                    user_id,
+                )
 
             # Close IMAP connection for THIS user
             imap.close()
