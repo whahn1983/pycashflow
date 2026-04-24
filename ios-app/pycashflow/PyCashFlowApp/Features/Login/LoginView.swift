@@ -157,6 +157,8 @@ struct LoginView: View {
     private func submitFromKeyboard() {
         dismissKeyboard()
         focusedField = nil
+        guard !isLoading else { return }
+        isLoading = true
         Task { @MainActor in
             await Task.yield()
             await submit()
@@ -165,14 +167,13 @@ struct LoginView: View {
 
     @MainActor
     private func submit() async {
-        isLoading = true
+        defer { isLoading = false }
         authErrorText = nil
         if challenge == nil {
             await login()
         } else {
             await completeTwoFA()
         }
-        isLoading = false
     }
 
     private func login() async {
