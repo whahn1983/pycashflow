@@ -66,6 +66,7 @@ struct DashboardView: View {
                     navRow("Projections", systemImage: "chart.line.uptrend.xyaxis", destination: ProjectionsView())
                     navRow("Schedules", systemImage: "calendar", destination: SchedulesView())
                     navRow("Scenarios", systemImage: "slider.horizontal.3", destination: ScenariosView())
+                    navRow("AI Insights", systemImage: "sparkles", destination: AIInsightsView())
                     navRow("Settings", systemImage: "gearshape", destination: SettingsView())
                 }
             }

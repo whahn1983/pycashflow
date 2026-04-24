@@ -13,10 +13,17 @@ struct CashFlowChartView: View {
 
     private var hasScenario: Bool { !scenarioPoints.isEmpty }
 
+    private static let horizonDays = 90
+    private static let visibleDays = 30
+
     private var xDomain: ClosedRange<Date> {
         let today = Calendar.current.startOfDay(for: Date())
-        let end = Calendar.current.date(byAdding: .day, value: 90, to: today) ?? today
+        let end = Calendar.current.date(byAdding: .day, value: Self.horizonDays, to: today) ?? today
         return today...end
+    }
+
+    private var visibleDomainLength: TimeInterval {
+        TimeInterval(Self.visibleDays * 24 * 60 * 60)
     }
 
     private var yDomain: ClosedRange<Double> {
@@ -85,6 +92,9 @@ struct CashFlowChartView: View {
         }
         .chartXScale(domain: xDomain)
         .chartYScale(domain: yDomain)
+        .chartScrollableAxes(.horizontal)
+        .chartXVisibleDomain(length: visibleDomainLength)
+        .chartScrollPosition(initialX: xDomain.lowerBound)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine().foregroundStyle(AppTheme.border.opacity(0.5))

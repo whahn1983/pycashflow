@@ -3,7 +3,6 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var session: SessionManager
     @State private var settings: SettingsDTO?
-    @State private var insights: InsightsDTO?
     @State private var currentPassword = ""
     @State private var newPassword = ""
     @State private var errorText: String?
@@ -29,34 +28,6 @@ struct SettingsView: View {
                         infoRow(label: "Subscription expiry", value: expiry)
                     }
                 }
-
-                if let insights, let items = insights.insights, !items.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Insights")
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.textMuted)
-                        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                            VStack(alignment: .leading, spacing: 2) {
-                                if let title = item.title, !title.isEmpty {
-                                    Text(title)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(AppTheme.textPrimary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                if let description = item.description, !description.isEmpty {
-                                    Text(description)
-                                        .foregroundStyle(AppTheme.textSecondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                    .cardRow()
-                }
-
-                Button("Refresh AI Insights") { Task { await refreshInsights() } }
-                    .buttonStyle(PrimaryButtonStyle())
 
                 VStack(spacing: 8) {
                     Text("Change Password").foregroundStyle(AppTheme.textPrimary)
@@ -115,25 +86,9 @@ struct SettingsView: View {
                 token: token,
                 as: APIEnvelope<SettingsDTO>.self
             )
-            let insightsResponse: APIEnvelope<InsightsDTO> = try await APIClient.shared.request(
-                "insights",
-                token: token,
-                as: APIEnvelope<InsightsDTO>.self
-            )
             settings = settingsResponse.data
-            insights = insightsResponse.data
         } catch {
             errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to load settings"
-        }
-    }
-
-    private func refreshInsights() async {
-        guard let token = session.token else { return }
-        do {
-            let response: APIEnvelope<InsightsDTO> = try await APIClient.shared.request("insights/refresh", method: "POST", token: token, as: APIEnvelope<InsightsDTO>.self)
-            insights = response.data
-        } catch {
-            errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to refresh insights"
         }
     }
 
