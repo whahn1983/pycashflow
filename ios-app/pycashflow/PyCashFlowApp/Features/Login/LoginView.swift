@@ -107,6 +107,9 @@ struct LoginView: View {
                             .padding(12)
                             .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
                             .foregroundStyle(AppTheme.textPrimary)
+                        Text("For local dev use http://127.0.0.1:5000/api/v1 (not https).")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.textMuted)
                         Button("Save Server URL") {
                             if !session.updateSelfHostedBaseURL(selfHostedURL) {
                                 selfHostedErrorText = "Please enter a valid URL, including /api/v1."
