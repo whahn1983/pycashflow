@@ -475,8 +475,19 @@ def api_passkey_login_verify():
     if payload is None or _is_passkey_challenge_consumed(challenge_token):
         return unauthorized("Invalid or expired passkey challenge")
 
+    # Mirror the eligibility check used by /auth/passkey/options and return a
+    # single generic error for every post-decode failure mode. Otherwise an
+    # attacker holding a decoy challenge_token for email X can distinguish
+    # "active account without passkeys" (previously "Passkey not recognized")
+    # from "unknown/inactive email" (previously "Invalid or expired passkey
+    # challenge"), reintroducing account enumeration at /verify.
     user = User.query.filter_by(email=payload["email"]).first()
-    if user is None or not enforce_user_access(user):
+    eligible = (
+        user is not None
+        and enforce_user_access(user)
+        and bool(user.passkey_credentials)
+    )
+    if not eligible:
         return unauthorized("Invalid or expired passkey challenge")
 
     raw_credential_id = credential.get("id")
@@ -485,7 +496,7 @@ def api_passkey_login_verify():
         user_id=user.id,
     ).first()
     if stored_credential is None:
-        return unauthorized("Passkey not recognized for this account")
+        return unauthorized("Invalid or expired passkey challenge")
 
     try:
         verification = verify_authentication_response(
@@ -499,7 +510,7 @@ def api_passkey_login_verify():
         )
     except Exception as exc:
         logger.warning("API passkey login verification failed: %s", exc)
-        return unauthorized("Passkey verification failed")
+        return unauthorized("Invalid or expired passkey challenge")
 
     if not _try_mark_passkey_challenge_consumed(challenge_token):
         return unauthorized("Invalid or expired passkey challenge")

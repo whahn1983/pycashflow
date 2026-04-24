@@ -398,3 +398,86 @@ def test_api_passkey_verify_rejects_replay(client, app_ctx, monkeypatch):
         json={"challenge_token": challenge_token, "credential": credential_payload},
     )
     assert replay.status_code == 401
+
+
+def test_api_passkey_verify_decoy_is_indistinguishable_from_unknown(
+    client, app_ctx, monkeypatch
+):
+    # Enumeration-resistance regression: /verify must return the same error
+    # for a decoy challenge bound to an existing-but-ineligible account as it
+    # does for a decoy bound to a truly unknown email. Previously the
+    # existing-account path returned "Passkey not recognized for this account"
+    # while the unknown path returned "Invalid or expired passkey challenge".
+    _enable_passkey(monkeypatch)
+
+    existing = User(
+        email="decoy-no-passkey@test.local",
+        password="x",
+        name="No Passkey",
+        admin=True,
+        is_active=True,
+    )
+    db.session.add(existing)
+    db.session.commit()
+    # Sanity: this user is active but has no passkeys, so /options should
+    # treat them as a decoy.
+    assert existing.passkey_credentials == []
+
+    monkeypatch.setattr(
+        api_auth_module,
+        "generate_authentication_options",
+        lambda **kwargs: SimpleNamespace(challenge=b"c"),
+    )
+    monkeypatch.setattr(
+        api_auth_module,
+        "options_to_json",
+        lambda opts: '{"challenge": "Yw"}',
+    )
+    monkeypatch.setattr(api_auth_module, "bytes_to_base64url", lambda b: "Yw")
+    monkeypatch.setattr(
+        api_auth_module, "base64url_to_bytes", lambda s: s.encode("utf-8")
+    )
+    monkeypatch.setattr(
+        api_auth_module,
+        "PublicKeyCredentialDescriptor",
+        lambda id: SimpleNamespace(id=id),
+    )
+    monkeypatch.setattr(
+        api_auth_module,
+        "UserVerificationRequirement",
+        SimpleNamespace(REQUIRED="required"),
+    )
+
+    def _options(email: str) -> str:
+        resp = client.post(
+            "/api/v1/auth/passkey/options",
+            json={"email": email},
+        )
+        assert resp.status_code == 200
+        return resp.get_json()["data"]["challenge_token"]
+
+    credential_payload = {
+        "id": "fake-cred-id",
+        "rawId": "fake-cred-id",
+        "type": "public-key",
+        "response": {
+            "authenticatorData": "AAAA",
+            "clientDataJSON": "AAAA",
+            "signature": "AAAA",
+        },
+    }
+
+    existing_token = _options("decoy-no-passkey@test.local")
+    unknown_token = _options("decoy-unknown@test.local")
+
+    existing_resp = client.post(
+        "/api/v1/auth/passkey/verify",
+        json={"challenge_token": existing_token, "credential": credential_payload},
+    )
+    unknown_resp = client.post(
+        "/api/v1/auth/passkey/verify",
+        json={"challenge_token": unknown_token, "credential": credential_payload},
+    )
+
+    assert existing_resp.status_code == unknown_resp.status_code == 401
+    assert existing_resp.get_json() == unknown_resp.get_json()
