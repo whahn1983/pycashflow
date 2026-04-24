@@ -17,8 +17,10 @@ struct CashFlowChartView: View {
     private static let visibleDays = 30
 
     private var xDomain: ClosedRange<Date> {
-        let today = Calendar.current.startOfDay(for: Date())
-        let end = Calendar.current.date(byAdding: .day, value: Self.horizonDays, to: today) ?? today
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? calendar.timeZone
+        let today = calendar.startOfDay(for: Date())
+        let end = calendar.date(byAdding: .day, value: Self.horizonDays, to: today) ?? today
         return today...end
     }
 
