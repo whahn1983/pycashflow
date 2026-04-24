@@ -268,6 +268,17 @@ Begin a passkey (WebAuthn) login flow. Returns the challenge parameters and a
 signed `challenge_token` that must be echoed back to
 `POST /api/v1/auth/passkey/verify`.
 
+#### iOS Associated Domains requirement (passkeys/shared web credentials)
+
+For iOS passkeys and shared web credentials to work with
+`com.h3consultingpartners.pycashflow`, the app must include this entitlement:
+
+- `webcredentials:app.pycashflow.com`
+
+The backend serves Apple App Site Association (AASA) JSON over HTTPS at:
+
+- `https://app.pycashflow.com/.well-known/apple-app-site-association`
+
 **Auth required:** No
 
 **Rate limit:** 10/minute
