@@ -359,6 +359,18 @@ def _build_passkey_challenge_token(user: User, challenge_b64url: str) -> str:
     return _passkey_challenge_serializer().dumps(payload)
 
 
+def _build_decoy_passkey_challenge_token(email: str, challenge_b64url: str) -> str:
+    # uid=0 never matches a real user, so /auth/passkey/verify naturally
+    # rejects this token without revealing whether the email exists.
+    payload = {
+        "uid": 0,
+        "email": email,
+        "challenge": challenge_b64url,
+        "nonce": hash_token(f"decoy:{email}:{datetime.now(timezone.utc).isoformat()}"),
+    }
+    return _passkey_challenge_serializer().dumps(payload)
+
+
 def _decode_passkey_challenge_token(challenge_token: str) -> dict | None:
     try:
         payload = _passkey_challenge_serializer().loads(
@@ -394,25 +406,34 @@ def api_passkey_login_options():
         return validation_error(errors)
 
     user = User.query.filter_by(email=email).first()
-    if (
-        user is None
-        or not enforce_user_access(user)
-        or not user.passkey_credentials
-    ):
-        # Generic message to avoid revealing whether an account exists.
-        return unauthorized("Unable to start passkey login")
+    eligible = (
+        user is not None
+        and enforce_user_access(user)
+        and bool(user.passkey_credentials)
+    )
 
-    allow_credentials = [
-        PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
-        for c in user.passkey_credentials
-    ]
+    # Always return a success-shaped response so an unauthenticated caller
+    # cannot enumerate which emails have passkey-enabled accounts. For
+    # ineligible emails we issue a decoy challenge token that will fail
+    # at /auth/passkey/verify.
+    if eligible:
+        allow_credentials = [
+            PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
+            for c in user.passkey_credentials
+        ]
+    else:
+        allow_credentials = []
+
     options = generate_authentication_options(
         rp_id=current_app.config["PASSKEY_RP_ID"],
         allow_credentials=allow_credentials,
         user_verification=UserVerificationRequirement.REQUIRED,
     )
     challenge_b64url = bytes_to_base64url(options.challenge)
-    challenge_token = _build_passkey_challenge_token(user, challenge_b64url)
+    if eligible:
+        challenge_token = _build_passkey_challenge_token(user, challenge_b64url)
+    else:
+        challenge_token = _build_decoy_passkey_challenge_token(email, challenge_b64url)
 
     return api_ok({
         "challenge_token": challenge_token,

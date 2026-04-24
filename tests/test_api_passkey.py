@@ -94,16 +94,68 @@ def test_api_passkey_options_requires_email(client, monkeypatch):
     assert resp.get_json()["fields"]["email"]
 
 
-def test_api_passkey_options_unknown_user_returns_401(client, monkeypatch):
+def test_api_passkey_options_unknown_user_returns_decoy(client, monkeypatch):
     _enable_passkey(monkeypatch)
+
+    stub_options = SimpleNamespace(challenge=b"decoy-challenge-bytes")
+    monkeypatch.setattr(
+        api_auth_module,
+        "generate_authentication_options",
+        lambda **kwargs: stub_options,
+    )
+    monkeypatch.setattr(
+        api_auth_module,
+        "options_to_json",
+        lambda opts: '{"challenge": "ZGVjb3ktY2hhbGxlbmdlLWJ5dGVz"}',
+    )
+    monkeypatch.setattr(
+        api_auth_module,
+        "bytes_to_base64url",
+        lambda b: "ZGVjb3ktY2hhbGxlbmdlLWJ5dGVz",
+    )
+    monkeypatch.setattr(
+        api_auth_module,
+        "base64url_to_bytes",
+        lambda s: s.encode("utf-8"),
+    )
+    monkeypatch.setattr(
+        api_auth_module,
+        "PublicKeyCredentialDescriptor",
+        lambda id: SimpleNamespace(id=id),
+    )
+    monkeypatch.setattr(
+        api_auth_module,
+        "UserVerificationRequirement",
+        SimpleNamespace(REQUIRED="required"),
+    )
 
     resp = client.post(
         "/api/v1/auth/passkey/options",
         json={"email": "no-such-user@test.local"},
     )
-    assert resp.status_code == 401
-    body = resp.get_json()
-    assert body["code"] == "unauthorized"
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert data["challenge_token"]
+    assert data["options"]["challenge"] == "ZGVjb3ktY2hhbGxlbmdlLWJ5dGVz"
+
+    # The decoy token must not grant access when submitted to /verify.
+    verify_resp = client.post(
+        "/api/v1/auth/passkey/verify",
+        json={
+            "challenge_token": data["challenge_token"],
+            "credential": {
+                "id": "anything",
+                "rawId": "anything",
+                "type": "public-key",
+                "response": {
+                    "authenticatorData": "AAAA",
+                    "clientDataJSON": "AAAA",
+                    "signature": "AAAA",
+                },
+            },
+        },
+    )
+    assert verify_resp.status_code == 401
 
 
 def test_api_passkey_verify_returns_bearer_token(client, app_ctx, monkeypatch):
