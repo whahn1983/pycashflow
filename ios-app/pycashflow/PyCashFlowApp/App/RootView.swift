@@ -4,21 +4,25 @@ struct RootView: View {
     @EnvironmentObject var session: SessionManager
 
     var body: some View {
-        NavigationStack {
+        Group {
             if !session.isAuthenticated {
-                LoginView()
+                NavigationStack {
+                    LoginView()
+                }
             } else {
-                switch session.accessState {
-                case .unknown, .checking:
-                    ProgressView("Checking account status...")
-                        .foregroundStyle(AppTheme.textPrimary)
-                case .allowed:
-                    DashboardView()
-                case .blocked(let message):
-                    if session.appMode == .cloud {
-                        SubscriptionPaywallView(message: message)
-                    } else {
+                NavigationStack {
+                    switch session.accessState {
+                    case .unknown, .checking:
+                        ProgressView("Checking account status...")
+                            .foregroundStyle(AppTheme.textPrimary)
+                    case .allowed:
                         DashboardView()
+                    case .blocked(let message):
+                        if session.appMode == .cloud {
+                            SubscriptionPaywallView(message: message)
+                        } else {
+                            DashboardView()
+                        }
                     }
                 }
             }
