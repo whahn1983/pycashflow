@@ -134,7 +134,7 @@ final class StoreKitSubscriptionManager: ObservableObject {
     }
 
     private static func isValidEmail(_ email: String) -> Bool {
-        let pattern = #"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$"#
+        let pattern = #"^[^\s@]+@[^\s@]+\.[^\s@]+$"#
         return email.range(of: pattern, options: .regularExpression) != nil
     }
 
