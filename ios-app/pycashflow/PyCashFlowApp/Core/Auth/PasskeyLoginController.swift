@@ -117,15 +117,23 @@ final class PasskeyLoginController: NSObject, ASAuthorizationControllerDelegate,
         for controller: ASAuthorizationController
     ) -> ASPresentationAnchor {
         MainActor.assumeIsolated {
-            Self.keyWindow() ?? ASPresentationAnchor()
+            Self.presentationAnchor()
         }
     }
 
-    private static func keyWindow() -> UIWindow? {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first { $0.isKeyWindow }
+    private static func presentationAnchor() -> ASPresentationAnchor {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let windows = scenes.flatMap(\.windows)
+        if let keyWindow = windows.first(where: \.isKeyWindow) {
+            return keyWindow
+        }
+        if let anyWindow = windows.first {
+            return anyWindow
+        }
+        if let scene = scenes.first {
+            return UIWindow(windowScene: scene)
+        }
+        preconditionFailure("No connected window scenes available to anchor passkey UI")
     }
 }
 
