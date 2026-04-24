@@ -37,7 +37,20 @@ final class APIClient {
             request.httpBody = try JSONEncoder().encode(AnyEncodable(body))
         }
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            let urlError = error as? URLError
+            throw APIErrorEnvelope(
+                error: urlError?.localizedDescription ?? "Network request failed: \(error.localizedDescription)",
+                code: "network_error",
+                status: 0,
+                fields: nil
+            )
+        }
+
         let code = (response as? HTTPURLResponse)?.statusCode ?? 500
         let decoder = JSONDecoder()
 
@@ -54,13 +67,59 @@ final class APIClient {
                     fields: nil
                 )
             }
-            return try decoder.decode(T.self, from: data)
+            do {
+                return try decoder.decode(T.self, from: data)
+            } catch let decodingError as DecodingError {
+                throw APIErrorEnvelope(
+                    error: "Could not read server response: \(Self.describe(decodingError))",
+                    code: "decoding_error",
+                    status: code,
+                    fields: nil
+                )
+            } catch {
+                throw APIErrorEnvelope(
+                    error: "Could not read server response: \(error.localizedDescription)",
+                    code: "decoding_error",
+                    status: code,
+                    fields: nil
+                )
+            }
         }
 
         if let apiError = try? decoder.decode(APIErrorEnvelope.self, from: data) {
             throw apiError
         }
-        throw APIErrorEnvelope(error: "Request failed", code: "request_failed", status: code, fields: nil)
+
+        let bodyPreview = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .prefix(200)
+        let suffix = (bodyPreview?.isEmpty == false) ? ": \(bodyPreview!)" : ""
+        throw APIErrorEnvelope(
+            error: "Request failed (HTTP \(code))\(suffix)",
+            code: "request_failed",
+            status: code,
+            fields: nil
+        )
+    }
+
+    private static func describe(_ error: DecodingError) -> String {
+        switch error {
+        case .typeMismatch(_, let ctx):
+            return "type mismatch at \(Self.path(ctx.codingPath)) — \(ctx.debugDescription)"
+        case .valueNotFound(_, let ctx):
+            return "missing value at \(Self.path(ctx.codingPath)) — \(ctx.debugDescription)"
+        case .keyNotFound(let key, let ctx):
+            return "missing key '\(key.stringValue)' at \(Self.path(ctx.codingPath))"
+        case .dataCorrupted(let ctx):
+            return "corrupted data at \(Self.path(ctx.codingPath)) — \(ctx.debugDescription)"
+        @unknown default:
+            return "\(error)"
+        }
+    }
+
+    private static func path(_ keys: [CodingKey]) -> String {
+        let rendered = keys.map { $0.stringValue }.joined(separator: ".")
+        return rendered.isEmpty ? "(root)" : rendered
     }
 }
 

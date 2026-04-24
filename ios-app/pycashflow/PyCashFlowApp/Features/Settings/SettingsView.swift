@@ -31,17 +31,25 @@ struct SettingsView: View {
                 }
 
                 if let insights, let items = insights.insights, !items.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 10) {
                         Text("Insights")
                             .font(.caption)
                             .foregroundStyle(AppTheme.textMuted)
-                        ForEach(Array(items.enumerated()), id: \.offset) { _, line in
-                            HStack(alignment: .top, spacing: 8) {
-                                Text("•").foregroundStyle(AppTheme.textMuted)
-                                Text(line)
-                                    .foregroundStyle(AppTheme.textPrimary)
-                                    .fixedSize(horizontal: false, vertical: true)
+                        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                            VStack(alignment: .leading, spacing: 2) {
+                                if let title = item.title, !title.isEmpty {
+                                    Text(title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(AppTheme.textPrimary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                if let description = item.description, !description.isEmpty {
+                                    Text(description)
+                                        .foregroundStyle(AppTheme.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                     .cardRow()

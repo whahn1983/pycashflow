@@ -91,7 +91,11 @@ struct DashboardView: View {
         guard let runwayDays = risk.runway_days else {
             return "Unavailable"
         }
-        return "\(runwayDays) days"
+        let rounded = runwayDays.rounded()
+        if abs(runwayDays - rounded) < 0.05 {
+            return "\(Int(rounded)) days"
+        }
+        return String(format: "%.1f days", runwayDays)
     }
 
     private func statCard(title: String, value: String) -> some View {
