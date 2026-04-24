@@ -81,6 +81,7 @@ struct DashboardView: View {
             FloatingNavItem(title: "Balance", systemImage: "dollarsign.circle") { BalanceView() },
             FloatingNavItem(title: "Schedules", systemImage: "calendar") { SchedulesView() },
             FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3") { ScenariosView() },
+            FloatingNavItem(title: "Holds", systemImage: "pause.circle") { HoldsView() },
             FloatingNavItem(title: "AI Insights", systemImage: "sparkles") { AIInsightsView() },
             FloatingNavItem(title: "Settings", systemImage: "gearshape") { SettingsView() }
         ]
