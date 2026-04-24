@@ -19,8 +19,8 @@ struct DashboardView: View {
                     }
                     if let risk = dashboard.risk_v2 {
                         metricsGrid {
-                            statCard(title: "Risk", value: "\(risk.score ?? 0) · \(risk.status ?? "Unknown")")
-                            statCard(title: "Runway", value: "\(risk.runway_days ?? 0) days")
+                            statCard(title: "Risk", value: riskSummaryText(risk))
+                            statCard(title: "Runway", value: runwayText(risk))
                         }
                     }
 
@@ -70,6 +70,20 @@ struct DashboardView: View {
                 content()
             }
         }
+    }
+
+
+    private func riskSummaryText(_ risk: RiskV2DTO) -> String {
+        let scoreText = risk.score.map(String.init) ?? "—"
+        let statusText = risk.status ?? "Unavailable"
+        return "\(scoreText) · \(statusText)"
+    }
+
+    private func runwayText(_ risk: RiskV2DTO) -> String {
+        guard let runwayDays = risk.runway_days else {
+            return "Unavailable"
+        }
+        return "\(runwayDays) days"
     }
 
     private func statCard(title: String, value: String) -> some View {
