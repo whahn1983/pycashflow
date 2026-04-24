@@ -3,6 +3,7 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject var session: SessionManager
     @State private var dashboard: DashboardDTO?
+    @State private var projections: ProjectionsDTO?
     @State private var errorText: String?
 
     var body: some View {
@@ -18,6 +19,13 @@ struct DashboardView: View {
                             statCard(title: "Risk", value: riskSummaryText(risk))
                             statCard(title: "Runway", value: runwayText(risk))
                         }
+                    }
+
+                    if let projections {
+                        CashFlowChartView(
+                            schedule: projections.schedule,
+                            scenario: projections.scenario ?? []
+                        )
                     }
 
                     Text("Upcoming")
@@ -63,8 +71,8 @@ struct DashboardView: View {
             }
             .padding(20)
         }
-        .task { await loadDashboard() }
-        .refreshable { await loadDashboard() }
+        .task { await loadAll() }
+        .refreshable { await loadAll() }
         .appBackground()
         .navigationTitle("Dashboard")
     }
@@ -115,6 +123,12 @@ struct DashboardView: View {
         .surfaceCard()
     }
 
+    private func loadAll() async {
+        async let dashboardTask: Void = loadDashboard()
+        async let projectionsTask: Void = loadProjections()
+        _ = await (dashboardTask, projectionsTask)
+    }
+
     private func loadDashboard() async {
         guard let token = session.token else { return }
         do {
@@ -125,6 +139,16 @@ struct DashboardView: View {
             }
         } catch {
             await MainActor.run { errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to load dashboard" }
+        }
+    }
+
+    private func loadProjections() async {
+        guard let token = session.token else { return }
+        do {
+            let response: APIEnvelope<ProjectionsDTO> = try await APIClient.shared.request("projections", token: token, as: APIEnvelope<ProjectionsDTO>.self)
+            await MainActor.run { projections = response.data }
+        } catch {
+            // Chart silently hides if projections fail; dashboard error surfaces other issues.
         }
     }
 
