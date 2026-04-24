@@ -73,13 +73,13 @@ struct DashboardView: View {
     }
 
 
-    private func riskSummaryText(_ risk: RiskV2DTO) -> String {
+    private func riskSummaryText(_ risk: RiskScoreDTO) -> String {
         let scoreText = risk.score.map(String.init) ?? "—"
         let statusText = risk.status ?? "Unavailable"
         return "\(scoreText) · \(statusText)"
     }
 
-    private func runwayText(_ risk: RiskV2DTO) -> String {
+    private func runwayText(_ risk: RiskScoreDTO) -> String {
         guard let runwayDays = risk.runway_days else {
             return "Unavailable"
         }
