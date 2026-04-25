@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var currentPassword = ""
     @State private var newPassword = ""
     @State private var errorText: String?
+    @State private var showPasswordFields = false
 
     var body: some View {
         ScrollView {
@@ -30,11 +31,17 @@ struct SettingsView: View {
                 }
 
                 VStack(spacing: 8) {
-                    Text("Change Password").foregroundStyle(AppTheme.textPrimary)
-                    SecureField("Current password", text: $currentPassword).fieldStyle()
-                    SecureField("New password", text: $newPassword).fieldStyle()
-                    Button("Update Password") { Task { await changePassword() } }
-                        .buttonStyle(PrimaryButtonStyle())
+                    Button("Change Password") {
+                        withAnimation { showPasswordFields.toggle() }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+
+                    if showPasswordFields {
+                        SecureField("Current password", text: $currentPassword).fieldStyle()
+                        SecureField("New password", text: $newPassword).fieldStyle()
+                        Button("Update Password") { Task { await changePassword() } }
+                            .buttonStyle(PrimaryButtonStyle())
+                    }
                 }
                 .surfaceCard()
 
