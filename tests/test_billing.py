@@ -142,6 +142,29 @@ def test_appstore_verification_stub_mode_can_activate_owner(flask_app, client):
         assert user.is_active is True
 
 
+def test_appstore_verification_stub_mode_accepts_original_id_alias(flask_app, client):
+    with flask_app.app_context():
+        flask_app.config["APPSTORE_ALLOW_STUB_VERIFICATION"] = True
+        flask_app.config["FRONTEND_BASE_URL"] = "https://app.example.com"
+
+    resp = client.post(
+        "/api/v1/billing/verify-appstore",
+        json={
+            "email": "ios-stub-alias@test.local",
+            "receipt_data": "dummy-receipt",
+            "transaction": {"original_id": "ios_txn_alias_1"},
+        },
+    )
+    assert resp.status_code == 200
+    body = _json(resp)["data"]
+    assert body["verification_status"] == "verified_stub"
+
+    with flask_app.app_context():
+        user = User.query.filter_by(email="ios-stub-alias@test.local").first()
+        assert user is not None
+        assert user.subscription_id == "ios_txn_alias_1"
+
+
 def test_appstore_existing_user_subscription_update_no_duplicate(
     flask_app, client, monkeypatch, billing_routes_module
 ):

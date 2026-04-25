@@ -3,7 +3,7 @@ import Foundation
 struct AppStoreVerificationPayload: Encodable {
     struct TransactionPayload: Encodable {
         let id: String
-        let original_id: String
+        let original_transaction_id: String
         let product_id: String
         let purchase_date: String
         let expiry_date: String?
