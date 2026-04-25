@@ -49,9 +49,8 @@ final class SessionManager: ObservableObject {
     func setSession(token: String, user: UserDTO) {
         self.token = token
         self.user = user
-        if TokenKeychainStore.saveToken(token) {
-            UserDefaults.standard.removeObject(forKey: "api_token")
-        }
+        _ = TokenKeychainStore.saveToken(token)
+        UserDefaults.standard.removeObject(forKey: "api_token")
     }
 
     func establishSession(token: String, user: UserDTO) async {
