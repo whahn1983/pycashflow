@@ -165,6 +165,29 @@ def test_appstore_verification_stub_mode_accepts_original_id_alias(flask_app, cl
         assert user.subscription_id == "ios_txn_alias_1"
 
 
+def test_appstore_verification_stub_mode_rejects_non_string_original_id(flask_app, client):
+    with flask_app.app_context():
+        flask_app.config["APPSTORE_ALLOW_STUB_VERIFICATION"] = True
+        flask_app.config["FRONTEND_BASE_URL"] = "https://app.example.com"
+
+    resp = client.post(
+        "/api/v1/billing/verify-appstore",
+        json={
+            "email": "ios-stub-alias-nonstr@test.local",
+            "receipt_data": "dummy-receipt",
+            "transaction": {"original_id": 123},
+        },
+    )
+    assert resp.status_code == 200
+    body = _json(resp)["data"]
+    assert body["verification_status"] == "verified_stub"
+
+    with flask_app.app_context():
+        user = User.query.filter_by(email="ios-stub-alias-nonstr@test.local").first()
+        assert user is not None
+        assert user.subscription_id == "dummy-receipt"
+
+
 def test_appstore_existing_user_subscription_update_no_duplicate(
     flask_app, client, monkeypatch, billing_routes_module
 ):
