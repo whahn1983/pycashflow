@@ -9,7 +9,6 @@ from __future__ import annotations
 import base64
 import json
 import time
-import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -45,7 +44,13 @@ def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
 
-def _jwt_es256(issuer_id: str, key_id: str, private_key_pem: str, audience: str) -> str:
+def _jwt_es256(
+    issuer_id: str,
+    key_id: str,
+    private_key_pem: str,
+    audience: str,
+    bundle_id: str,
+) -> str:
     now = int(time.time())
     header = {"alg": "ES256", "kid": key_id, "typ": "JWT"}
     payload = {
@@ -53,7 +58,7 @@ def _jwt_es256(issuer_id: str, key_id: str, private_key_pem: str, audience: str)
         "iat": now,
         "exp": now + 300,
         "aud": audience,
-        "nonce": str(uuid.uuid4()),
+        "bid": bundle_id,
     }
     signing_input = f"{_b64url(json.dumps(header, separators=(',', ':')).encode())}.{_b64url(json.dumps(payload, separators=(',', ':')).encode())}".encode()
 
@@ -134,10 +139,20 @@ def verify_app_store_subscription(
     private_key: str | None,
     private_key_path: str | None,
     environment: str,
+    bundle_id: str,
 ) -> AppStoreVerificationResult:
     """Verify a subscription using Apple's App Store Server API."""
+    if not (bundle_id or "").strip():
+        raise AppStoreVerificationError("APPLE_BUNDLE_ID is required to authenticate with Apple")
+
     private_key_pem = _read_private_key(private_key, private_key_path)
-    token = _jwt_es256(issuer_id, key_id, private_key_pem, audience="appstoreconnect-v1")
+    token = _jwt_es256(
+        issuer_id,
+        key_id,
+        private_key_pem,
+        audience="appstoreconnect-v1",
+        bundle_id=bundle_id.strip(),
+    )
 
     env = (environment or "production").strip().lower()
     if env not in {"production", "sandbox", "auto"}:
