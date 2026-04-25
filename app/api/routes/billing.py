@@ -186,9 +186,9 @@ def _verify_appstore_purchase(transaction_info: dict, receipt_data: str | None):
         or ""
     ).strip()
 
-    if not issuer_id or not key_id:
+    if not issuer_id or not key_id or not expected_bundle_id:
         raise AppStoreVerificationError(
-            "Apple credentials are incomplete: APPLE_ISSUER_ID and APPLE_KEY_ID are required"
+            "Apple credentials are incomplete: APPLE_ISSUER_ID, APPLE_KEY_ID, and APPLE_BUNDLE_ID are required"
         )
 
     verification = verify_app_store_subscription(
@@ -198,9 +198,10 @@ def _verify_appstore_purchase(transaction_info: dict, receipt_data: str | None):
         private_key=private_key,
         private_key_path=private_key_path,
         environment=environment,
+        bundle_id=expected_bundle_id,
     )
 
-    if expected_bundle_id and verification.bundle_id and verification.bundle_id != expected_bundle_id:
+    if verification.bundle_id and verification.bundle_id != expected_bundle_id:
         raise AppStoreVerificationError("App Store bundle identifier mismatch")
 
     return {
