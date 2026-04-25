@@ -2,27 +2,39 @@ import SwiftUI
 
 /// Floating bottom navigation bar rendered with the iOS 26 Liquid Glass
 /// material so it matches the translucent back button SwiftUI renders in
-/// the navigation bar. Scrolls horizontally when buttons overflow.
+/// the navigation bar. Sizes to fit its buttons and stays horizontally
+/// centered, falling back to a horizontal scroll view only when the
+/// available width is too narrow to fit every button.
 struct FloatingNavBar: View {
     let items: [FloatingNavItem]
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                ForEach(items) { item in
-                    NavigationLink {
-                        item.destination
-                    } label: {
-                        FloatingNavItemLabel(item: item)
-                    }
-                    .buttonStyle(FloatingNavButtonStyle())
-                }
+        ViewThatFits(in: .horizontal) {
+            navContent
+                .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                navContent
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
         }
-        .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
+    }
+
+    private var navContent: some View {
+        HStack(spacing: 4) {
+            ForEach(items) { item in
+                NavigationLink {
+                    item.destination
+                } label: {
+                    FloatingNavItemLabel(item: item)
+                }
+                .buttonStyle(FloatingNavButtonStyle())
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 }
 
