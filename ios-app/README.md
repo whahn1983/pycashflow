@@ -45,7 +45,9 @@ The iOS app supports **Apple App Store** purchase flow only. Stripe is intention
 These values are hardcoded in `PyCashFlowApp/Core/Config/Config.swift`:
 
 - `API_BASE_URL` => `https://app.pycashflow.com/api/v1`
-- `SELF_HOSTED_API_BASE_URL` => `https://localhost:5000`
-- `APP_STORE_PRODUCT_IDS` => empty string for now
+- `SELF_HOSTED_API_BASE_URL` => `http://127.0.0.1:5000/api/v1`
+- `APP_STORE_PRODUCT_IDS` => `com.h3consultingpartners.pycashflow.cloud.monthly`
 
 `APIClient` normalizes base URLs so host-only values automatically use `/api/v1`.
+For security, remote self-hosted servers must use HTTPS. Plain HTTP is only
+allowed for localhost development endpoints.

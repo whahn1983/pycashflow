@@ -51,8 +51,6 @@ final class SessionManager: ObservableObject {
         self.user = user
         if TokenKeychainStore.saveToken(token) {
             UserDefaults.standard.removeObject(forKey: "api_token")
-        } else {
-            UserDefaults.standard.set(token, forKey: "api_token")
         }
     }
 
@@ -116,7 +114,7 @@ final class SessionManager: ObservableObject {
     @discardableResult
     func updateSelfHostedBaseURL(_ value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let parsed = URL(string: trimmed), parsed.scheme != nil, parsed.host != nil else {
+        guard let parsed = Self.validatedSelfHostedURL(from: trimmed) else {
             return false
         }
         let canonical = Self.canonicalizedHostedURL(parsed)
@@ -147,9 +145,7 @@ final class SessionManager: ObservableObject {
 
     private static func loadSelfHostedURL() -> URL {
         if let raw = UserDefaults.standard.string(forKey: selfHostedURLKey),
-           let url = URL(string: raw),
-           url.scheme != nil,
-           url.host != nil {
+           let url = validatedSelfHostedURL(from: raw) {
             let canonical = canonicalizedHostedURL(url)
             if canonical != url {
                 UserDefaults.standard.set(canonical.absoluteString, forKey: selfHostedURLKey)
@@ -157,6 +153,26 @@ final class SessionManager: ObservableObject {
             return canonical
         }
         return AppEnvironment.defaultSelfHostedAPIBaseURL
+    }
+
+    private static func validatedSelfHostedURL(from raw: String) -> URL? {
+        guard let parsed = URL(string: raw), parsed.scheme != nil, parsed.host != nil else {
+            return nil
+        }
+        guard let scheme = parsed.scheme?.lowercased() else {
+            return nil
+        }
+        if scheme == "https" {
+            return parsed
+        }
+        if scheme == "http", let host = parsed.host?.lowercased(), isAllowedInsecureHost(host) {
+            return parsed
+        }
+        return nil
+    }
+
+    private static func isAllowedInsecureHost(_ host: String) -> Bool {
+        host == "localhost" || host == "127.0.0.1" || host == "::1"
     }
 
     private static func canonicalizedHostedURL(_ url: URL) -> URL {
@@ -180,7 +196,8 @@ private enum TokenKeychainStore {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecValueData as String: data
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
         let addStatus = SecItemAdd(query as CFDictionary, nil)
         if addStatus == errSecSuccess {
@@ -218,8 +235,9 @@ private enum TokenKeychainStore {
 
         if saveToken(legacyToken) {
             defaults.removeObject(forKey: account)
+            return legacyToken
         }
-        return legacyToken
+        return nil
     }
 
     private static func readToken() -> String? {
