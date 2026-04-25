@@ -17,9 +17,9 @@ struct RootView: View {
                             .foregroundStyle(AppTheme.textPrimary)
                     case .allowed:
                         DashboardView()
-                    case .blocked(let message):
+                    case .blocked:
                         if session.appMode == .cloud {
-                            SubscriptionPaywallView(message: message)
+                            SubscriptionPaywallView()
                         } else {
                             DashboardView()
                         }

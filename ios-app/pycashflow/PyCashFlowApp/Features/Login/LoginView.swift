@@ -155,7 +155,7 @@ struct LoginView: View {
                         Text("Using PyCashFlow Cloud hosted service.")
                             .foregroundStyle(AppTheme.textSecondary)
                         NavigationLink("Activate or Restore Cloud Subscription") {
-                            SubscriptionPaywallView(message: "Use App Store subscription to activate or restore your hosted PyCashFlow Cloud account.")
+                            SubscriptionPaywallView()
                         }
                         .buttonStyle(PrimaryButtonStyle())
                     }
