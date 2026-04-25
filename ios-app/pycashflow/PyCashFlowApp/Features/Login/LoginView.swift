@@ -129,14 +129,14 @@ struct LoginView: View {
                             .padding(12)
                             .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
                             .foregroundStyle(AppTheme.textPrimary)
-                        Text("For local dev use http://127.0.0.1:5000/api/v1 (not https).")
+                        Text("Use HTTPS for remote servers. HTTP is allowed only for localhost/127.0.0.1 during local development.")
                             .font(.caption)
                             .foregroundStyle(AppTheme.textMuted)
                         Button("Save Server URL") {
                             dismissKeyboard()
                             focusedField = nil
                             if !session.updateSelfHostedBaseURL(selfHostedURL) {
-                                selfHostedErrorText = "Please enter a valid URL, including /api/v1."
+                                selfHostedErrorText = "Enter a valid server URL. Use HTTPS for remote hosts; HTTP is only allowed for localhost."
                             } else {
                                 selfHostedErrorText = nil
                             }
@@ -274,6 +274,13 @@ struct LoginView: View {
         guard !rpId.isEmpty else {
             authErrorText = "Passkey sign-in is not available for this server"
             return
+        }
+        if session.appMode == .cloud {
+            let expectedCloudRPID = AppEnvironment.cloudAPIBaseURL.host?.lowercased() ?? ""
+            if rpId.lowercased() != expectedCloudRPID {
+                authErrorText = "Passkey sign-in is unavailable due to an unexpected cloud security domain."
+                return
+            }
         }
 
         let allowedCredentialIDs: [Data] = (optionsResponse.options.allowCredentials ?? [])

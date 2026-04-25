@@ -4,6 +4,12 @@ final class APIClient {
     static let shared = APIClient()
 
     var baseURL: URL = AppEnvironment.cloudAPIBaseURL
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.urlCache = nil
+        return URLSession(configuration: config)
+    }()
 
     func request<T: Decodable>(
         _ path: String,
@@ -40,7 +46,7 @@ final class APIClient {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            (data, response) = try await session.data(for: request)
         } catch {
             let urlError = error as? URLError
             throw APIErrorEnvelope(
