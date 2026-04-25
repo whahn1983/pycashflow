@@ -140,17 +140,21 @@ def _verify_appstore_purchase(transaction_info: dict, receipt_data: str | None):
 
     Stub verification can be enabled for local development/testing only.
     """
+    def _strip_if_string(value) -> str:
+        return value.strip() if isinstance(value, str) else ""
+
     original_transaction_id = (
-        (transaction_info.get("original_transaction_id") or "").strip()
-        or (transaction_info.get("originalTransactionId") or "").strip()
-        or (transaction_info.get("original_id") or "").strip()
+        _strip_if_string(transaction_info.get("original_transaction_id"))
+        or _strip_if_string(transaction_info.get("originalTransactionId"))
+        or _strip_if_string(transaction_info.get("original_id"))
     )
 
     if _appstore_stub_verification_enabled():
         if not original_transaction_id:
             original_transaction_id = (
-                (transaction_info.get("id") or "").strip()
-                or (receipt_data or "stub-receipt").strip()
+                _strip_if_string(transaction_info.get("id"))
+                or _strip_if_string(receipt_data)
+                or "stub-receipt"
             )
         if not original_transaction_id:
             raise AppStoreVerificationError("missing original transaction id")
