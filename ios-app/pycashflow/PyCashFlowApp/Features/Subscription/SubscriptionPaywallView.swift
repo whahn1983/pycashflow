@@ -6,8 +6,6 @@ struct SubscriptionPaywallView: View {
     @StateObject private var manager = StoreKitSubscriptionManager()
     @State private var cloudEmail = ""
 
-    let message: String
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -15,11 +13,7 @@ struct SubscriptionPaywallView: View {
                     .font(.title.bold())
                     .foregroundStyle(AppTheme.textPrimary)
 
-                Text("App Store subscription is only for PyCashFlow Cloud account activation and maintenance.")
-                    .foregroundStyle(AppTheme.textSecondary)
-                    .cardRow()
-
-                Text(message)
+                Text("App Store subscription is only for PyCashFlow Cloud account activation.")
                     .foregroundStyle(AppTheme.textSecondary)
                     .cardRow()
 
@@ -88,12 +82,6 @@ struct SubscriptionPaywallView: View {
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(manager.isBusy)
 
-                Button("Re-check Account Status") {
-                    Task { await session.refreshSubscriptionState(forceProfileRefresh: true) }
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(manager.isBusy)
-
                 if let statusMessage = manager.statusMessage {
                     Text(statusMessage)
                         .foregroundStyle(AppTheme.textSecondary)
@@ -107,16 +95,6 @@ struct SubscriptionPaywallView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Button("Logout", role: .destructive) {
-                    session.clear()
-                }
-                .buttonStyle(PrimaryButtonStyle())
-
-                Button("Switch to Self-Hosted Mode") {
-                    session.switchMode(.selfHosted)
-                }
-                .buttonStyle(PrimaryButtonStyle())
             }
             .padding(20)
         }
