@@ -261,10 +261,8 @@ def process_email_balances():
 
                 if existing_balance:
                     logger.info(
-                        "Duplicate balance ignored for user %s (date=%s, amount=%s)",
+                        "Duplicate balance ignored for user %s",
                         user_id,
-                        balance_date.isoformat(),
-                        f"{new_balance:.2f}",
                     )
                 else:
                     # Insert balance WITH user_id using SQLAlchemy ORM
