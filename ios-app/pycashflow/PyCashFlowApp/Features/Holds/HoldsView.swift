@@ -84,36 +84,35 @@ struct HoldsView: View {
             }
 
             ForEach(holds) { hold in
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(hold.name)
-                                .foregroundStyle(AppTheme.textPrimary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                            Text(hold.type)
-                                .font(.caption)
-                                .foregroundStyle(AppTheme.textMuted)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                        Text("$\(hold.amount)")
-                            .foregroundStyle(hold.type == "Expense" ? AppTheme.danger : AppTheme.success)
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(hold.name)
+                            .foregroundStyle(AppTheme.textPrimary)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .layoutPriority(1)
+                            .truncationMode(.tail)
+                        Text(hold.type)
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.textMuted)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                    HStack {
-                        Spacer()
-                        iconButton(systemName: "trash", color: AppTheme.danger, label: "Delete") {
-                            Task { await deleteHold(hold.id) }
-                        }
-                    }
+                    Text("$\(hold.amount)")
+                        .foregroundStyle(hold.type == "Expense" ? AppTheme.danger : AppTheme.success)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .layoutPriority(1)
                 }
                 .surfaceCard()
                 .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                 .listRowBackground(Color.clear)
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        Task { await deleteHold(hold.id) }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .tint(AppTheme.danger)
+                }
             }
         }
     }
@@ -128,55 +127,38 @@ struct HoldsView: View {
             }
 
             ForEach(skips) { skip in
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(skip.name)
-                                .foregroundStyle(AppTheme.textPrimary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                            Text(skip.date ?? skip.type)
-                                .font(.caption)
-                                .foregroundStyle(AppTheme.textMuted)
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                        Text("$\(skip.amount)")
-                            .foregroundStyle(skip.type == "Expense" ? AppTheme.danger : AppTheme.success)
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(skip.name)
+                            .foregroundStyle(AppTheme.textPrimary)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .layoutPriority(1)
+                            .truncationMode(.tail)
+                        Text(skip.date ?? skip.type)
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.textMuted)
+                            .lineLimit(1)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                    HStack {
-                        Spacer()
-                        iconButton(systemName: "trash", color: AppTheme.danger, label: "Delete") {
-                            Task { await deleteSkip(skip.id) }
-                        }
-                    }
+                    Text("$\(skip.amount)")
+                        .foregroundStyle(skip.type == "Expense" ? AppTheme.danger : AppTheme.success)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .layoutPriority(1)
                 }
                 .surfaceCard()
                 .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                 .listRowBackground(Color.clear)
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        Task { await deleteSkip(skip.id) }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .tint(AppTheme.danger)
+                }
             }
         }
-    }
-
-    private func iconButton(systemName: String, color: Color, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: systemName)
-                    .font(.system(size: 14, weight: .semibold))
-                Text(label)
-                    .font(.caption)
-            }
-            .foregroundStyle(color)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(color.opacity(0.15), in: Capsule())
-        }
-        .buttonStyle(.borderless)
     }
 
     private func load() async {
