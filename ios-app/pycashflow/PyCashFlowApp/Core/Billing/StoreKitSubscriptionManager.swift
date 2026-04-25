@@ -104,7 +104,7 @@ final class StoreKitSubscriptionManager: ObservableObject {
             expiry_date: expiryISO,
             transaction: .init(
                 id: String(transaction.id),
-                original_id: String(transaction.originalID),
+                original_transaction_id: String(transaction.originalID),
                 product_id: transaction.productID,
                 purchase_date: Self.isoDate(transaction.purchaseDate),
                 expiry_date: expiryISO,

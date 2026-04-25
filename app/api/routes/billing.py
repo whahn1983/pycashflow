@@ -143,6 +143,7 @@ def _verify_appstore_purchase(transaction_info: dict, receipt_data: str | None):
     original_transaction_id = (
         (transaction_info.get("original_transaction_id") or "").strip()
         or (transaction_info.get("originalTransactionId") or "").strip()
+        or (transaction_info.get("original_id") or "").strip()
     )
 
     if _appstore_stub_verification_enabled():
