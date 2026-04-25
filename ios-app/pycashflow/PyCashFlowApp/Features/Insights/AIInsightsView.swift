@@ -14,7 +14,7 @@ struct AIInsightsView: View {
                         infoRow(label: "Model", value: model)
                     }
                     if let lastUpdated = insights.last_updated, !lastUpdated.isEmpty {
-                        infoRow(label: "Last Updated", value: lastUpdated)
+                        infoRow(label: "Last Updated", value: Self.formatLastUpdated(lastUpdated))
                     }
                     infoRow(label: "AI Configured", value: insights.configured ? "Yes" : "No")
                 }
@@ -98,6 +98,27 @@ struct AIInsightsView: View {
         } catch {
             errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to load insights"
         }
+    }
+
+    private static let lastUpdatedParser: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static let lastUpdatedDisplayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        formatter.doesRelativeDateFormatting = true
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        return formatter
+    }()
+
+    static func formatLastUpdated(_ raw: String) -> String {
+        guard let date = lastUpdatedParser.date(from: raw) else { return raw }
+        return lastUpdatedDisplayFormatter.string(from: date)
     }
 
     private func refreshInsights() async {
