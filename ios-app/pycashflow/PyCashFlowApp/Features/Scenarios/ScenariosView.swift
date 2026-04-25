@@ -91,15 +91,6 @@ struct ScenariosView: View {
                                 .layoutPriority(1)
                         }
 
-                        HStack(spacing: 16) {
-                            iconButton(systemName: "pencil", color: AppTheme.accent, label: "Edit") {
-                                beginEdit(scenario)
-                            }
-                            iconButton(systemName: "trash", color: AppTheme.danger, label: "Delete") {
-                                Task { await deleteScenario(scenario.id) }
-                            }
-                        }
-
                         if editingID == scenario.id {
                             VStack(spacing: 8) {
                                 TextField("Name", text: $editName).fieldStyle()
@@ -120,6 +111,22 @@ struct ScenariosView: View {
                     .surfaceCard()
                     .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                     .listRowBackground(Color.clear)
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        Button {
+                            beginEdit(scenario)
+                        } label: {
+                            Label("Edit", systemImage: "pencil.circle.fill")
+                        }
+                        .tint(AppTheme.accent)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            Task { await deleteScenario(scenario.id) }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        .tint(AppTheme.danger)
+                    }
                 }
             }
         }
@@ -128,20 +135,6 @@ struct ScenariosView: View {
         .refreshable { await load() }
         .appBackground()
         .navigationTitle("Scenarios")
-    }
-
-    private func iconButton(systemName: String, color: Color, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 2) {
-                Image(systemName: systemName)
-                    .font(.system(size: 16, weight: .semibold))
-                Text(label)
-                    .font(.caption2)
-            }
-            .foregroundStyle(color)
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderless)
     }
 
     private func pickerRow(label: String, selection: Binding<String>, options: [String]) -> some View {

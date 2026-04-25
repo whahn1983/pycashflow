@@ -100,21 +100,6 @@ struct SchedulesView: View {
                                 .layoutPriority(1)
                         }
 
-                        HStack(spacing: 16) {
-                            iconButton(systemName: "pencil", color: AppTheme.accent, label: "Edit") {
-                                beginEdit(schedule)
-                            }
-                            iconButton(systemName: "pause.fill", color: AppTheme.warning, label: "Hold") {
-                                Task { await addHold(schedule.id) }
-                            }
-                            iconButton(systemName: "forward.fill", color: AppTheme.warning, label: "Skip") {
-                                Task { await addSkip(schedule.id) }
-                            }
-                            iconButton(systemName: "trash", color: AppTheme.danger, label: "Delete") {
-                                Task { await deleteSchedule(schedule.id) }
-                            }
-                        }
-
                         if editingID == schedule.id {
                             VStack(spacing: 8) {
                                 TextField("Name", text: $editName).fieldStyle()
@@ -135,6 +120,36 @@ struct SchedulesView: View {
                     .surfaceCard()
                     .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                     .listRowBackground(Color.clear)
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        Button {
+                            beginEdit(schedule)
+                        } label: {
+                            Label("Edit", systemImage: "pencil.circle.fill")
+                        }
+                        .tint(AppTheme.accent)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            Task { await deleteSchedule(schedule.id) }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        .tint(AppTheme.danger)
+
+                        Button {
+                            Task { await addHold(schedule.id) }
+                        } label: {
+                            Label("Hold", systemImage: "pause.circle.fill")
+                        }
+                        .tint(AppTheme.warning)
+
+                        Button {
+                            Task { await addSkip(schedule.id) }
+                        } label: {
+                            Label("Skip", systemImage: "forward.circle.fill")
+                        }
+                        .tint(AppTheme.warning)
+                    }
                 }
             }
         }
@@ -143,20 +158,6 @@ struct SchedulesView: View {
         .refreshable { await load() }
         .appBackground()
         .navigationTitle("Schedules")
-    }
-
-    private func iconButton(systemName: String, color: Color, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 2) {
-                Image(systemName: systemName)
-                    .font(.system(size: 16, weight: .semibold))
-                Text(label)
-                    .font(.caption2)
-            }
-            .foregroundStyle(color)
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderless)
     }
 
     private func pickerRow(label: String, selection: Binding<String>, options: [String]) -> some View {
