@@ -174,8 +174,8 @@
         </a>
     </div>
 
-    {% if not current_user.account_owner_id and not current_user.owner_user_id %}
-    <!-- Delete Account Card - Account Owners Only -->
+    {% if not current_user.account_owner_id and not current_user.owner_user_id and not current_user.is_global_admin %}
+    <!-- Delete Account Card - Account Owners Only (hidden for global admins) -->
     <div class="metric-card">
         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
             <div style="width: 3rem; height: 3rem; background: linear-gradient(135deg, #ef4444, #f87171); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
@@ -694,8 +694,8 @@
 </div>
 {% endif %}
 
-{% if not current_user.account_owner_id and not current_user.owner_user_id %}
-<!-- Delete Account Modal - Account Owners Only -->
+{% if not current_user.account_owner_id and not current_user.owner_user_id and not current_user.is_global_admin %}
+<!-- Delete Account Modal - Account Owners Only (hidden for global admins) -->
 <div class="modal fade modal-modern" id="deleteaccountmodal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">

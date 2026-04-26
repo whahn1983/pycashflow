@@ -383,6 +383,101 @@ def test_delete_owner_removes_guest_password_setup_tokens(
     assert password_setup_token_model.query.filter_by(id=token_id).first() is None
 
 
+def test_delete_owner_with_guest_passkey_does_not_break_integrity(
+    auth_client, app_ctx, user_model, passkey_credential_model
+):
+    """Regression: a guest passkey row must not block bulk-deletion of the
+    parent account owner via the /delete_user/<id> path."""
+    db = app_ctx
+    acting_admin = user_model.query.filter_by(email="admin@test.local").first()
+    acting_admin.is_global_admin = True
+    db.session.flush()
+
+    owner = user_model(
+        email="owner-with-guest-passkey@test.local",
+        password=generate_password_hash("testpass123", method="scrypt"),
+        name="Owner With Guest Passkey",
+        admin=True,
+        is_active=True,
+        account_owner_id=None,
+        is_global_admin=False,
+    )
+    db.session.add(owner)
+    db.session.flush()
+
+    guest = user_model(
+        email="guest-with-passkey@test.local",
+        password=generate_password_hash("testpass123", method="scrypt"),
+        name="Guest With Passkey",
+        admin=False,
+        is_active=True,
+        account_owner_id=owner.id,
+        is_global_admin=False,
+    )
+    db.session.add(guest)
+    db.session.flush()
+
+    guest_id = guest.id
+    credential = passkey_credential_model(
+        user_id=guest.id,
+        credential_id="guest-passkey-blocking-owner-delete",
+        public_key="pk",
+        sign_count=0,
+        label="Guest Key",
+    )
+    db.session.add(credential)
+    db.session.commit()
+
+    resp = auth_client.post(f"/delete_user/{owner.id}", follow_redirects=False)
+
+    assert resp.status_code in (301, 302)
+    assert user_model.query.filter_by(id=owner.id).first() is None
+    assert user_model.query.filter_by(id=guest_id).first() is None
+    assert passkey_credential_model.query.filter_by(
+        credential_id="guest-passkey-blocking-owner-delete"
+    ).first() is None
+
+
+def test_delete_my_account_blocks_global_admin(
+    flask_app, app_ctx, user_model
+):
+    """Regression: global admins must not be able to self-delete via the
+    user-facing /delete_my_account path, since it would orphan the platform."""
+    db = app_ctx
+
+    admin = user_model(
+        email="global-admin-self-delete@test.local",
+        password=generate_password_hash("testpass123", method="scrypt"),
+        name="Global Admin",
+        admin=True,
+        is_active=True,
+        account_owner_id=None,
+        is_global_admin=True,
+    )
+    db.session.add(admin)
+    db.session.commit()
+    admin_id = admin.id
+
+    c = flask_app.test_client()
+    with c.session_transaction() as sess:
+        sess["_user_id"] = str(admin_id)
+        sess["_fresh"] = True
+
+    resp = c.post(
+        "/delete_my_account",
+        data={
+            "username": "global-admin-self-delete@test.local",
+            "password": "testpass123",
+        },
+        follow_redirects=False,
+    )
+
+    assert resp.status_code in (301, 302)
+    assert "/settings" in resp.headers.get("Location", "")
+    # The admin account must still exist after the blocked self-delete attempt.
+    assert user_model.query.filter_by(id=admin_id).first() is not None
+
+
 class TestGuestOnboarding:
     def test_add_guest_sends_password_setup_email(
         self, auth_client, flask_app, app_ctx, user_model, password_setup_token_model, monkeypatch

@@ -6,6 +6,7 @@ from flask import Blueprint, render_template
 from .models import (
     Schedule, Scenario, Balance, User, Settings, TextSettings, Email, Hold, Skip,
     GlobalEmailSettings, AISettings, PasskeyCredential, UserToken, PasswordSetupToken,
+    Subscription,
 )
 from app import db, limiter
 from datetime import datetime, timezone
@@ -820,46 +821,45 @@ def update_user():
         return redirect(url_for('main.manage_guests'))
 
 
+def _delete_user_owned_rows(user_ids):
+    # Bulk-delete every FK-linked row owned by the given user IDs.
+    # Bulk deletes bypass ORM cascades, so each table with a user_id FK
+    # must be cleared explicitly to avoid integrity errors.
+    if not user_ids:
+        return
+
+    for model in (
+        PasswordSetupToken,
+        UserToken,
+        PasskeyCredential,
+        AISettings,
+        Subscription,
+        Email,
+        Skip,
+        Hold,
+        Balance,
+        Scenario,
+        Schedule,
+    ):
+        db.session.query(model).filter(
+            model.user_id.in_(user_ids)
+        ).delete(synchronize_session=False)
+
+
 def _cascade_delete_user(user):
     # Manually delete all related data before deleting the user, then commit.
     user_id = user.id
 
-    # Delete setup tokens for all guests before deleting guest rows
+    # Clear FK-linked rows for every guest before bulk-deleting guest User rows.
     guest_ids = [
         guest_id for (guest_id,) in db.session.query(User.id).filter_by(account_owner_id=user_id).all()
     ]
+    _delete_user_owned_rows(guest_ids)
     if guest_ids:
-        db.session.query(PasswordSetupToken).filter(
-            PasswordSetupToken.user_id.in_(guest_ids)
-        ).delete(synchronize_session=False)
+        db.session.query(User).filter(User.id.in_(guest_ids)).delete(synchronize_session=False)
 
-    # Delete all guest users for this admin user
-    db.session.query(User).filter_by(account_owner_id=user_id).delete()
-
-    # Delete all schedules for this user
-    db.session.query(Schedule).filter_by(user_id=user_id).delete()
-
-    # Delete all scenarios for this user
-    db.session.query(Scenario).filter_by(user_id=user_id).delete()
-
-    # Delete all balances for this user
-    db.session.query(Balance).filter_by(user_id=user_id).delete()
-
-    # Delete all holds for this user
-    db.session.query(Hold).filter_by(user_id=user_id).delete()
-
-    # Delete all skips for this user
-    db.session.query(Skip).filter_by(user_id=user_id).delete()
-
-    # Delete all email configs for this user
-    db.session.query(Email).filter_by(user_id=user_id).delete()
-
-    # Delete all passkey credentials for this user
-    db.session.query(PasskeyCredential).filter_by(user_id=user_id).delete()
-
-    # Delete all API tokens for this user
-    db.session.query(UserToken).filter_by(user_id=user_id).delete()
-    db.session.query(PasswordSetupToken).filter_by(user_id=user_id).delete()
+    # Clear FK-linked rows for the user themselves.
+    _delete_user_owned_rows([user_id])
 
     # Now delete the user
     db.session.delete(user)
@@ -902,6 +902,12 @@ def delete_user(id):
 @limiter.limit("5 per minute")
 def delete_my_account():
     # Account owners can permanently delete their own account, all guests, and all associated data.
+    # Global admins are blocked from this self-service path so the platform always retains
+    # at least one admin able to manage users; they must demote themselves first.
+    if current_user.is_global_admin:
+        flash('Global admins cannot delete their own account from this page')
+        return redirect(url_for('main.settings'))
+
     username = (request.form.get('username') or '').strip().lower()
     password = request.form.get('password') or ''
 
