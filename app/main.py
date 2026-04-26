@@ -1,7 +1,7 @@
 from flask import (
     request, redirect, url_for, send_from_directory, flash, send_file, Response, session, current_app
 )
-from flask_login import login_required, current_user
+from flask_login import login_required, current_user, logout_user
 from flask import Blueprint, render_template
 from .models import (
     Schedule, Scenario, Balance, User, Settings, TextSettings, Email, Hold, Skip,
@@ -820,6 +820,52 @@ def update_user():
         return redirect(url_for('main.manage_guests'))
 
 
+def _cascade_delete_user(user):
+    # Manually delete all related data before deleting the user, then commit.
+    user_id = user.id
+
+    # Delete setup tokens for all guests before deleting guest rows
+    guest_ids = [
+        guest_id for (guest_id,) in db.session.query(User.id).filter_by(account_owner_id=user_id).all()
+    ]
+    if guest_ids:
+        db.session.query(PasswordSetupToken).filter(
+            PasswordSetupToken.user_id.in_(guest_ids)
+        ).delete(synchronize_session=False)
+
+    # Delete all guest users for this admin user
+    db.session.query(User).filter_by(account_owner_id=user_id).delete()
+
+    # Delete all schedules for this user
+    db.session.query(Schedule).filter_by(user_id=user_id).delete()
+
+    # Delete all scenarios for this user
+    db.session.query(Scenario).filter_by(user_id=user_id).delete()
+
+    # Delete all balances for this user
+    db.session.query(Balance).filter_by(user_id=user_id).delete()
+
+    # Delete all holds for this user
+    db.session.query(Hold).filter_by(user_id=user_id).delete()
+
+    # Delete all skips for this user
+    db.session.query(Skip).filter_by(user_id=user_id).delete()
+
+    # Delete all email configs for this user
+    db.session.query(Email).filter_by(user_id=user_id).delete()
+
+    # Delete all passkey credentials for this user
+    db.session.query(PasskeyCredential).filter_by(user_id=user_id).delete()
+
+    # Delete all API tokens for this user
+    db.session.query(UserToken).filter_by(user_id=user_id).delete()
+    db.session.query(PasswordSetupToken).filter_by(user_id=user_id).delete()
+
+    # Now delete the user
+    db.session.delete(user)
+    db.session.commit()
+
+
 @main.route('/delete_user/<id>', methods=['POST'])
 @login_required
 @admin_required
@@ -838,49 +884,7 @@ def delete_user(id):
                 else:
                     return redirect(url_for('main.manage_guests'))
 
-            # Manually delete all related data before deleting the user
-            user_id = user.id
-
-            # Delete setup tokens for all guests before deleting guest rows
-            guest_ids = [
-                guest_id for (guest_id,) in db.session.query(User.id).filter_by(account_owner_id=user_id).all()
-            ]
-            if guest_ids:
-                db.session.query(PasswordSetupToken).filter(
-                    PasswordSetupToken.user_id.in_(guest_ids)
-                ).delete(synchronize_session=False)
-
-            # Delete all guest users for this admin user
-            db.session.query(User).filter_by(account_owner_id=user_id).delete()
-
-            # Delete all schedules for this user
-            db.session.query(Schedule).filter_by(user_id=user_id).delete()
-
-            # Delete all scenarios for this user
-            db.session.query(Scenario).filter_by(user_id=user_id).delete()
-
-            # Delete all balances for this user
-            db.session.query(Balance).filter_by(user_id=user_id).delete()
-
-            # Delete all holds for this user
-            db.session.query(Hold).filter_by(user_id=user_id).delete()
-
-            # Delete all skips for this user
-            db.session.query(Skip).filter_by(user_id=user_id).delete()
-
-            # Delete all email configs for this user
-            db.session.query(Email).filter_by(user_id=user_id).delete()
-
-            # Delete all passkey credentials for this user
-            db.session.query(PasskeyCredential).filter_by(user_id=user_id).delete()
-
-            # Delete all API tokens for this user
-            db.session.query(UserToken).filter_by(user_id=user_id).delete()
-            db.session.query(PasswordSetupToken).filter_by(user_id=user_id).delete()
-
-            # Now delete the user
-            db.session.delete(user)
-            db.session.commit()
+            _cascade_delete_user(user)
             flash("Deleted Successfully")
         else:
             flash("You don't have permission to delete this user")
@@ -890,6 +894,31 @@ def delete_user(id):
         return redirect(url_for('main.global_admin_panel'))
     else:
         return redirect(url_for('main.manage_guests'))
+
+
+@main.route('/delete_my_account', methods=['POST'])
+@login_required
+@account_owner_required
+@limiter.limit("5 per minute")
+def delete_my_account():
+    # Account owners can permanently delete their own account, all guests, and all associated data.
+    username = (request.form.get('username') or '').strip().lower()
+    password = request.form.get('password') or ''
+
+    user = User.query.filter_by(id=current_user.id).first()
+
+    if not user or not username or not password \
+            or username != (user.email or '').lower() \
+            or not check_password_hash(user.password, password):
+        flash('Username or password is incorrect')
+        return redirect(url_for('main.settings'))
+
+    _cascade_delete_user(user)
+
+    session.clear()
+    logout_user()
+    flash('Your account has been deleted')
+    return redirect(url_for('auth.login'))
 
 
 @main.route('/activate_user/<id>', methods=['POST'])
