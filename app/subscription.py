@@ -89,24 +89,7 @@ def get_effective_subscription(user: User | None) -> Subscription | None:
         .order_by(Subscription.updated_at.desc(), Subscription.id.desc())
         .first()
     )
-    if latest is not None:
-        return latest
-    return _legacy_user_subscription(user)
-
-
-def _legacy_user_subscription(user: User) -> Subscription | None:
-    """Build a transient subscription view from legacy user columns."""
-    if not user.subscription_source or user.subscription_source == "none":
-        return None
-    return Subscription(
-        user_id=user.id,
-        source=_canonical_source(user.subscription_source),
-        status=user.subscription_status or SUB_INACTIVE,
-        external_subscription_id=user.subscription_id if user.subscription_source == "stripe" else None,
-        original_transaction_id=user.subscription_id if user.subscription_source == "app_store" else None,
-        latest_transaction_id=user.subscription_id if user.subscription_source == "app_store" else None,
-        expires_at=user.subscription_expiry,
-    )
+    return latest
 
 
 def _canonical_source(source: str) -> str:
@@ -114,12 +97,6 @@ def _canonical_source(source: str) -> str:
     if source in {"app_store", "apple"}:
         return "apple"
     return source or "manual"
-
-
-def _legacy_source(source: str) -> str:
-    if source == "apple":
-        return "app_store"
-    return source
 
 
 def upsert_subscription(
@@ -184,9 +161,6 @@ def upsert_subscription(
 def _expire_user(user: User) -> bool:
     """Mark non-admin user expired/inactive. Returns True when mutated."""
     changed = False
-    if user.subscription_status != SUB_EXPIRED:
-        user.subscription_status = SUB_EXPIRED
-        changed = True
     if not user.is_global_admin and user.is_active:
         user.is_active = False
         changed = True
@@ -204,16 +178,11 @@ def apply_subscription_status(
     commit: bool = True,
 ) -> None:
     """Apply a subscription mutation and persist audit log entry."""
-    old_status = user.subscription_status
     old_active = bool(user.is_active)
 
     if status not in VALID_SUBSCRIPTION_STATUSES:
         raise ValueError(f"Invalid subscription status: {status}")
 
-    user.subscription_status = status
-    user.subscription_source = _legacy_source(_canonical_source(source))
-    user.subscription_id = subscription_id
-    user.subscription_expiry = expiry
     user.is_account_owner = True
     user.owner_user_id = None
     user.account_owner_id = None
@@ -232,8 +201,8 @@ def apply_subscription_status(
     logger.info(
         "Subscription change user_id=%s status=%s->%s active=%s->%s source=%s sub_id=%s expiry=%s",
         user.id,
-        old_status,
-        user.subscription_status,
+        "n/a",
+        status,
         old_active,
         user.is_active,
         source,
