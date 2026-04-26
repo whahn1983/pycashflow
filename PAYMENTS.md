@@ -8,9 +8,33 @@ PyCashFlow supports three activation sources:
 2. **Apple App Store subscriptions** (server-side verification via App Store Server API JWT auth)
 3. **Self-hosted/manual** activation when `PAYMENTS_ENABLED=false`
 
-All subscription state is stored on `User` and enforced centrally for both web and API auth paths.
+Subscription truth is normalized into a dedicated `subscription` table and
+enforced centrally for both web and API auth paths. Legacy `User`
+subscription columns remain as compatibility mirrors during transition.
 
-## User Subscription Fields
+## Subscription Table (Source of Truth)
+
+- `user_id` (owner `user.id`, non-null)
+- `source` (`apple | stripe | manual`)
+- `environment` (`production | sandbox | null/manual`)
+- `product_id` (provider product SKU/id)
+- `original_transaction_id` (Apple lifecycle identity)
+- `latest_transaction_id` (latest Apple transaction id)
+- `external_subscription_id` (Stripe subscription id or provider id)
+- `status` (`active | trial | grace_period | expired | canceled | inactive`)
+- `expires_at`
+- `raw_last_verified_at`
+- `created_at`, `updated_at`
+
+### Uniqueness and ownership constraints
+
+- Apple ownership lock: unique (`source`, `environment`, `original_transaction_id`)
+- Stripe uniqueness: unique (`source`, `external_subscription_id`)
+
+This prevents one Apple original transaction lifecycle from activating more
+than one account owner in the same environment.
+
+## Legacy User Compatibility Fields
 
 - `subscription_status`: `active | inactive | trial | expired`
 - `subscription_source`: `stripe | app_store | manual | none`
@@ -57,9 +81,16 @@ Default behavior in this repository is `PAYMENTS_ENABLED=false`.
 - Supports `APPLE_ENVIRONMENT=production|sandbox|auto` (`auto` tries production then sandbox).
 - Optionally validates `APPLE_BUNDLE_ID` against Apple-signed transaction payload.
 - Applies subscription lifecycle transitions from Apple truth source:
-  - Active statuses (`1`, `3`, `4`) => `subscription_status=active`, `is_active=true`
-  - Non-active statuses => `subscription_status=expired`, `is_active=false`
-- Creates/updates account owner by email and stores source `app_store`.
+  - Active statuses (`1`, `3`, `4`) => `status=active`, owner active
+  - Non-active statuses => `status=expired`, owner inactive
+- Uses `originalTransactionId` as the Apple lifecycle identity.
+- Stores `transactionId` as `latest_transaction_id`.
+- Ownership enforcement:
+  - If no matching subscription exists, create one for the owner.
+  - If the same owner re-verifies, update idempotently.
+  - If another owner attempts same `originalTransactionId` + environment,
+    verification is rejected and no activation occurs.
+- Creates/updates account owner by email and mirrors source `app_store` on `User`.
 - For first-time paid users only, creates a one-time password setup token and
   sends an onboarding email. Existing users do not receive setup email.
 - Optional local/dev stub mode remains available with
@@ -94,6 +125,16 @@ updated silently and no password setup email is sent.
 
 Guest users inherit access from their owner (`owner_user_id` or legacy `account_owner_id`).
 If owner subscription expires (and payments are enabled), guests are denied and marked inactive.
+
+## Cancel / Expire / Resubscribe Behavior
+
+- Same user + same Apple `originalTransactionId`: update existing row and
+  reactivate when Apple status returns active.
+- Same user + new Apple `originalTransactionId`: create a new row; older rows
+  may remain expired/canceled for history.
+- Same Apple lifecycle id + different user: rejected by ownership rule.
+- Sandbox and production are treated separately by the `(source, environment, original_transaction_id)`
+  unique constraint.
 
 ## Admin Behavior
 

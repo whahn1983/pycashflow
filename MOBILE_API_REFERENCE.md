@@ -959,6 +959,19 @@ Additional behavior updates:
 
 ## 2026-04-10 Payments Update
 
+## 2026-04-25 Subscription Ownership Update
+
+Backend subscription ownership is now normalized in a dedicated `subscription`
+table. Existing user-facing API fields remain backward-compatible.
+
+### Backend ownership rules
+
+- Apple lifecycle identity is `originalTransactionId`.
+- `transactionId` is tracked as latest transaction id separately.
+- One Apple lifecycle id cannot activate multiple owners in the same environment.
+- Sandbox and production are independent ownership namespaces.
+- Guests always inherit access from their account owner.
+
 ### User object additions
 
 `POST /api/v1/auth/login` and `GET /api/v1/auth/me` now include:
@@ -1025,6 +1038,10 @@ Server endpoint for iOS subscription verification against Apple App Store Server
 - `transaction.original_transaction_id` is required for real verification.
 - `APPLE_ENVIRONMENT=auto` enables production-first with sandbox fallback.
 - Response `data.environment` indicates which environment resolved the transaction.
+- Ownership is enforced by `(source=apple, environment, original_transaction_id)`:
+  - first verification creates an owner-linked subscription
+  - repeat verification by same owner is idempotent
+  - different owner with same lifecycle id is rejected
 - If verification fails, backend returns `401 unauthorized` and no account activation occurs.
 - Local development may opt into `APPSTORE_ALLOW_STUB_VERIFICATION=true` (non-production).
 
@@ -1054,6 +1071,15 @@ Server endpoint for iOS subscription verification against Apple App Store Server
   }
 }
 ```
+
+### Cancel / renew behavior
+
+- If Apple status becomes non-active, account becomes inactive when payments
+  enforcement is enabled.
+- Renewal on the same Apple lifecycle id updates expiry/latest transaction and
+  reactivates the same owner.
+- A new Apple lifecycle id for the same user creates an additional subscription
+  row; historical rows may remain expired/canceled.
 
 ### Access enforcement
 

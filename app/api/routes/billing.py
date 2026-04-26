@@ -11,10 +11,11 @@ import secrets
 from datetime import datetime, timezone
 
 from flask import current_app, request
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash
 
 from app import db
-from app.models import User
+from app.models import Subscription, User
 from app.getemail import send_password_setup_email
 from app.password_setup import (
     create_password_setup_link,
@@ -27,6 +28,8 @@ from app.subscription import (
     SUB_ACTIVE,
     SUB_EXPIRED,
     apply_subscription_status,
+    get_effective_subscription,
+    upsert_subscription,
     owner_for_user,
     payments_enabled,
     subscription_is_current,
@@ -162,8 +165,10 @@ def _verify_appstore_purchase(transaction_info: dict, receipt_data: str | None):
             "verification_status": "verified_stub",
             "is_active": True,
             "expiry": None,
-            "subscription_id": original_transaction_id,
+            "original_transaction_id": original_transaction_id,
+            "latest_transaction_id": original_transaction_id,
             "environment": "stub",
+            "product_id": None,
         }
 
     if not original_transaction_id:
@@ -208,10 +213,12 @@ def _verify_appstore_purchase(transaction_info: dict, receipt_data: str | None):
         "verification_status": "verified",
         "is_active": verification.is_active,
         "expiry": verification.expiry,
-        "subscription_id": verification.original_transaction_id,
+        "original_transaction_id": verification.original_transaction_id,
+        "latest_transaction_id": verification.transaction_id,
         "environment": verification.environment,
         "status_code": verification.status_code,
         "bundle_id": verification.bundle_id,
+        "product_id": None,
     }
 
 
@@ -234,7 +241,16 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
             subscription_id=obj.get("subscription") or obj.get("id"),
             expiry=expiry,
             activate=True,
+            commit=False,
         )
+        upsert_subscription(
+            user,
+            source="stripe",
+            status=SUB_ACTIVE,
+            external_subscription_id=obj.get("subscription") or obj.get("id"),
+            expires_at=expiry,
+        )
+        db.session.commit()
         _send_setup_email_for_new_user(user, created)
         return api_ok({"processed": event_type, "user_id": user.id})
 
@@ -245,7 +261,14 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
         subscription_id = obj.get("id")
         user = None
         if subscription_id:
-            user = User.query.filter_by(subscription_id=subscription_id).first()
+            existing_subscription = Subscription.query.filter_by(
+                source="stripe",
+                external_subscription_id=subscription_id,
+            ).first()
+            if existing_subscription is not None:
+                user = db.session.get(User, existing_subscription.user_id)
+            if user is None:
+                user = User.query.filter_by(subscription_id=subscription_id).first()
         created = False
         if user is None and email:
             if not _can_create_paid_user(email):
@@ -277,7 +300,16 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
             subscription_id=subscription_id,
             expiry=expires_at,
             activate=activate,
+            commit=False,
         )
+        upsert_subscription(
+            user,
+            source="stripe",
+            status=next_status,
+            external_subscription_id=subscription_id,
+            expires_at=expires_at,
+        )
+        db.session.commit()
         _send_setup_email_for_new_user(user, created)
         return api_ok({"processed": event_type, "user_id": user.id})
 
@@ -288,6 +320,13 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
 
         user = User.query.filter_by(subscription_id=sub_id).first()
         if not user:
+            existing_subscription = Subscription.query.filter_by(
+                source="stripe",
+                external_subscription_id=sub_id,
+            ).first()
+            if existing_subscription is not None:
+                user = db.session.get(User, existing_subscription.user_id)
+        if not user:
             return api_ok({"processed": event_type, "ignored": True})
 
         apply_subscription_status(
@@ -297,7 +336,16 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
             subscription_id=sub_id,
             expiry=datetime.now(timezone.utc).replace(tzinfo=None),
             activate=False,
+            commit=False,
         )
+        upsert_subscription(
+            user,
+            source="stripe",
+            status=SUB_EXPIRED,
+            external_subscription_id=sub_id,
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+        db.session.commit()
         return api_ok({"processed": event_type, "user_id": user.id})
 
     return api_ok({"processed": event_type, "ignored": True})
@@ -356,7 +404,26 @@ def api_billing_status():
             effective_is_active = bool(user.is_active)
 
     subscription_subject = owner or user
-    expiry = subscription_subject.subscription_expiry
+    effective_subscription = get_effective_subscription(subscription_subject)
+    status = (
+        effective_subscription.status
+        if effective_subscription is not None
+        else subscription_subject.subscription_status
+    )
+    source = (
+        "app_store"
+        if effective_subscription is not None and effective_subscription.source == "apple"
+        else (
+            effective_subscription.source
+            if effective_subscription is not None
+            else subscription_subject.subscription_source
+        )
+    )
+    expiry = (
+        effective_subscription.expires_at
+        if effective_subscription is not None
+        else subscription_subject.subscription_expiry
+    )
     if expiry and expiry.tzinfo is None:
         expiry = expiry.replace(tzinfo=timezone.utc)
 
@@ -365,8 +432,8 @@ def api_billing_status():
             "user_id": user.id,
             "is_active": bool(user.is_active),
             "effective_is_active": effective_is_active,
-            "subscription_status": subscription_subject.subscription_status,
-            "subscription_source": subscription_subject.subscription_source,
+            "subscription_status": status,
+            "subscription_source": source,
             "subscription_expiry": expiry.strftime("%Y-%m-%dT%H:%M:%SZ") if expiry else None,
             "payments_enabled": payments_enabled(),
             "is_global_admin": bool(user.is_global_admin),
@@ -416,21 +483,74 @@ def api_verify_appstore():
     expiry = verification.get("expiry")
     is_active = bool(verification.get("is_active"))
     subscription_status = SUB_ACTIVE if is_active else SUB_EXPIRED
+    appstore_env = verification.get("environment")
+    original_txn_id = (verification.get("original_transaction_id") or "").strip() or None
+    latest_txn_id = (verification.get("latest_transaction_id") or "").strip() or None
 
     if not _can_create_paid_user(email):
         return validation_error(
             {"frontend_base_url": "FRONTEND_BASE_URL is required to onboard new paid users"}
         )
 
+    existing_subscription = None
+    if original_txn_id:
+        existing_subscription = Subscription.query.filter_by(
+            source="apple",
+            environment=appstore_env,
+            original_transaction_id=original_txn_id,
+        ).first()
+        if existing_subscription is not None:
+            existing_owner = db.session.get(User, existing_subscription.user_id)
+            if existing_owner is None or existing_owner.email != email:
+                logger.warning(
+                    "App Store original transaction ownership conflict original_txn=%s env=%s email=%s owner_id=%s",
+                    original_txn_id,
+                    appstore_env,
+                    email,
+                    existing_subscription.user_id,
+                )
+                return unauthorized(
+                    "App Store subscription is already linked to another account"
+                )
+
     user, created = _create_or_get_owner(email)
+    if existing_subscription is not None and existing_subscription.user_id != user.id:
+            logger.warning(
+                "App Store original transaction ownership conflict original_txn=%s env=%s user_id=%s owner_id=%s",
+                original_txn_id,
+                appstore_env,
+                user.id,
+                existing_subscription.user_id,
+            )
+            return unauthorized(
+                "App Store subscription is already linked to another account"
+            )
+
     apply_subscription_status(
         user,
         status=subscription_status,
-        source="app_store",
-        subscription_id=verification.get("subscription_id"),
+        source="apple",
+        subscription_id=original_txn_id,
         expiry=expiry,
         activate=is_active,
+        commit=False,
     )
+    try:
+        upsert_subscription(
+            user,
+            source="apple",
+            status=subscription_status,
+            environment=appstore_env,
+            product_id=verification.get("product_id"),
+            original_transaction_id=original_txn_id,
+            latest_transaction_id=latest_txn_id,
+            expires_at=expiry,
+            raw_last_verified_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return unauthorized("App Store subscription is already linked to another account")
     _send_setup_email_for_new_user(user, created)
 
     return api_ok(

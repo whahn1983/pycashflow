@@ -12,7 +12,7 @@ import logging
 from flask import current_app
 
 from app import db
-from app.models import User
+from app.models import Subscription, User
 
 
 logger = logging.getLogger(__name__)
@@ -20,10 +20,20 @@ logger = logging.getLogger(__name__)
 SUB_ACTIVE = "active"
 SUB_INACTIVE = "inactive"
 SUB_TRIAL = "trial"
+SUB_GRACE_PERIOD = "grace_period"
 SUB_EXPIRED = "expired"
+SUB_CANCELED = "canceled"
 
 
-VALID_SUBSCRIPTION_STATUSES = {SUB_ACTIVE, SUB_INACTIVE, SUB_TRIAL, SUB_EXPIRED}
+VALID_SUBSCRIPTION_STATUSES = {
+    SUB_ACTIVE,
+    SUB_INACTIVE,
+    SUB_TRIAL,
+    SUB_GRACE_PERIOD,
+    SUB_EXPIRED,
+    SUB_CANCELED,
+}
+ACTIVE_SUBSCRIPTION_STATUSES = {SUB_ACTIVE, SUB_TRIAL, SUB_GRACE_PERIOD}
 
 
 def payments_enabled() -> bool:
@@ -46,15 +56,129 @@ def subscription_is_current(user: User | None) -> bool:
     """Return True when user subscription status/expiry is currently valid."""
     if user is None:
         return False
-    if user.subscription_status not in {SUB_ACTIVE, SUB_TRIAL}:
+    subscription = get_effective_subscription(user)
+    if subscription is None:
         return False
-    if user.subscription_expiry is None:
+    if subscription.status not in ACTIVE_SUBSCRIPTION_STATUSES:
+        return False
+    if subscription.expires_at is None:
         return True
 
-    expiry = user.subscription_expiry
+    expiry = subscription.expires_at
     if expiry.tzinfo is None:
         expiry = expiry.replace(tzinfo=timezone.utc)
     return expiry >= datetime.now(timezone.utc)
+
+
+def get_effective_subscription(user: User | None) -> Subscription | None:
+    """Return a user's most recently-updated subscription record, if present."""
+    if user is None:
+        return None
+
+    latest_active = (
+        Subscription.query.filter_by(user_id=user.id)
+        .filter(Subscription.status.in_(tuple(ACTIVE_SUBSCRIPTION_STATUSES)))
+        .order_by(Subscription.expires_at.desc(), Subscription.updated_at.desc())
+        .first()
+    )
+    if latest_active is not None:
+        return latest_active
+
+    latest = (
+        Subscription.query.filter_by(user_id=user.id)
+        .order_by(Subscription.updated_at.desc(), Subscription.id.desc())
+        .first()
+    )
+    if latest is not None:
+        return latest
+    return _legacy_user_subscription(user)
+
+
+def _legacy_user_subscription(user: User) -> Subscription | None:
+    """Build a transient subscription view from legacy user columns."""
+    if not user.subscription_source or user.subscription_source == "none":
+        return None
+    return Subscription(
+        user_id=user.id,
+        source=_canonical_source(user.subscription_source),
+        status=user.subscription_status or SUB_INACTIVE,
+        external_subscription_id=user.subscription_id if user.subscription_source == "stripe" else None,
+        original_transaction_id=user.subscription_id if user.subscription_source == "app_store" else None,
+        latest_transaction_id=user.subscription_id if user.subscription_source == "app_store" else None,
+        expires_at=user.subscription_expiry,
+    )
+
+
+def _canonical_source(source: str) -> str:
+    source = (source or "").strip().lower()
+    if source in {"app_store", "apple"}:
+        return "apple"
+    return source or "manual"
+
+
+def _legacy_source(source: str) -> str:
+    if source == "apple":
+        return "app_store"
+    return source
+
+
+def upsert_subscription(
+    user: User,
+    *,
+    source: str,
+    status: str,
+    environment: str | None = None,
+    product_id: str | None = None,
+    original_transaction_id: str | None = None,
+    latest_transaction_id: str | None = None,
+    external_subscription_id: str | None = None,
+    expires_at: datetime | None = None,
+    raw_last_verified_at: datetime | None = None,
+) -> Subscription:
+    """Create or update a provider subscription for a user."""
+    canonical_source = _canonical_source(source)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    raw_last_verified_at = raw_last_verified_at or now
+    if status not in VALID_SUBSCRIPTION_STATUSES:
+        raise ValueError(f"Invalid subscription status: {status}")
+
+    query = Subscription.query.filter_by(user_id=user.id, source=canonical_source)
+    if canonical_source == "apple" and original_transaction_id:
+        query = query.filter_by(
+            environment=environment,
+            original_transaction_id=original_transaction_id,
+        )
+    elif canonical_source == "stripe" and external_subscription_id:
+        query = query.filter_by(external_subscription_id=external_subscription_id)
+
+    subscription = query.order_by(Subscription.id.desc()).first()
+    if subscription is None:
+        subscription = Subscription(
+            user_id=user.id,
+            source=canonical_source,
+            environment=environment,
+            product_id=product_id,
+            original_transaction_id=original_transaction_id,
+            latest_transaction_id=latest_transaction_id,
+            external_subscription_id=external_subscription_id,
+            status=status,
+            expires_at=expires_at,
+            raw_last_verified_at=raw_last_verified_at,
+        )
+    else:
+        subscription.environment = environment
+        subscription.product_id = product_id
+        subscription.original_transaction_id = original_transaction_id or subscription.original_transaction_id
+        subscription.latest_transaction_id = latest_transaction_id or subscription.latest_transaction_id
+        subscription.external_subscription_id = external_subscription_id or subscription.external_subscription_id
+        subscription.status = status
+        subscription.expires_at = expires_at
+        subscription.raw_last_verified_at = raw_last_verified_at
+        subscription.updated_at = now
+
+    db.session.add(subscription)
+    db.session.flush()
+    return subscription
 
 
 def _expire_user(user: User) -> bool:
@@ -77,6 +201,7 @@ def apply_subscription_status(
     subscription_id: str | None = None,
     expiry: datetime | None = None,
     activate: bool = True,
+    commit: bool = True,
 ) -> None:
     """Apply a subscription mutation and persist audit log entry."""
     old_status = user.subscription_status
@@ -86,7 +211,7 @@ def apply_subscription_status(
         raise ValueError(f"Invalid subscription status: {status}")
 
     user.subscription_status = status
-    user.subscription_source = source
+    user.subscription_source = _legacy_source(_canonical_source(source))
     user.subscription_id = subscription_id
     user.subscription_expiry = expiry
     user.is_account_owner = True
@@ -102,7 +227,8 @@ def apply_subscription_status(
         user.is_active = False
 
     db.session.add(user)
-    db.session.commit()
+    if commit:
+        db.session.commit()
     logger.info(
         "Subscription change user_id=%s status=%s->%s active=%s->%s source=%s sub_id=%s expiry=%s",
         user.id,
