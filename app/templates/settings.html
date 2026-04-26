@@ -718,6 +718,19 @@
                         skips, email configurations, passkeys, and API tokens). This cannot be undone.
                     </p>
                 </div>
+                <div style="background-color: rgba(245,158,11,0.08); border-left: 4px solid var(--warning);
+                            padding: 1rem; margin-bottom: 1.5rem; border-radius: var(--radius-md);">
+                    <p style="margin: 0 0 0.5rem 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 600;">
+                        <i class="fa-brands fa-apple" style="color: var(--warning);"></i>
+                        iOS subscribers: cancel your subscription separately.
+                    </p>
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 0.875rem;">
+                        If you subscribed through the iOS App Store, deleting your account here will
+                        <strong>not</strong> cancel your Apple subscription. You must cancel it yourself
+                        in iOS Settings &rarr; [your name] &rarr; Subscriptions, or it will continue
+                        renewing after your account is deleted.
+                    </p>
+                </div>
                 <form action="{{ url_for('main.delete_my_account') }}" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group-modern">
