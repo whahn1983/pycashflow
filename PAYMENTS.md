@@ -9,8 +9,7 @@ PyCashFlow supports three activation sources:
 3. **Self-hosted/manual** activation when `PAYMENTS_ENABLED=false`
 
 Subscription truth is normalized into a dedicated `subscription` table and
-enforced centrally for both web and API auth paths. Legacy `User`
-subscription columns remain as compatibility mirrors during transition.
+enforced centrally for both web and API auth paths.
 
 ## Subscription Table (Source of Truth)
 
@@ -34,12 +33,8 @@ subscription columns remain as compatibility mirrors during transition.
 This prevents one Apple original transaction lifecycle from activating more
 than one account owner in the same environment.
 
-## Legacy User Compatibility Fields
+## User Access Fields
 
-- `subscription_status`: `active | inactive | trial | expired`
-- `subscription_source`: `stripe | app_store | manual | none`
-- `subscription_id`: provider subscription identifier
-- `subscription_expiry`: UTC datetime for access expiry
 - `is_account_owner`: explicit owner marker
 - `owner_user_id`: owner link for guests (legacy `account_owner_id` is still respected)
 - `is_global_admin`: bypasses payment checks and is always active
@@ -90,7 +85,7 @@ Default behavior in this repository is `PAYMENTS_ENABLED=false`.
   - If the same owner re-verifies, update idempotently.
   - If another owner attempts same `originalTransactionId` + environment,
     verification is rejected and no activation occurs.
-- Creates/updates account owner by email and mirrors source `app_store` on `User`.
+- Creates/updates account owner by email and writes provider state only to `subscription`.
 - For first-time paid users only, creates a one-time password setup token and
   sends an onboarding email. Existing users do not receive setup email.
 - Optional local/dev stub mode remains available with

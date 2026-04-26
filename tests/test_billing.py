@@ -55,9 +55,10 @@ def test_stripe_webhook_checkout_activation_flow(flask_app, client):
     with flask_app.app_context():
         user = User.query.filter_by(email="stripe-user@test.local").first()
         assert user is not None
-        assert user.subscription_status == "active"
-        assert user.subscription_source == "stripe"
-        assert user.subscription_id == "sub_123"
+        sub = Subscription.query.filter_by(user_id=user.id, source="stripe").first()
+        assert sub is not None
+        assert sub.status == "active"
+        assert sub.external_subscription_id == "sub_123"
         assert user.is_active is True
         assert user.is_account_owner is True
 
@@ -72,11 +73,27 @@ def test_stripe_subscription_deleted_expires_user(flask_app, client):
             admin=True,
             is_account_owner=True,
             is_active=True,
-            subscription_status="active",
-            subscription_source="stripe",
-            subscription_id="sub_cancel_1",
         )
         db.session.add(user)
+        db.session.commit()
+        db.session.add(
+            Subscription(
+                user_id=user.id,
+                source="stripe",
+                status="expired",
+                external_subscription_id="sub_existing_123",
+            )
+        )
+        db.session.commit()
+        db.session.add(
+            Subscription(
+                user_id=user.id,
+                source="stripe",
+                status="active",
+                external_subscription_id="sub_cancel_1",
+                expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
+            )
+        )
         db.session.commit()
 
     payload = {
@@ -93,7 +110,9 @@ def test_stripe_subscription_deleted_expires_user(flask_app, client):
 
     with flask_app.app_context():
         user = User.query.filter_by(email="cancel@test.local").first()
-        assert user.subscription_status == "expired"
+        sub = Subscription.query.filter_by(user_id=user.id, source="stripe").first()
+        assert sub is not None
+        assert sub.status == "expired"
         assert user.is_active is False
 
 
@@ -137,8 +156,9 @@ def test_appstore_verification_stub_mode_can_activate_owner(flask_app, client):
     with flask_app.app_context():
         user = User.query.filter_by(email="ios-stub@test.local").first()
         assert user is not None
-        assert user.subscription_source == "app_store"
-        assert user.subscription_status == "active"
+        sub = Subscription.query.filter_by(user_id=user.id, source="apple").first()
+        assert sub is not None
+        assert sub.status == "active"
         assert user.is_active is True
 
 
@@ -162,7 +182,9 @@ def test_appstore_verification_stub_mode_accepts_original_id_alias(flask_app, cl
     with flask_app.app_context():
         user = User.query.filter_by(email="ios-stub-alias@test.local").first()
         assert user is not None
-        assert user.subscription_id == "ios_txn_alias_1"
+        sub = Subscription.query.filter_by(user_id=user.id, source="apple").first()
+        assert sub is not None
+        assert sub.original_transaction_id == "ios_txn_alias_1"
 
 
 def test_appstore_verification_stub_mode_rejects_non_string_original_id(flask_app, client):
@@ -185,7 +207,9 @@ def test_appstore_verification_stub_mode_rejects_non_string_original_id(flask_ap
     with flask_app.app_context():
         user = User.query.filter_by(email="ios-stub-alias-nonstr@test.local").first()
         assert user is not None
-        assert user.subscription_id == "dummy-receipt"
+        sub = Subscription.query.filter_by(user_id=user.id, source="apple").first()
+        assert sub is not None
+        assert sub.original_transaction_id == "dummy-receipt"
 
 
 def test_appstore_existing_user_subscription_update_no_duplicate(
@@ -199,9 +223,6 @@ def test_appstore_existing_user_subscription_update_no_duplicate(
             admin=True,
             is_account_owner=True,
             is_active=False,
-            subscription_status="expired",
-            subscription_source="app_store",
-            subscription_id="orig_old",
         )
         db.session.add(existing)
         db.session.commit()
@@ -235,16 +256,15 @@ def test_appstore_existing_user_subscription_update_no_duplicate(
         assert len(users) == 1
         user = users[0]
         assert user.id == existing_id
-        assert user.subscription_status == "active"
-        assert user.subscription_source == "app_store"
-        assert user.subscription_id == "orig_txn_renewed"
-        assert user.is_active is True
         sub = Subscription.query.filter_by(
+            user_id=user.id,
             source="apple",
             environment="production",
             original_transaction_id="orig_txn_renewed",
         ).first()
         assert sub is not None
+        assert sub.status == "active"
+        assert user.is_active is True
         assert sub.latest_transaction_id == "ios_latest_renew_1"
 
 
@@ -259,13 +279,9 @@ def test_appstore_expired_subscription_deactivates_owner_and_guest(
             admin=True,
             is_account_owner=True,
             is_active=True,
-            subscription_status="active",
-            subscription_source="app_store",
-            subscription_id="orig_expire",
         )
         db.session.add(owner)
         db.session.commit()
-
         guest = User(
             email="ios-guest-expire@test.local",
             password=generate_password_hash("pass12345", method="scrypt"),
@@ -275,8 +291,6 @@ def test_appstore_expired_subscription_deactivates_owner_and_guest(
             is_account_owner=False,
             owner_user_id=owner.id,
             account_owner_id=owner.id,
-            subscription_status="inactive",
-            subscription_source="none",
         )
         db.session.add(guest)
         db.session.commit()
@@ -309,7 +323,11 @@ def test_appstore_expired_subscription_deactivates_owner_and_guest(
         guest = User.query.filter_by(email="ios-guest-expire@test.local").first()
         assert owner is not None
         assert guest is not None
-        assert owner.subscription_status == "expired"
+        sub = Subscription.query.filter_by(
+            user_id=owner.id, source="apple", original_transaction_id="orig_expire"
+        ).first()
+        assert sub is not None
+        assert sub.status == "expired"
         assert owner.is_active is False
         assert guest.is_active is True
 
@@ -338,9 +356,6 @@ def test_appstore_renewed_subscription_reactivates_deactivated_owner(
             admin=True,
             is_account_owner=True,
             is_active=False,
-            subscription_status="expired",
-            subscription_source="app_store",
-            subscription_id="orig_renew",
         )
         db.session.add(owner)
         db.session.commit()
@@ -372,7 +387,11 @@ def test_appstore_renewed_subscription_reactivates_deactivated_owner(
     with flask_app.app_context():
         owner = User.query.filter_by(email="ios-owner-renew@test.local").first()
         assert owner is not None
-        assert owner.subscription_status == "active"
+        sub = Subscription.query.filter_by(
+            user_id=owner.id, source="apple", original_transaction_id="orig_renew"
+        ).first()
+        assert sub is not None
+        assert sub.status == "active"
         assert owner.is_active is True
 
 
@@ -387,8 +406,6 @@ def test_appstore_failed_verification_does_not_activate_user(
             admin=True,
             is_account_owner=True,
             is_active=False,
-            subscription_status="expired",
-            subscription_source="app_store",
         )
         db.session.add(user)
         db.session.commit()
@@ -407,7 +424,8 @@ def test_appstore_failed_verification_does_not_activate_user(
     with flask_app.app_context():
         user = User.query.filter_by(email="ios-fail@test.local").first()
         assert user is not None
-        assert user.subscription_status == "expired"
+        sub = Subscription.query.filter_by(user_id=user.id, source="apple").first()
+        assert sub is None
         assert user.is_active is False
 
 
@@ -593,12 +611,9 @@ def test_guest_access_depends_on_owner_subscription(flask_app, client):
             name="Owner",
             admin=True,
             is_active=True,
-            subscription_status="expired",
-            subscription_source="stripe",
         )
         db.session.add(owner)
         db.session.commit()
-
         guest = User(
             email="guest-expired@test.local",
             password=generate_password_hash("pass12345", method="scrypt"),
@@ -608,8 +623,6 @@ def test_guest_access_depends_on_owner_subscription(flask_app, client):
             account_owner_id=owner.id,
             owner_user_id=owner.id,
             is_account_owner=False,
-            subscription_status="inactive",
-            subscription_source="none",
         )
         db.session.add(guest)
         db.session.commit()
@@ -635,11 +648,18 @@ def test_inactive_guest_is_reactivated_when_owner_subscription_is_current(flask_
             name="Owner",
             admin=True,
             is_active=True,
-            subscription_status="active",
-            subscription_source="stripe",
-            subscription_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
         )
         db.session.add(owner)
+        db.session.commit()
+        db.session.add(
+            Subscription(
+                user_id=owner.id,
+                source="stripe",
+                status="active",
+                external_subscription_id="sub_owner_active_reactivate_1",
+                expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
+            )
+        )
         db.session.commit()
 
         guest = User(
@@ -651,8 +671,6 @@ def test_inactive_guest_is_reactivated_when_owner_subscription_is_current(flask_
             account_owner_id=owner.id,
             owner_user_id=owner.id,
             is_account_owner=False,
-            subscription_status="inactive",
-            subscription_source="none",
         )
         db.session.add(guest)
         db.session.commit()
@@ -678,18 +696,24 @@ def test_subscription_webhook_update_without_email_uses_existing_subscription_id
             admin=True,
             is_account_owner=True,
             is_active=False,
-            subscription_status="expired",
-            subscription_source="stripe",
-            subscription_id="sub_existing_123",
         )
         db.session.add(user)
+        db.session.commit()
+        db.session.add(
+            Subscription(
+                user_id=user.id,
+                source="stripe",
+                status="expired",
+                external_subscription_id="sub_existing_update_123",
+            )
+        )
         db.session.commit()
 
     payload = {
         "type": "customer.subscription.updated",
         "data": {
             "object": {
-                "id": "sub_existing_123",
+                "id": "sub_existing_update_123",
                 "status": "active",
                 "current_period_end": int((datetime.now(timezone.utc) + timedelta(days=45)).timestamp()),
             }
@@ -705,11 +729,15 @@ def test_subscription_webhook_update_without_email_uses_existing_subscription_id
 
     with flask_app.app_context():
         user = User.query.filter_by(email="sub-update@test.local").first()
-        assert user.subscription_status == "active"
+        sub = Subscription.query.filter_by(
+            user_id=user.id, source="stripe", external_subscription_id="sub_existing_update_123"
+        ).first()
+        assert sub is not None
+        assert sub.status == "active"
         assert user.is_active is True
         assert (
             Subscription.query.filter_by(
-                source="stripe", external_subscription_id="sub_existing_123"
+                source="stripe", external_subscription_id="sub_existing_update_123"
             ).count()
             == 1
         )
@@ -726,8 +754,6 @@ def test_guest_of_global_admin_is_subscription_exempt(flask_app, client):
             admin=True,
             is_global_admin=True,
             is_active=True,
-            subscription_status="expired",
-            subscription_source="none",
         )
         db.session.add(admin)
         db.session.commit()
@@ -741,8 +767,6 @@ def test_guest_of_global_admin_is_subscription_exempt(flask_app, client):
             account_owner_id=admin.id,
             owner_user_id=admin.id,
             is_account_owner=False,
-            subscription_status="inactive",
-            subscription_source="none",
         )
         db.session.add(guest)
         db.session.commit()
@@ -769,8 +793,6 @@ def test_inactive_guest_of_global_admin_is_reactivated(flask_app, client):
             admin=True,
             is_global_admin=True,
             is_active=True,
-            subscription_status="expired",
-            subscription_source="none",
         )
         db.session.add(admin)
         db.session.commit()
@@ -784,8 +806,6 @@ def test_inactive_guest_of_global_admin_is_reactivated(flask_app, client):
             account_owner_id=admin.id,
             owner_user_id=admin.id,
             is_account_owner=False,
-            subscription_status="inactive",
-            subscription_source="none",
         )
         db.session.add(guest)
         db.session.commit()
@@ -810,8 +830,6 @@ def test_global_admin_is_subscription_exempt(flask_app, client):
             admin=True,
             is_global_admin=True,
             is_active=True,
-            subscription_status="expired",
-            subscription_source="none",
         )
         db.session.add(admin)
         db.session.commit()
@@ -831,8 +849,6 @@ def test_payments_toggle_disables_subscription_enforcement(flask_app, client):
             name="Manual",
             admin=True,
             is_active=True,
-            subscription_status="expired",
-            subscription_source="manual",
         )
         db.session.add(user)
         db.session.commit()
@@ -853,11 +869,18 @@ def test_billing_status_endpoint_returns_subscription_snapshot(flask_app, client
             name="BillingStatus",
             admin=True,
             is_active=True,
-            subscription_status="active",
-            subscription_source="stripe",
-            subscription_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
         )
         db.session.add(user)
+        db.session.commit()
+        db.session.add(
+            Subscription(
+                user_id=user.id,
+                source="stripe",
+                status="active",
+                external_subscription_id="sub_billing_status_1",
+                expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
+            )
+        )
         db.session.commit()
         raw, _ = create_token_for_user(user)
 
@@ -882,11 +905,18 @@ def test_billing_status_endpoint_for_guest_uses_owner_subscription(flask_app, cl
             name="Owner",
             admin=True,
             is_active=True,
-            subscription_status="active",
-            subscription_source="stripe",
-            subscription_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
         )
         db.session.add(owner)
+        db.session.commit()
+        db.session.add(
+            Subscription(
+                user_id=owner.id,
+                source="stripe",
+                status="active",
+                external_subscription_id="sub_billing_owner_1",
+                expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
+            )
+        )
         db.session.commit()
 
         guest = User(
@@ -898,8 +928,6 @@ def test_billing_status_endpoint_for_guest_uses_owner_subscription(flask_app, cl
             is_account_owner=False,
             owner_user_id=owner.id,
             account_owner_id=owner.id,
-            subscription_status="inactive",
-            subscription_source="none",
         )
         db.session.add(guest)
         db.session.commit()
@@ -925,8 +953,6 @@ def test_billing_status_rejects_manual_deactivated_user(flask_app, client):
             name="BillingManualInactive",
             admin=True,
             is_active=False,
-            subscription_status="inactive",
-            subscription_source="manual",
         )
         db.session.add(user)
         db.session.commit()
@@ -949,11 +975,18 @@ def test_billing_status_rejects_admin_deactivated_user_with_current_subscription
             name="BillingAdminInactive",
             admin=True,
             is_active=False,
-            subscription_status="active",
-            subscription_source="stripe",
-            subscription_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=10),
         )
         db.session.add(user)
+        db.session.commit()
+        db.session.add(
+            Subscription(
+                user_id=user.id,
+                source="stripe",
+                status="active",
+                external_subscription_id="sub_billing_admin_1",
+                expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=10),
+            )
+        )
         db.session.commit()
         raw, _ = create_token_for_user(user)
 
@@ -974,11 +1007,18 @@ def test_billing_status_allows_inactive_users_for_refresh(flask_app, client):
             name="BillingExpired",
             admin=True,
             is_active=False,
-            subscription_status="expired",
-            subscription_source="stripe",
-            subscription_expiry=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1),
         )
         db.session.add(user)
+        db.session.commit()
+        db.session.add(
+            Subscription(
+                user_id=user.id,
+                source="stripe",
+                status="expired",
+                external_subscription_id="sub_billing_expired_1",
+                expires_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1),
+            )
+        )
         db.session.commit()
         raw, _ = create_token_for_user(user)
 

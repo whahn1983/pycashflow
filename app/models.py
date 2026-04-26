@@ -16,14 +16,6 @@ class User(UserMixin, db.Model):
     owner_user_id = db.Column(
         db.Integer, db.ForeignKey('user.id', name='fk_user_owner_user_id'), nullable=True
     )
-    subscription_status = db.Column(
-        db.String(20), default='inactive', nullable=False, server_default='inactive'
-    )
-    subscription_source = db.Column(
-        db.String(20), default='none', nullable=False, server_default='none'
-    )
-    subscription_id = db.Column(db.String(255), nullable=True)
-    subscription_expiry = db.Column(db.DateTime, nullable=True)
     twofa_enabled = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
     twofa_secret = db.Column(db.String(500), nullable=True)   # Fernet-encrypted TOTP secret
     twofa_backup_codes = db.Column(db.Text, nullable=True)    # JSON array of scrypt-hashed backup codes

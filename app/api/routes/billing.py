@@ -84,8 +84,6 @@ def _create_or_get_owner(email: str) -> tuple[User, bool]:
         admin=True,
         is_account_owner=True,
         is_active=True,
-        subscription_status="inactive",
-        subscription_source="none",
     )
     db.session.add(user)
     db.session.commit()
@@ -267,8 +265,6 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
             ).first()
             if existing_subscription is not None:
                 user = db.session.get(User, existing_subscription.user_id)
-            if user is None:
-                user = User.query.filter_by(subscription_id=subscription_id).first()
         created = False
         if user is None and email:
             if not _can_create_paid_user(email):
@@ -318,14 +314,11 @@ def _apply_stripe_event(event_type: str, obj: dict) -> tuple[dict, int]:
         if not sub_id:
             return validation_error({"subscription": "subscription id missing"})
 
-        user = User.query.filter_by(subscription_id=sub_id).first()
-        if not user:
-            existing_subscription = Subscription.query.filter_by(
-                source="stripe",
-                external_subscription_id=sub_id,
-            ).first()
-            if existing_subscription is not None:
-                user = db.session.get(User, existing_subscription.user_id)
+        existing_subscription = Subscription.query.filter_by(
+            source="stripe",
+            external_subscription_id=sub_id,
+        ).first()
+        user = db.session.get(User, existing_subscription.user_id) if existing_subscription else None
         if not user:
             return api_ok({"processed": event_type, "ignored": True})
 
@@ -408,7 +401,7 @@ def api_billing_status():
     status = (
         effective_subscription.status
         if effective_subscription is not None
-        else subscription_subject.subscription_status
+        else "inactive"
     )
     source = (
         "app_store"
@@ -416,13 +409,13 @@ def api_billing_status():
         else (
             effective_subscription.source
             if effective_subscription is not None
-            else subscription_subject.subscription_source
+            else "none"
         )
     )
     expiry = (
         effective_subscription.expires_at
         if effective_subscription is not None
-        else subscription_subject.subscription_expiry
+        else None
     )
     if expiry and expiry.tzinfo is None:
         expiry = expiry.replace(tzinfo=timezone.utc)
@@ -557,8 +550,8 @@ def api_verify_appstore():
         {
             "verification_status": verification.get("verification_status"),
             "user_id": user.id,
-            "subscription_status": user.subscription_status,
-            "subscription_source": user.subscription_source,
+            "subscription_status": subscription_status,
+            "subscription_source": "app_store",
             "environment": verification.get("environment"),
         }
     )

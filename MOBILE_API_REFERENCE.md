@@ -961,8 +961,8 @@ Additional behavior updates:
 
 ## 2026-04-25 Subscription Ownership Update
 
-Backend subscription ownership is now normalized in a dedicated `subscription`
-table. Existing user-facing API fields remain backward-compatible.
+Backend subscription ownership is normalized in the dedicated `subscription`
+table. The `User` table no longer stores subscription lifecycle columns.
 
 ### Backend ownership rules
 
@@ -979,6 +979,9 @@ table. Existing user-facing API fields remain backward-compatible.
 - `subscription_status`: `active | inactive | trial | expired`
 - `subscription_source`: `stripe | app_store | manual | none`
 - `subscription_expiry`: UTC datetime string or `null`
+
+These fields are computed from the effective `subscription` row (owner-scoped
+for guests), not from `User` columns.
 
 ### New billing endpoints
 
