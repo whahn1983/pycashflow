@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from werkzeug.security import generate_password_hash
 
 from app import db
-from app.models import PasswordSetupToken, User
+from app.models import PasswordSetupToken, Subscription, User
 from app.api.auth_utils import create_token_for_user
 
 
@@ -214,7 +214,8 @@ def test_appstore_existing_user_subscription_update_no_duplicate(
             "verification_status": "verified",
             "is_active": True,
             "expiry": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=40),
-            "subscription_id": "orig_txn_renewed",
+            "original_transaction_id": "orig_txn_renewed",
+            "latest_transaction_id": "ios_latest_renew_1",
             "environment": "production",
         },
     )
@@ -238,6 +239,13 @@ def test_appstore_existing_user_subscription_update_no_duplicate(
         assert user.subscription_source == "app_store"
         assert user.subscription_id == "orig_txn_renewed"
         assert user.is_active is True
+        sub = Subscription.query.filter_by(
+            source="apple",
+            environment="production",
+            original_transaction_id="orig_txn_renewed",
+        ).first()
+        assert sub is not None
+        assert sub.latest_transaction_id == "ios_latest_renew_1"
 
 
 def test_appstore_expired_subscription_deactivates_owner_and_guest(
@@ -280,7 +288,8 @@ def test_appstore_expired_subscription_deactivates_owner_and_guest(
             "verification_status": "verified",
             "is_active": False,
             "expiry": datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1),
-            "subscription_id": "orig_expire",
+            "original_transaction_id": "orig_expire",
+            "latest_transaction_id": "ios_latest_expire_1",
             "environment": "production",
         },
     )
@@ -343,7 +352,8 @@ def test_appstore_renewed_subscription_reactivates_deactivated_owner(
             "verification_status": "verified",
             "is_active": True,
             "expiry": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=25),
-            "subscription_id": "orig_renew",
+            "original_transaction_id": "orig_renew",
+            "latest_transaction_id": "ios_latest_renew_2",
             "environment": "sandbox",
         },
     )
@@ -697,6 +707,12 @@ def test_subscription_webhook_update_without_email_uses_existing_subscription_id
         user = User.query.filter_by(email="sub-update@test.local").first()
         assert user.subscription_status == "active"
         assert user.is_active is True
+        assert (
+            Subscription.query.filter_by(
+                source="stripe", external_subscription_id="sub_existing_123"
+            ).count()
+            == 1
+        )
 
 
 def test_guest_of_global_admin_is_subscription_exempt(flask_app, client):
@@ -975,3 +991,153 @@ def test_billing_status_allows_inactive_users_for_refresh(flask_app, client):
 
     with flask_app.app_context():
         flask_app.config["PAYMENTS_ENABLED"] = original_toggle
+
+
+def test_appstore_same_original_transaction_id_different_user_rejected(
+    flask_app, client, monkeypatch, billing_routes_module
+):
+    with flask_app.app_context():
+        flask_app.config["FRONTEND_BASE_URL"] = "https://app.example.com"
+        first = User(
+            email="ios-owner-a@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="Owner A",
+            admin=True,
+            is_account_owner=True,
+            is_active=True,
+        )
+        db.session.add(first)
+        db.session.commit()
+        first_id = first.id
+
+    monkeypatch.setattr(
+        billing_routes_module,
+        "_verify_appstore_purchase",
+        lambda *_args, **_kwargs: {
+            "verification_status": "verified",
+            "is_active": True,
+            "expiry": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
+            "original_transaction_id": "orig_unique_lock_1",
+            "latest_transaction_id": "latest_unique_lock_1",
+            "environment": "production",
+        },
+    )
+    resp_a = client.post(
+        "/api/v1/billing/verify-appstore",
+        json={
+            "email": "ios-owner-a@test.local",
+            "receipt_data": "receipt-a",
+            "transaction": {"original_transaction_id": "orig_unique_lock_1"},
+        },
+    )
+    assert resp_a.status_code == 200
+
+    resp_b = client.post(
+        "/api/v1/billing/verify-appstore",
+        json={
+            "email": "ios-owner-b@test.local",
+            "receipt_data": "receipt-b",
+            "transaction": {"original_transaction_id": "orig_unique_lock_1"},
+        },
+    )
+    assert resp_b.status_code == 401
+
+    with flask_app.app_context():
+        sub = Subscription.query.filter_by(
+            source="apple",
+            environment="production",
+            original_transaction_id="orig_unique_lock_1",
+        ).one()
+        assert sub.user_id == first_id
+        user_b = User.query.filter_by(email="ios-owner-b@test.local").first()
+        assert user_b is None
+
+
+def test_appstore_idempotent_reverify_does_not_duplicate_subscription(
+    flask_app, client, monkeypatch, billing_routes_module
+):
+    monkeypatch.setattr(
+        billing_routes_module,
+        "_verify_appstore_purchase",
+        lambda *_args, **_kwargs: {
+            "verification_status": "verified",
+            "is_active": True,
+            "expiry": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=15),
+            "original_transaction_id": "orig_idempotent_1",
+            "latest_transaction_id": "latest_idempotent_1",
+            "environment": "sandbox",
+        },
+    )
+    payload = {
+        "email": "ios-idempotent@test.local",
+        "receipt_data": "receipt",
+        "transaction": {"original_transaction_id": "orig_idempotent_1"},
+    }
+    assert client.post("/api/v1/billing/verify-appstore", json=payload).status_code == 200
+    assert client.post("/api/v1/billing/verify-appstore", json=payload).status_code == 200
+
+    with flask_app.app_context():
+        user = User.query.filter_by(email="ios-idempotent@test.local").one()
+        subs = Subscription.query.filter_by(
+            user_id=user.id,
+            source="apple",
+            environment="sandbox",
+            original_transaction_id="orig_idempotent_1",
+        ).all()
+        assert len(subs) == 1
+
+
+def test_appstore_same_original_transaction_id_different_environment_allowed(
+    flask_app, client, monkeypatch, billing_routes_module
+):
+    responses = [
+        {
+            "verification_status": "verified",
+            "is_active": True,
+            "expiry": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=15),
+            "original_transaction_id": "orig_env_dual_1",
+            "latest_transaction_id": "latest_env_prod",
+            "environment": "production",
+        },
+        {
+            "verification_status": "verified",
+            "is_active": True,
+            "expiry": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=15),
+            "original_transaction_id": "orig_env_dual_1",
+            "latest_transaction_id": "latest_env_sandbox",
+            "environment": "sandbox",
+        },
+    ]
+
+    def _mock_verify(*_args, **_kwargs):
+        return responses.pop(0)
+
+    monkeypatch.setattr(billing_routes_module, "_verify_appstore_purchase", _mock_verify)
+    payload = {
+        "email": "ios-env@test.local",
+        "receipt_data": "receipt",
+        "transaction": {"original_transaction_id": "orig_env_dual_1"},
+    }
+    assert client.post("/api/v1/billing/verify-appstore", json=payload).status_code == 200
+    assert client.post("/api/v1/billing/verify-appstore", json=payload).status_code == 200
+
+    with flask_app.app_context():
+        user = User.query.filter_by(email="ios-env@test.local").one()
+        assert (
+            Subscription.query.filter_by(
+                user_id=user.id,
+                source="apple",
+                environment="production",
+                original_transaction_id="orig_env_dual_1",
+            ).count()
+            == 1
+        )
+        assert (
+            Subscription.query.filter_by(
+                user_id=user.id,
+                source="apple",
+                environment="sandbox",
+                original_transaction_id="orig_env_dual_1",
+            ).count()
+            == 1
+        )

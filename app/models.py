@@ -34,6 +34,25 @@ class User(UserMixin, db.Model):
         foreign_keys='User.account_owner_id',
         backref=db.backref('account_owner', remote_side=[id]),
     )
+    subscriptions = db.relationship(
+        'Subscription',
+        back_populates='user',
+        cascade='all, delete-orphan',
+        lazy='dynamic',
+    )
+
+    @property
+    def active_subscription(self):
+        """Return the most recent currently-active subscription, if any."""
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        return (
+            self.subscriptions.filter(
+                Subscription.status.in_(["active", "trial", "grace_period"]),
+                db.or_(Subscription.expires_at.is_(None), Subscription.expires_at >= now),
+            )
+            .order_by(Subscription.updated_at.desc(), Subscription.id.desc())
+            .first()
+        )
 
     # Constraints
     __table_args__ = (
@@ -230,3 +249,51 @@ class PasswordSetupToken(db.Model):
 
     # Relationships
     user = db.relationship('User', backref='password_setup_tokens')
+
+
+class Subscription(db.Model):
+    """Normalized provider subscription state tied to account owner users."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    source = db.Column(db.String(20), nullable=False)
+    environment = db.Column(db.String(20), nullable=True)
+    product_id = db.Column(db.String(255), nullable=True)
+    original_transaction_id = db.Column(db.String(255), nullable=True)
+    latest_transaction_id = db.Column(db.String(255), nullable=True)
+    external_subscription_id = db.Column(db.String(255), nullable=True)
+    status = db.Column(
+        db.String(20),
+        nullable=False,
+        default='inactive',
+        server_default='inactive',
+    )
+    expires_at = db.Column(db.DateTime, nullable=True)
+    raw_last_verified_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+
+    user = db.relationship('User', back_populates='subscriptions')
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'source',
+            'environment',
+            'original_transaction_id',
+            name='uq_subscription_apple_original',
+        ),
+        db.UniqueConstraint(
+            'source',
+            'external_subscription_id',
+            name='uq_subscription_external_source_id',
+        ),
+    )
