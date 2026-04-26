@@ -99,7 +99,11 @@ def _migrate_legacy_user_subscription_fields():
         subscription_id = (row.subscription_id or '').strip() or None
         if source in {'app_store', 'apple'}:
             source = 'apple'
-            environment = None
+            # Legacy App Store subscriptions had no explicit environment on
+            # `user`. Backfill to sandbox so existing ownership records
+            # continue to participate in (source, environment,
+            # original_transaction_id) locking.
+            environment = 'sandbox'
             original_transaction_id = subscription_id
             latest_transaction_id = subscription_id
             external_subscription_id = None
