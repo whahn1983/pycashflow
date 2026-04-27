@@ -129,7 +129,6 @@ Guest Users can view shared owner data, including:
 - Dashboard metrics
 - Projections/charts
 - Upcoming transactions
-- Schedules, scenarios, holds, skips (viewing in read-only contexts)
 - Cached AI insight results
 
 ### 4.3 Guest User limitations
@@ -255,10 +254,10 @@ At sign-in, use either:
 
 ### 5.10 Offline behavior (web)
 
-The web app includes offline support for previously visited pages.
+The web app does not cache authenticated HTML pages for offline viewing.
 
-- You may see cached content when offline.
-- You’ll see an offline banner/page when connection is lost.
+- If your connection drops while navigating pages, the app shows an offline banner/page.
+- Some static assets (for example CSS, icons, and offline page resources) are cached to help the app shell load.
 - Logging out clears cached page data for privacy.
 
 ---
@@ -315,6 +314,7 @@ Guest User behavior in iOS:
 ### 6.5 iOS navigation differences
 
 - Account Owners see a bottom floating navigation bar to major features.
+- On smaller screens, if all nav buttons are not visible at once, swipe the bar horizontally to reveal additional buttons.
 - Guest Users get a simplified navigation path focused on dashboard + settings.
 
 ### 6.6 Switching accounts / logout
@@ -326,6 +326,19 @@ To switch accounts on iOS:
 3. Sign in with another account.
 
 Switching between Cloud and Self-Hosted modes also signs you out so you can reconnect cleanly.
+
+### 6.7 iOS swipe actions on cards (Account Owner)
+
+In list/card views, swipe gestures provide quick actions:
+
+- **Schedules cards**
+  - Swipe right: **Edit**
+  - Swipe left: **Delete**, **Hold**, **Skip**
+- **Scenarios cards**
+  - Swipe right: **Edit**
+  - Swipe left: **Delete**
+- **Holds/Skips cards**
+  - Swipe left: **Delete**
 
 ---
 
