@@ -1033,6 +1033,55 @@ def test_billing_status_allows_inactive_users_for_refresh(flask_app, client):
         flask_app.config["PAYMENTS_ENABLED"] = original_toggle
 
 
+def test_billing_status_allows_inactive_reviewer_user_for_refresh(flask_app, client):
+    original_toggle = flask_app.config["PAYMENTS_ENABLED"]
+    with flask_app.app_context():
+        flask_app.config["PAYMENTS_ENABLED"] = True
+        owner = User(
+            email="billing-reviewer-owner@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="ReviewerOwner",
+            admin=True,
+            is_account_owner=True,
+            is_active=False,
+            is_review_user=True,
+        )
+        db.session.add(owner)
+        db.session.commit()
+        guest = User(
+            email="billing-reviewer-guest@test.local",
+            password=generate_password_hash("pass12345", method="scrypt"),
+            name="ReviewerGuest",
+            admin=False,
+            is_account_owner=False,
+            account_owner_id=owner.id,
+            owner_user_id=owner.id,
+            is_active=False,
+        )
+        db.session.add(guest)
+        db.session.add(
+            Subscription(
+                user_id=owner.id,
+                source="stripe",
+                status="expired",
+                external_subscription_id="sub_billing_reviewer_1",
+                expires_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1),
+            )
+        )
+        db.session.commit()
+        raw, _ = create_token_for_user(guest)
+
+    resp = client.get("/api/v1/billing/status", headers={"Authorization": f"Bearer {raw}"})
+    assert resp.status_code == 200
+    body = _json(resp)["data"]
+    assert body["is_active"] is False
+    assert body["effective_is_active"] is True
+    assert body["is_guest"] is True
+
+    with flask_app.app_context():
+        flask_app.config["PAYMENTS_ENABLED"] = original_toggle
+
+
 def test_appstore_same_original_transaction_id_different_user_rejected(
     flask_app, client, monkeypatch, billing_routes_module
 ):

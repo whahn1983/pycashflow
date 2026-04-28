@@ -385,10 +385,11 @@ def api_billing_status():
     if not user.is_global_admin and not user.is_active:
         # Keep manual/admin deactivation checks, but allow expired users to
         # retrieve billing status when payments enforcement is enabled.
-        if (
+        # Reviewer-linked accounts always pass through so the client can refresh
+        # and discover the bypass even when leftover is_active=False persists.
+        if not owner_is_review_user and (
             not payments_enabled()
             or owner_is_global_admin
-            or owner_is_review_user
             or subscription_is_current(owner)
         ):
             return unauthorized("Invalid credentials or account is not active")
