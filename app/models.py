@@ -19,6 +19,11 @@ class User(UserMixin, db.Model):
     twofa_enabled = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
     twofa_secret = db.Column(db.String(500), nullable=True)   # Fernet-encrypted TOTP secret
     twofa_backup_codes = db.Column(db.Text, nullable=True)    # JSON array of scrypt-hashed backup codes
+    # Marks an account owner as an Apple/store reviewer test account. Reviewer
+    # accounts bypass payment-subscription enforcement and remain active.
+    is_review_user = db.Column(
+        db.Boolean, default=False, server_default=db.false(), nullable=False
+    )
 
     # Relationships
     guests = db.relationship(

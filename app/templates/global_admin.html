@@ -246,6 +246,9 @@
                 {% else %}
                 <span class="badge-modern badge-inactive"><i class="fa-solid fa-circle-xmark"></i> Inactive</span>
                 {% endif %}
+                {% if owner.is_review_user %}
+                <span class="badge-modern badge-reviewer"><i class="fa-solid fa-flask"></i> Reviewer</span>
+                {% endif %}
             </div>
             <div class="rc-cell rc-actions">
                 {% if not owner.is_active %}
@@ -263,6 +266,18 @@
                     </button>
                 </form>
                 {% endif %}
+                <form action="/toggle_review_user/{{owner.id}}" method="POST" style="display:inline;" onsubmit="return confirm('{% if owner.is_review_user %}Remove reviewer status from this account?{% else %}Mark this account as an Apple reviewer test account? It will be exempt from subscription requirements and remain active.{% endif %}')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% if owner.is_review_user %}
+                    <button type="submit" class="btn-warning-modern btn-modern btn-sm-modern">
+                        <i class="fa-solid fa-flask-vial"></i> Unmark Reviewer
+                    </button>
+                    {% else %}
+                    <button type="submit" class="btn-outline-modern btn-modern btn-sm-modern">
+                        <i class="fa-solid fa-flask"></i> Mark Reviewer
+                    </button>
+                    {% endif %}
+                </form>
                 <button class="btn-primary-modern btn-modern btn-sm-modern" data-bs-toggle="modal" data-bs-target="#modaleditowner{{owner.id}}">
                     <i class="fa-solid fa-pen"></i> Edit
                 </button>

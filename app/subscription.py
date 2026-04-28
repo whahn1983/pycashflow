@@ -240,6 +240,20 @@ def enforce_user_access(user: User | None) -> bool:
             db.session.commit()
         return True
 
+    # Reviewer accounts (used for App Store review) bypass subscription
+    # enforcement and remain active.
+    if getattr(owner, "is_review_user", False):
+        changed = False
+        if not owner.is_active:
+            owner.is_active = True
+            changed = True
+        if not user.is_active:
+            user.is_active = True
+            changed = True
+        if changed:
+            db.session.commit()
+        return True
+
     if subscription_is_current(owner):
         changed = False
         if not owner.is_global_admin and not owner.is_active:
