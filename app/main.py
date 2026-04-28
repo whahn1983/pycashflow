@@ -988,6 +988,39 @@ def deactivate_user(id):
         return redirect(url_for('main.manage_guests'))
 
 
+@main.route('/toggle_review_user/<id>', methods=['POST'])
+@login_required
+@global_admin_required
+def toggle_review_user(id):
+    """Mark/unmark an account owner as an Apple-review test account.
+
+    Reviewer accounts bypass payment-subscription enforcement and remain
+    active so the App Store review team can exercise the app without a
+    purchased subscription.
+    """
+    user = User.query.filter_by(id=int(id)).first()
+
+    if not user:
+        flash("User not found")
+        return redirect(url_for('main.global_admin_panel'))
+
+    if user.account_owner_id is not None:
+        flash("Reviewer flag can only be toggled on account owners")
+        return redirect(url_for('main.global_admin_panel'))
+
+    user.is_review_user = not bool(user.is_review_user)
+    if user.is_review_user:
+        user.is_active = True
+    db.session.commit()
+
+    if user.is_review_user:
+        flash(f"User {user.name} is now a reviewer account (subscription exempt)")
+    else:
+        flash(f"User {user.name} is no longer a reviewer account")
+
+    return redirect(url_for('main.global_admin_panel'))
+
+
 @main.route('/create_user', methods=('GET', 'POST'))
 @login_required
 @admin_required

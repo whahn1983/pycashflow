@@ -1283,6 +1283,12 @@ body.modal-open {
   border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
+.badge-reviewer {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
 /* ── Mobile: stacked card layout (≤640px) ── */
 @media (max-width: 640px) {
   /* Add bottom breathing room inside overflow:hidden table-card */
