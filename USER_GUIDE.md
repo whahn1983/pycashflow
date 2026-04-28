@@ -288,9 +288,15 @@ For local testing, localhost-style HTTP addresses can be used. For remote server
 In **PyCashFlow Cloud** mode:
 
 1. Open **Activate or Restore Cloud Subscription**.
-2. Enter your cloud account email.
-3. Choose a subscription product and complete purchase, or use **Restore Purchases**.
-4. After verification, sign in (or complete emailed password setup if this is a new account email).
+2. Review the on-screen subscription details before purchase:
+   - **PyCashFlow Cloud Monthly**
+   - **$9.99/month**
+   - **Billed monthly. Auto-renewing subscription.**
+   - Renewal and cancellation notice for Apple ID billing
+   - Functional links to **Terms of Use** and **Privacy Policy**
+3. Enter your cloud account email.
+4. Choose a subscription product and complete purchase, or use **Restore Purchases**.
+5. After verification, sign in (or complete emailed password setup if this is a new account email).
 
 ### 6.4 What you can do in iOS
 

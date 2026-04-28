@@ -17,6 +17,32 @@ struct SubscriptionPaywallView: View {
                     .foregroundStyle(AppTheme.textSecondary)
                     .cardRow()
 
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(SubscriptionDisclosure.title)
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.textPrimary)
+
+                    Text(SubscriptionDisclosure.price)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(AppTheme.textPrimary)
+
+                    Text(SubscriptionDisclosure.durationAndType)
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(SubscriptionDisclosure.renewalNotice)
+                        .font(.footnote)
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Link(SubscriptionDisclosure.termsTitle, destination: SubscriptionDisclosure.termsURL)
+                        Link(SubscriptionDisclosure.privacyTitle, destination: SubscriptionDisclosure.privacyURL)
+                    }
+                    .font(.footnote.weight(.semibold))
+                }
+                .cardRow()
+
                 TextField("Cloud account email", text: $cloudEmail)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
