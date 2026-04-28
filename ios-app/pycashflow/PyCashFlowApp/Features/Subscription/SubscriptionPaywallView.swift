@@ -17,32 +17,6 @@ struct SubscriptionPaywallView: View {
                     .foregroundStyle(AppTheme.textSecondary)
                     .cardRow()
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(SubscriptionDisclosure.title)
-                        .font(.headline)
-                        .foregroundStyle(AppTheme.textPrimary)
-
-                    Text(SubscriptionDisclosure.price)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(AppTheme.textPrimary)
-
-                    Text(SubscriptionDisclosure.durationAndType)
-                        .foregroundStyle(AppTheme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(SubscriptionDisclosure.renewalNotice)
-                        .font(.footnote)
-                        .foregroundStyle(AppTheme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Link(SubscriptionDisclosure.termsTitle, destination: SubscriptionDisclosure.termsURL)
-                        Link(SubscriptionDisclosure.privacyTitle, destination: SubscriptionDisclosure.privacyURL)
-                    }
-                    .font(.footnote.weight(.semibold))
-                }
-                .cardRow()
-
                 TextField("Cloud account email", text: $cloudEmail)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -69,12 +43,7 @@ struct SubscriptionPaywallView: View {
                 } else {
                     ForEach(manager.availableProducts, id: \.id) { product in
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(product.displayName)
-                                .font(.headline)
-                                .foregroundStyle(AppTheme.textPrimary)
-                                .lineLimit(2)
-                                .minimumScaleFactor(0.85)
-                                .fixedSize(horizontal: false, vertical: true)
+                            SubscriptionDisclosure(product: product)
                             Text(product.description)
                                 .foregroundStyle(AppTheme.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
