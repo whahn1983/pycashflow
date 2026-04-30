@@ -51,3 +51,13 @@ These values are hardcoded in `PyCashFlowApp/Core/Config/Config.swift`:
 `APIClient` normalizes base URLs so host-only values automatically use `/api/v1`.
 For security, remote self-hosted servers must use HTTPS. Plain HTTP is only
 allowed for localhost development endpoints.
+
+## Licensing
+
+The iOS app in this directory is **not** licensed under the repository root GNU GPLv3 license.
+
+- iOS app license: see [`LICENSE`](LICENSE) in this directory.
+- App Store distributions are additionally licensed under Apple's Standard EULA:
+  https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+
+Backend/server components remain licensed under GNU GPLv3 per the root [`../LICENSE`](../LICENSE) file.

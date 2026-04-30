@@ -1,0 +1,9 @@
+This directory contains the PyCashFlow iOS application.
+
+The PyCashFlow iOS application is not licensed under the GNU General Public License v3.0.
+
+The iOS application is distributed under a separate proprietary license and, when downloaded through the Apple App Store, is licensed under Apple's Standard End User License Agreement (EULA):
+
+https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+
+All backend/server components of PyCashFlow remain licensed under GNU GPLv3 as described in the root LICENSE file.

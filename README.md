@@ -837,9 +837,15 @@ H3 Consulting Partners specializes in enterprise deployments, custom feature dev
 
 ---
 
-## License
+## Licensing
 
-This project is licensed under the terms specified in the [LICENSE](LICENSE) file.
+This repository contains multiple components with separate licenses:
+
+- Backend / Flask server: GNU GPLv3, as provided in the root [LICENSE](LICENSE) file.
+- iOS application located in `/ios-app`: licensed separately under [`ios-app/LICENSE`](ios-app/LICENSE) and, when distributed through the Apple App Store, under Apple's Standard End User License Agreement (EULA):
+  https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+
+The root GPLv3 license applies to backend/server components and does not apply to the separately licensed iOS application in `/ios-app`.
 
 ---
 
