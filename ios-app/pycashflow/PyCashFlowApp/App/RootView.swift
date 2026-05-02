@@ -59,6 +59,7 @@ private extension RootView {
 
     var navItems: [FloatingNavItem] {
         [
+            FloatingNavItem(title: "Dashboard", systemImage: "house", section: .dashboard),
             FloatingNavItem(title: "Balance", systemImage: "dollarsign.circle", section: .balance),
             FloatingNavItem(title: "Schedules", systemImage: "calendar", section: .schedules),
             FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3", section: .scenarios),
