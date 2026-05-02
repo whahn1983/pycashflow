@@ -19,6 +19,8 @@ struct LoginView: View {
     @State private var selfHostedErrorText: String?
     @State private var isLoading = false
     @State private var isPasskeyLoading = false
+    @State private var showPasswordLoginFields = false
+    @State private var showPasskeyEmailField = false
     @FocusState private var focusedField: Field?
 
     var body: some View {
@@ -33,34 +35,31 @@ struct LoginView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                Picker("App Mode", selection: Binding(
-                    get: { session.appMode },
-                    set: { newValue in
-                        // Route through `switchMode` directly instead of a
-                        // `$session.appMode` two-way binding + `.onChange`: the
-                        // binding pattern mutates `appMode` before `onChange`
-                        // fires, so `switchMode`'s equality guard would
-                        // short-circuit and leave the base URL pointed at the
-                        // previous environment.
-                        guard newValue != session.appMode else { return }
-                        // Resign any active text field before the self-hosted
-                        // card appears/disappears; otherwise the keyboard layout
-                        // constraints conflict with the view hierarchy change.
-                        dismissKeyboard()
-                        focusedField = nil
-                        session.switchMode(newValue)
-                        authErrorText = nil
-                        selfHostedErrorText = nil
+                HStack(spacing: 4) {
+                    Text("Logging in on:")
+                        .foregroundStyle(AppTheme.textSecondary)
+                    Picker("App Mode", selection: Binding(
+                        get: { session.appMode },
+                        set: { newValue in
+                            guard newValue != session.appMode else { return }
+                            dismissKeyboard()
+                            focusedField = nil
+                            session.switchMode(newValue)
+                            authErrorText = nil
+                            selfHostedErrorText = nil
+                        }
+                    )) {
+                        ForEach(SessionManager.AppMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
                     }
-                )) {
-                    ForEach(SessionManager.AppMode.allCases) { mode in
-                        Text(mode.label).tag(mode)
-                    }
+                    .pickerStyle(.menu)
+                    .tint(AppTheme.accent)
                 }
-                .surfaceCard()
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 VStack(spacing: 12) {
-                    if challenge == nil {
+                    if challenge == nil && showPasswordLoginFields {
                         TextField("Email", text: $email)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -102,8 +101,26 @@ struct LoginView: View {
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(isLoading || isPasskeyLoading)
 
+                    if challenge == nil && showPasskeyEmailField && !showPasswordLoginFields {
+                        TextField("Email", text: $email)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .submitLabel(.go)
+                            .focused($focusedField, equals: .email)
+                            .onSubmit { startPasskeyLogin() }
+                            .padding(12)
+                            .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+                            .foregroundStyle(AppTheme.textPrimary)
+                    }
+
                     if challenge == nil {
                         Button {
+                            if !showPasskeyEmailField {
+                                showPasskeyEmailField = true
+                                showPasswordLoginFields = false
+                                focusedField = .email
+                                return
+                            }
                             startPasskeyLogin()
                         } label: {
                             HStack(spacing: 8) {
@@ -188,6 +205,12 @@ struct LoginView: View {
         dismissKeyboard()
         focusedField = nil
         guard !isLoading else { return }
+        if challenge == nil && !showPasswordLoginFields {
+            showPasswordLoginFields = true
+            showPasskeyEmailField = false
+            focusedField = .email
+            return
+        }
         Task { @MainActor in
             await Task.yield()
             guard !isLoading else { return }
