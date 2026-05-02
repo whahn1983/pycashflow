@@ -68,24 +68,6 @@ struct DashboardView: View {
         .refreshable { await loadAll() }
         .appBackground()
         .navigationTitle("Dashboard")
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if session.user?.is_guest == true {
-                GuestSettingsButton()
-            } else {
-                FloatingNavBar(items: navItems)
-            }
-        }
-    }
-
-    private var navItems: [FloatingNavItem] {
-        [
-            FloatingNavItem(title: "Balance", systemImage: "dollarsign.circle") { BalanceView() },
-            FloatingNavItem(title: "Schedules", systemImage: "calendar") { SchedulesView() },
-            FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3") { ScenariosView() },
-            FloatingNavItem(title: "Holds", systemImage: "pause.circle") { HoldsView() },
-            FloatingNavItem(title: "AI Insights", systemImage: "sparkles") { AIInsightsView() },
-            FloatingNavItem(title: "Settings", systemImage: "gearshape") { SettingsView() }
-        ]
     }
 
     private func metricsGrid<Content: View>(@ViewBuilder content: () -> Content) -> some View {
