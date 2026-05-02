@@ -18,11 +18,13 @@ struct RootView: View {
                             .foregroundStyle(AppTheme.textPrimary)
                     case .allowed:
                         selectedView
+                            .safeAreaPadding(.bottom, bottomContentInset)
                     case .blocked:
                         if session.appMode == .cloud {
                             SubscriptionPaywallView()
                         } else {
                             selectedView
+                                .safeAreaPadding(.bottom, bottomContentInset)
                         }
                     }
                 }
@@ -55,6 +57,10 @@ private extension RootView {
         case .unknown, .checking:
             return false
         }
+    }
+
+    var bottomContentInset: CGFloat {
+        shouldShowBottomBar ? 112 : 0
     }
 
     var navItems: [FloatingNavItem] {
