@@ -14,7 +14,7 @@ struct ScenariosView: View {
     @State private var editAmount = ""
     @State private var editType = "Expense"
     @State private var editFrequency = "Monthly"
-    @State private var editStartDate = defaultStartDate()
+    @State private var editStartDate = Date()
     @State private var errorText: String?
 
     private let types = ["Expense", "Income"]
@@ -97,7 +97,9 @@ struct ScenariosView: View {
                                 TextField("Amount", text: $editAmount).keyboardType(.decimalPad).fieldStyle()
                                 pickerRow(label: "Type", selection: $editType, options: types)
                                 pickerRow(label: "Frequency", selection: $editFrequency, options: frequencies)
-                                TextField("Start date (YYYY-MM-DD)", text: $editStartDate).fieldStyle()
+                                DatePicker("Start date", selection: $editStartDate, displayedComponents: .date)
+                                    .datePickerStyle(.compact)
+                                    .fieldStyle()
                                 HStack(spacing: 8) {
                                     Button("Save") { Task { await saveEdit(scenario.id) } }
                                         .buttonStyle(PrimaryButtonStyle())
@@ -156,13 +158,25 @@ struct ScenariosView: View {
         .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
     }
 
-    private static func defaultStartDate() -> String {
+    private static let apiDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.timeZone = .current
         formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Date())
+        return formatter
+    }()
+
+    private static func defaultStartDate() -> String {
+        apiDateFormatter.string(from: Date())
+    }
+
+    private static func parseAPIDate(_ value: String) -> Date {
+        apiDateFormatter.date(from: value) ?? Date()
+    }
+
+    private static func formatAPIDate(_ value: Date) -> String {
+        apiDateFormatter.string(from: value)
     }
 
     private func resetAddForm() {
@@ -180,7 +194,7 @@ struct ScenariosView: View {
         editAmount = scenario.amount
         editType = scenario.type
         editFrequency = scenario.frequency
-        editStartDate = scenario.start_date
+        editStartDate = Self.parseAPIDate(scenario.start_date)
     }
 
     private func load() async {
@@ -242,7 +256,7 @@ struct ScenariosView: View {
                 "scenarios/\(id)",
                 method: "PUT",
                 token: token,
-                body: Payload(name: editName, amount: editAmount, type: editType, frequency: editFrequency, start_date: editStartDate),
+                body: Payload(name: editName, amount: editAmount, type: editType, frequency: editFrequency, start_date: Self.formatAPIDate(editStartDate)),
                 as: APIEnvelope<ScenarioDTO>.self
             )
             await load()
