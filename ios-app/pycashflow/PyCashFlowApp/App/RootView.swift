@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject var session: SessionManager
+    @State private var selectedSection: AppSection = .dashboard
 
     var body: some View {
         Group {
@@ -16,12 +17,12 @@ struct RootView: View {
                         ProgressView("Checking account status...")
                             .foregroundStyle(AppTheme.textPrimary)
                     case .allowed:
-                        DashboardView()
+                        selectedView
                     case .blocked:
                         if session.appMode == .cloud {
                             SubscriptionPaywallView()
                         } else {
-                            DashboardView()
+                            selectedView
                         }
                     }
                 }
@@ -30,7 +31,7 @@ struct RootView: View {
                         if session.user?.is_guest == true {
                             GuestSettingsButton()
                         } else {
-                            FloatingNavBar(items: navItems)
+                            FloatingNavBar(items: navItems, selectedSection: $selectedSection)
                         }
                     }
                 }
@@ -58,12 +59,42 @@ private extension RootView {
 
     var navItems: [FloatingNavItem] {
         [
-            FloatingNavItem(title: "Balance", systemImage: "dollarsign.circle") { BalanceView() },
-            FloatingNavItem(title: "Schedules", systemImage: "calendar") { SchedulesView() },
-            FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3") { ScenariosView() },
-            FloatingNavItem(title: "Holds", systemImage: "pause.circle") { HoldsView() },
-            FloatingNavItem(title: "AI Insights", systemImage: "sparkles") { AIInsightsView() },
-            FloatingNavItem(title: "Settings", systemImage: "gearshape") { SettingsView() }
+            FloatingNavItem(title: "Balance", systemImage: "dollarsign.circle", section: .balance),
+            FloatingNavItem(title: "Schedules", systemImage: "calendar", section: .schedules),
+            FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3", section: .scenarios),
+            FloatingNavItem(title: "Holds", systemImage: "pause.circle", section: .holds),
+            FloatingNavItem(title: "AI Insights", systemImage: "sparkles", section: .aiInsights),
+            FloatingNavItem(title: "Settings", systemImage: "gearshape", section: .settings)
         ]
     }
+
+    @ViewBuilder
+    var selectedView: some View {
+        switch selectedSection {
+        case .dashboard:
+            DashboardView()
+        case .balance:
+            BalanceView()
+        case .schedules:
+            SchedulesView()
+        case .scenarios:
+            ScenariosView()
+        case .holds:
+            HoldsView()
+        case .aiInsights:
+            AIInsightsView()
+        case .settings:
+            SettingsView()
+        }
+    }
+}
+
+enum AppSection {
+    case dashboard
+    case balance
+    case schedules
+    case scenarios
+    case holds
+    case aiInsights
+    case settings
 }

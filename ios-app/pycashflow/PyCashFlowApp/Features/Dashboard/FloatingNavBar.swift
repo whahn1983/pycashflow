@@ -7,6 +7,7 @@ import SwiftUI
 /// available width is too narrow to fit every button.
 struct FloatingNavBar: View {
     let items: [FloatingNavItem]
+    @Binding var selectedSection: AppSection
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -25,8 +26,8 @@ struct FloatingNavBar: View {
     private var navContent: some View {
         HStack(spacing: 4) {
             ForEach(items) { item in
-                NavigationLink {
-                    item.destination
+                Button {
+                    selectedSection = item.section
                 } label: {
                     FloatingNavItemLabel(item: item)
                 }
@@ -64,13 +65,7 @@ struct FloatingNavItem: Identifiable {
     let id = UUID()
     let title: String
     let systemImage: String
-    let destination: AnyView
-
-    init<Destination: View>(title: String, systemImage: String, @ViewBuilder destination: () -> Destination) {
-        self.title = title
-        self.systemImage = systemImage
-        self.destination = AnyView(destination())
-    }
+    let section: AppSection
 }
 
 private struct FloatingNavItemLabel: View {
