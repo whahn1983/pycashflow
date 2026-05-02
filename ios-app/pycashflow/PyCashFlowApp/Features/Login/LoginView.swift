@@ -77,7 +77,7 @@ struct LoginView: View {
                             .padding(12)
                             .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
                             .foregroundStyle(AppTheme.textPrimary)
-                    } else {
+                    } else if challenge != nil {
                         TextField("6-digit code or backup code", text: $twoFACode)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
