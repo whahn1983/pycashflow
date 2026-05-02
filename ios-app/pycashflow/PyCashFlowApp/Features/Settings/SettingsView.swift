@@ -75,6 +75,14 @@ struct SettingsView: View {
         .refreshable { await load() }
         .appBackground()
         .navigationTitle("Settings")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Link(destination: URL(string: "https://pycashflow.com/user_guide")!) {
+                    Image(systemName: "questionmark.circle")
+                        .accessibilityLabel("User Guide")
+                }
+            }
+        }
     }
 
     private var moreSettingsURL: URL? {
