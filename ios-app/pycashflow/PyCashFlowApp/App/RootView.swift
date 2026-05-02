@@ -26,7 +26,7 @@ struct RootView: View {
                     }
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if session.accessState == .allowed || (session.accessState == .blocked && session.appMode != .cloud) {
+                    if shouldShowBottomBar {
                         if session.user?.is_guest == true {
                             GuestSettingsButton()
                         } else {
@@ -45,6 +45,17 @@ struct RootView: View {
 
 
 private extension RootView {
+    var shouldShowBottomBar: Bool {
+        switch session.accessState {
+        case .allowed:
+            return true
+        case .blocked:
+            return session.appMode != .cloud
+        case .unknown, .checking:
+            return false
+        }
+    }
+
     var navItems: [FloatingNavItem] {
         [
             FloatingNavItem(title: "Dashboard", systemImage: "house") { DashboardView() },
