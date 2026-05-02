@@ -54,6 +54,7 @@ struct LoginView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .frame(minWidth: 190, alignment: .leading)
                     .tint(AppTheme.accent)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
