@@ -9,6 +9,14 @@ struct HoldsView: View {
     @State private var skipsError: String?
     @State private var holdsStatus: String?
     @State private var skipsStatus: String?
+    private var sortedSkips: [SkipDTO] {
+        skips.sorted {
+            let lhsDate = Self.parseAPIDate($0.date)
+            let rhsDate = Self.parseAPIDate($1.date)
+            if lhsDate == rhsDate { return $0.id < $1.id }
+            return lhsDate < rhsDate
+        }
+    }
 
     private enum Tab: String, CaseIterable, Identifiable {
         case holds = "Holds"
@@ -126,7 +134,7 @@ struct HoldsView: View {
                     .listRowBackground(Color.clear)
             }
 
-            ForEach(skips) { skip in
+            ForEach(sortedSkips) { skip in
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(skip.name)
@@ -267,5 +275,19 @@ struct HoldsView: View {
                 skipsStatus = nil
             }
         }
+    }
+
+    private static let apiDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static func parseAPIDate(_ value: String?) -> Date {
+        guard let value else { return .distantFuture }
+        return apiDateFormatter.date(from: value) ?? .distantFuture
     }
 }

@@ -19,6 +19,14 @@ struct ScenariosView: View {
 
     private let types = ["Expense", "Income"]
     private let frequencies = ["Monthly", "Quarterly", "Yearly", "Weekly", "BiWeekly", "Onetime"]
+    private var sortedScenarios: [ScenarioDTO] {
+        scenarios.sorted {
+            let lhsDate = Self.parseAPIDate($0.start_date)
+            let rhsDate = Self.parseAPIDate($1.start_date)
+            if lhsDate == rhsDate { return $0.id < $1.id }
+            return lhsDate < rhsDate
+        }
+    }
 
     var body: some View {
         List {
@@ -70,7 +78,7 @@ struct ScenariosView: View {
                         .foregroundStyle(AppTheme.textMuted)
                 }
 
-                ForEach(scenarios) { scenario in
+                ForEach(sortedScenarios) { scenario in
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
