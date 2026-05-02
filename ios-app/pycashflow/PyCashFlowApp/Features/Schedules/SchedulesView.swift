@@ -8,7 +8,7 @@ struct SchedulesView: View {
     @State private var amount = ""
     @State private var type = "Expense"
     @State private var frequency = "Monthly"
-    @State private var startDate = defaultStartDate()
+    @State private var startDate = Date()
     @State private var editingID: Int?
     @State private var editName = ""
     @State private var editAmount = ""
@@ -45,7 +45,9 @@ struct SchedulesView: View {
                         TextField("Amount", text: $amount).keyboardType(.decimalPad).fieldStyle()
                         pickerRow(label: "Type", selection: $type, options: types)
                         pickerRow(label: "Frequency", selection: $frequency, options: frequencies)
-                        TextField("Start date (YYYY-MM-DD)", text: $startDate).fieldStyle()
+                        DatePicker("Start date", selection: $startDate, displayedComponents: .date)
+                            .datePickerStyle(.compact)
+                            .fieldStyle()
                         Button("Save Schedule") { Task { await addSchedule() } }
                             .buttonStyle(PrimaryButtonStyle())
                     }
@@ -190,10 +192,6 @@ struct SchedulesView: View {
         return formatter
     }()
 
-    private static func defaultStartDate() -> String {
-        apiDateFormatter.string(from: Date())
-    }
-
     private static func parseAPIDate(_ value: String) -> Date {
         apiDateFormatter.date(from: value) ?? Date()
     }
@@ -207,7 +205,7 @@ struct SchedulesView: View {
         amount = ""
         type = "Expense"
         frequency = "Monthly"
-        startDate = Self.defaultStartDate()
+        startDate = Date()
         errorText = nil
     }
 
@@ -252,7 +250,7 @@ struct SchedulesView: View {
                 "schedules",
                 method: "POST",
                 token: token,
-                body: Payload(name: name, amount: amount, type: type, frequency: frequency, start_date: startDate),
+                body: Payload(name: name, amount: amount, type: type, frequency: frequency, start_date: Self.formatAPIDate(startDate)),
                 as: APIEnvelope<ScheduleDTO>.self
             )
             await load()
