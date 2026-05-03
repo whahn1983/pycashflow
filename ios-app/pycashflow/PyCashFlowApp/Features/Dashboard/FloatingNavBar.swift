@@ -13,45 +13,46 @@ struct FloatingNavBar: View {
     @State private var isMoreExpanded = false
 
     var body: some View {
-        VStack(spacing: 8) {
+        navContent
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 12)
+            .animation(.easeOut(duration: 0.2), value: isMoreExpanded)
+    }
+
+    private var navContent: some View {
+        ZStack(alignment: .topTrailing) {
+            HStack(spacing: 4) {
+                ForEach(primaryItems) { item in
+                    navButton(for: item)
+                }
+
+                if !overflowItems.isEmpty {
+                    Button {
+                        isMoreExpanded.toggle()
+                    } label: {
+                        FloatingNavItemLabel(item: FloatingNavItem(title: "More", systemImage: "ellipsis", section: selectedSection))
+                    }
+                    .buttonStyle(FloatingNavButtonStyle(isSelected: isMoreExpanded))
+                    .disabled(isDisabled)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .glassEffect(.regular.interactive().tint(.white.opacity(0.08)), in: Capsule(style: .continuous))
+
             if isMoreExpanded {
-                VStack(spacing: 4) {
+                VStack(spacing: 8) {
                     ForEach(overflowItems) { item in
                         navButton(for: item)
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
                 .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
+                .offset(x: -6, y: -98)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-
-            navContent
-                .glassEffect(.regular.interactive().tint(.white.opacity(0.08)), in: Capsule(style: .continuous))
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 12)
-        .animation(.easeOut(duration: 0.2), value: isMoreExpanded)
-    }
-
-    private var navContent: some View {
-        HStack(spacing: 4) {
-            ForEach(primaryItems) { item in
-                navButton(for: item)
-            }
-
-            if !overflowItems.isEmpty {
-                Button {
-                    isMoreExpanded.toggle()
-                } label: {
-                    FloatingNavItemLabel(item: FloatingNavItem(title: "More", systemImage: "ellipsis", section: selectedSection))
-                }
-                .buttonStyle(FloatingNavButtonStyle(isSelected: isMoreExpanded))
-                .disabled(isDisabled)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
     }
 
     private func navButton(for item: FloatingNavItem) -> some View {
@@ -115,9 +116,9 @@ private struct FloatingNavItemLabel: View {
                 .lineLimit(1)
         }
         .foregroundStyle(AppTheme.textPrimary)
-        .frame(minWidth: 54)
+        .frame(minWidth: 54, minHeight: 42)
         .padding(.horizontal, 9)
-        .padding(.vertical, 5)
+        .padding(.vertical, 4)
     }
 }
 
