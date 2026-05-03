@@ -124,7 +124,7 @@ struct GuestSettingsButton: View {
         .buttonStyle(.plain)
         .background(
             Circle()
-                .fill(selectedSection == section ? .white.opacity(0.2) : .ultraThinMaterial)
+                .fill(selectedSection == section ? AnyShapeStyle(.white.opacity(0.2)) : AnyShapeStyle(.ultraThinMaterial))
                 .overlay(Circle().stroke(.white.opacity(0.14), lineWidth: 0.8))
         )
         .shadow(color: .black.opacity(0.16), radius: 10, x: 0, y: 4)
