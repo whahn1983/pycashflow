@@ -35,6 +35,9 @@ struct PyCashFlowApp: App {
 
         let moreListTableView = UITableView.appearance(whenContainedInInstancesOf: [moreListController])
         moreListTableView.backgroundColor = UIColor(AppTheme.primaryDark)
+
+        let moreListCell = UITableViewCell.appearance(whenContainedInInstancesOf: [moreListController])
+        moreListCell.backgroundColor = UIColor(AppTheme.primaryDark)
 #endif
     }
 }
