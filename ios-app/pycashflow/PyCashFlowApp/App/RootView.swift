@@ -31,9 +31,9 @@ struct RootView: View {
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if shouldShowBottomBar {
                         if session.user?.is_guest == true {
-                            GuestSettingsButton(selectedSection: $selectedSection)
+                            GuestSettingsButton(selectedSection: $selectedSection, isDisabled: session.isNavigationInteractionLocked)
                         } else {
-                            FloatingNavBar(items: navItems, selectedSection: $selectedSection)
+                            FloatingNavBar(items: navItems, selectedSection: $selectedSection, isDisabled: session.isNavigationInteractionLocked)
                         }
                     }
                 }
