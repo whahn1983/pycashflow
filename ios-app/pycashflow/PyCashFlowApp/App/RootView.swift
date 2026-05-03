@@ -17,23 +17,12 @@ struct RootView: View {
                         ProgressView("Checking account status...")
                             .foregroundStyle(AppTheme.textPrimary)
                     case .allowed:
-                        selectedView
-                            .safeAreaPadding(.bottom, bottomContentInset)
+                        tabScaffold
                     case .blocked:
                         if session.appMode == .cloud {
                             SubscriptionPaywallView()
                         } else {
-                            selectedView
-                                .safeAreaPadding(.bottom, bottomContentInset)
-                        }
-                    }
-                }
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if shouldShowBottomBar {
-                        if session.user?.is_guest == true {
-                            GuestSettingsButton(selectedSection: $selectedSection, isDisabled: session.isNavigationInteractionLocked)
-                        } else {
-                            FloatingNavBar(primaryItems: navItems, overflowItems: moreNavItems, selectedSection: $selectedSection, isDisabled: session.isNavigationInteractionLocked)
+                            tabScaffold
                         }
                     }
                 }
@@ -64,25 +53,58 @@ private extension RootView {
         }
     }
 
-    var bottomContentInset: CGFloat {
-        shouldShowBottomBar ? 78 : 0
+    @ViewBuilder
+    var tabScaffold: some View {
+        if shouldShowBottomBar {
+            tabView
+        } else {
+            selectedView
+        }
     }
 
-    var navItems: [FloatingNavItem] {
-        [
-            FloatingNavItem(title: "Dashboard", systemImage: "house", section: .dashboard),
-            FloatingNavItem(title: "Balance", systemImage: "dollarsign.circle", section: .balance),
-            FloatingNavItem(title: "Schedules", systemImage: "calendar", section: .schedules),
-            FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3", section: .scenarios)
-        ]
-    }
+    @ViewBuilder
+    var tabView: some View {
+        if session.user?.is_guest == true {
+            TabView(selection: $selectedSection) {
+                DashboardView()
+                    .tabItem { Label("Dashboard", systemImage: "house") }
+                    .tag(AppSection.dashboard)
 
-    var moreNavItems: [FloatingNavItem] {
-        [
-            FloatingNavItem(title: "Holds", systemImage: "pause.circle", section: .holds),
-            FloatingNavItem(title: "AI Insights", systemImage: "sparkles", section: .aiInsights),
-            FloatingNavItem(title: "Settings", systemImage: "gearshape", section: .settings)
-        ]
+                SettingsView()
+                    .tabItem { Label("Settings", systemImage: "gearshape") }
+                    .tag(AppSection.settings)
+            }
+        } else {
+            TabView(selection: $selectedSection) {
+                DashboardView()
+                    .tabItem { Label("Dashboard", systemImage: "house") }
+                    .tag(AppSection.dashboard)
+
+                BalanceView()
+                    .tabItem { Label("Balance", systemImage: "dollarsign.circle") }
+                    .tag(AppSection.balance)
+
+                SchedulesView()
+                    .tabItem { Label("Schedules", systemImage: "calendar") }
+                    .tag(AppSection.schedules)
+
+                ScenariosView()
+                    .tabItem { Label("Scenarios", systemImage: "slider.horizontal.3") }
+                    .tag(AppSection.scenarios)
+
+                HoldsView()
+                    .tabItem { Label("Holds", systemImage: "pause.circle") }
+                    .tag(AppSection.holds)
+
+                AIInsightsView()
+                    .tabItem { Label("AI Insights", systemImage: "sparkles") }
+                    .tag(AppSection.aiInsights)
+
+                SettingsView()
+                    .tabItem { Label("Settings", systemImage: "gearshape") }
+                    .tag(AppSection.settings)
+            }
+        }
     }
 
     @ViewBuilder
