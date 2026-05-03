@@ -7,7 +7,8 @@ struct AIInsightsView: View {
     @State private var isRefreshing = false
 
     var body: some View {
-        ScrollView {
+        ZStack {
+            ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let insights {
                     if let model = insights.model, !model.isEmpty {
@@ -65,7 +66,22 @@ struct AIInsightsView: View {
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(20)
+            }
+            .disabled(isRefreshing)
+
+            if isRefreshing {
+                ZStack {
+                    Color.black.opacity(0.2)
+                        .ignoresSafeArea()
+
+                    ProgressView("Refreshing AI insights...")
+                        .padding(20)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .transition(.opacity)
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: isRefreshing)
         .task { await load() }
         .refreshable { await load() }
         .appBackground()
@@ -134,6 +150,7 @@ struct AIInsightsView: View {
             )
             insights = response.data
             errorText = nil
+            await load()
         } catch {
             errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to refresh insights"
         }
