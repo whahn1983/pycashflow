@@ -146,7 +146,6 @@ struct AIInsightsView: View {
             )
             insights = response.data
             errorText = nil
-            await load()
         } catch {
             errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to refresh insights"
         }
