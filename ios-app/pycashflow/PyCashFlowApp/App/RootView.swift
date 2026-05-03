@@ -33,7 +33,7 @@ struct RootView: View {
                         if session.user?.is_guest == true {
                             GuestSettingsButton(selectedSection: $selectedSection, isDisabled: session.isNavigationInteractionLocked)
                         } else {
-                            FloatingNavBar(items: navItems, selectedSection: $selectedSection, isDisabled: session.isNavigationInteractionLocked)
+                            FloatingNavBar(primaryItems: navItems, overflowItems: moreNavItems, selectedSection: $selectedSection, isDisabled: session.isNavigationInteractionLocked)
                         }
                     }
                 }
@@ -65,7 +65,7 @@ private extension RootView {
     }
 
     var bottomContentInset: CGFloat {
-        shouldShowBottomBar ? 112 : 0
+        shouldShowBottomBar ? 78 : 0
     }
 
     var navItems: [FloatingNavItem] {
@@ -73,7 +73,12 @@ private extension RootView {
             FloatingNavItem(title: "Dashboard", systemImage: "house", section: .dashboard),
             FloatingNavItem(title: "Balance", systemImage: "dollarsign.circle", section: .balance),
             FloatingNavItem(title: "Schedules", systemImage: "calendar", section: .schedules),
-            FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3", section: .scenarios),
+            FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3", section: .scenarios)
+        ]
+    }
+
+    var moreNavItems: [FloatingNavItem] {
+        [
             FloatingNavItem(title: "Holds", systemImage: "pause.circle", section: .holds),
             FloatingNavItem(title: "AI Insights", systemImage: "sparkles", section: .aiInsights),
             FloatingNavItem(title: "Settings", systemImage: "gearshape", section: .settings)

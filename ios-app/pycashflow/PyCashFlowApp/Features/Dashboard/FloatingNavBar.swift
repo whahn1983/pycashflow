@@ -6,38 +6,63 @@ import SwiftUI
 /// centered, falling back to a horizontal scroll view only when the
 /// available width is too narrow to fit every button.
 struct FloatingNavBar: View {
-    let items: [FloatingNavItem]
+    let primaryItems: [FloatingNavItem]
+    let overflowItems: [FloatingNavItem]
     @Binding var selectedSection: AppSection
     let isDisabled: Bool
+    @State private var isMoreExpanded = false
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            navContent
+        VStack(spacing: 8) {
+            if isMoreExpanded {
+                VStack(spacing: 4) {
+                    ForEach(overflowItems) { item in
+                        navButton(for: item)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
                 .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                navContent
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
+
+            navContent
+                .glassEffect(.regular.interactive().tint(.white.opacity(0.08)), in: Capsule(style: .continuous))
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 12)
+        .animation(.easeOut(duration: 0.2), value: isMoreExpanded)
     }
 
     private var navContent: some View {
         HStack(spacing: 4) {
-            ForEach(items) { item in
+            ForEach(primaryItems) { item in
+                navButton(for: item)
+            }
+
+            if !overflowItems.isEmpty {
                 Button {
-                    selectedSection = item.section
+                    isMoreExpanded.toggle()
                 } label: {
-                    FloatingNavItemLabel(item: item)
+                    FloatingNavItemLabel(item: FloatingNavItem(title: "More", systemImage: "ellipsis", section: selectedSection))
                 }
-                .buttonStyle(FloatingNavButtonStyle(isSelected: selectedSection == item.section))
+                .buttonStyle(FloatingNavButtonStyle(isSelected: isMoreExpanded))
                 .disabled(isDisabled)
             }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.vertical, 5)
+    }
+
+    private func navButton(for item: FloatingNavItem) -> some View {
+        Button {
+            selectedSection = item.section
+            isMoreExpanded = false
+        } label: {
+            FloatingNavItemLabel(item: item)
+        }
+        .buttonStyle(FloatingNavButtonStyle(isSelected: selectedSection == item.section))
+        .disabled(isDisabled)
     }
 }
 
@@ -84,15 +109,15 @@ private struct FloatingNavItemLabel: View {
     var body: some View {
         VStack(spacing: 2) {
             Image(systemName: item.systemImage)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
             Text(item.title)
                 .font(.caption2.weight(.medium))
                 .lineLimit(1)
         }
         .foregroundStyle(AppTheme.textPrimary)
-        .frame(minWidth: 64)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .frame(minWidth: 54)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
     }
 }
 
