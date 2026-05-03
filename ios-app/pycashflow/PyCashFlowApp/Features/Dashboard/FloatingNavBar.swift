@@ -1,120 +1,105 @@
 import SwiftUI
 
-/// Floating bottom navigation bar with a native-feeling glass treatment,
-/// springy morphing selection pill, and reduced-motion fallback.
+/// Floating bottom navigation bar rendered with the iOS 26 Liquid Glass
+/// material. The selected tab is highlighted by a tinted glass pill that
+/// morphs between buttons via `GlassEffectContainer` + `glassEffectID`,
+/// producing the native liquid morphing transition.
 struct FloatingNavBar: View {
     let items: [FloatingNavItem]
     @Binding var selectedSection: AppSection
     let isDisabled: Bool
 
-    @Namespace private var selectionNamespace
+    @Namespace private var glassNamespace
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            navContainer {
-                HStack(spacing: 6) {
-                    navButtons
-                }
-            }
+        GlassEffectContainer(spacing: 6) {
+            ViewThatFits(in: .horizontal) {
+                navContent
 
-            navContainer {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        navButtons
-                    }
-                    .padding(.horizontal, 4)
+                    navContent
                 }
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 8)
     }
 
-    @ViewBuilder
-    private var navButtons: some View {
-        ForEach(items) { item in
-            let isSelected = selectedSection == item.section
+    private var navContent: some View {
+        HStack(spacing: 4) {
+            ForEach(items) { item in
+                let isSelected = selectedSection == item.section
 
-            Button {
-                withAnimation(tabSelectionAnimation) {
-                    selectedSection = item.section
-                }
-            } label: {
-                FloatingNavItemLabel(item: item, isSelected: isSelected)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .background {
-                if isSelected {
-                    selectionPill
-                } else {
-                    Capsule(style: .continuous)
-                        .fill(.clear)
-                }
-            }
-            .accessibilityLabel(item.title)
-            .disabled(isDisabled)
-            .animation(reduceMotion ? .easeOut(duration: 0.15) : tabSelectionAnimation, value: isSelected)
-        }
-    }
-
-    private var selectionPill: some View {
-        Capsule(style: .continuous)
-            .fill(.white.opacity(0.18))
-            .overlay {
-                Capsule(style: .continuous)
-                    .stroke(.white.opacity(0.24), lineWidth: 0.8)
-            }
-            .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 4)
-            .matchedGeometryEffect(id: "tab-selection", in: selectionNamespace)
-    }
-
-    private var tabSelectionAnimation: Animation {
-        reduceMotion
-            ? .easeOut(duration: 0.14)
-            : .spring(response: 0.38, dampingFraction: 0.82, blendDuration: 0.12)
-    }
-
-    private func navContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .stroke(.white.opacity(0.12), lineWidth: 0.6)
+                Button {
+                    withAnimation(selectionAnimation) {
+                        selectedSection = item.section
                     }
-                    .shadow(color: .black.opacity(0.18), radius: 16, x: 0, y: 6)
+                } label: {
+                    FloatingNavItemLabel(item: item, isSelected: isSelected)
+                }
+                .buttonStyle(.plain)
+                .disabled(isDisabled)
+                .background {
+                    if isSelected {
+                        Capsule(style: .continuous)
+                            .fill(Color.clear)
+                            .glassEffect(
+                                .regular
+                                    .tint(AppTheme.accent.opacity(0.55))
+                                    .interactive(),
+                                in: Capsule(style: .continuous)
+                            )
+                            .glassEffectID("selectedTab", in: glassNamespace)
+                    }
+                }
+                .accessibilityLabel(item.title)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background {
+            Capsule(style: .continuous)
+                .fill(Color.clear)
+                .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
+        }
+    }
+
+    private var selectionAnimation: Animation {
+        reduceMotion
+            ? .easeOut(duration: 0.18)
+            : .smooth(duration: 0.45, extraBounce: 0.18)
+    }
 }
 
-/// Small circular button cluster used as the navigation affordance for
-/// guest users (Dashboard + Settings).
+/// Small circular Liquid Glass button cluster used as the navigation
+/// affordance for guest users (Dashboard + Settings).
 struct GuestSettingsButton: View {
     @Binding var selectedSection: AppSection
     let isDisabled: Bool
 
+    @Namespace private var glassNamespace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        HStack(spacing: 12) {
-            guestButton(systemImage: "house", label: "Dashboard", section: .dashboard)
-            guestButton(systemImage: "gearshape", label: "Settings", section: .settings)
+        GlassEffectContainer(spacing: 6) {
+            HStack(spacing: 12) {
+                guestButton(systemImage: "house", label: "Dashboard", section: .dashboard)
+                guestButton(systemImage: "gearshape", label: "Settings", section: .settings)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
     }
 
     private func guestButton(systemImage: String, label: String, section: AppSection) -> some View {
-        Button {
-            selectedSection = section
+        let isSelected = selectedSection == section
+
+        return Button {
+            withAnimation(selectionAnimation) {
+                selectedSection = section
+            }
         } label: {
             Image(systemName: systemImage)
                 .font(.system(size: 20, weight: .semibold))
@@ -122,14 +107,26 @@ struct GuestSettingsButton: View {
                 .frame(width: 48, height: 48)
         }
         .buttonStyle(.plain)
-        .background(
+        .background {
             Circle()
-                .fill(selectedSection == section ? AnyShapeStyle(.white.opacity(0.2)) : AnyShapeStyle(.ultraThinMaterial))
-                .overlay(Circle().stroke(.white.opacity(0.14), lineWidth: 0.8))
-        )
-        .shadow(color: .black.opacity(0.16), radius: 10, x: 0, y: 4)
+                .fill(Color.clear)
+                .glassEffect(
+                    isSelected
+                        ? .regular.tint(AppTheme.accent.opacity(0.55)).interactive()
+                        : .regular.interactive(),
+                    in: Circle()
+                )
+                .glassEffectID(isSelected ? "guestSelected" : "guest-\(section)", in: glassNamespace)
+        }
         .disabled(isDisabled)
         .accessibilityLabel(label)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var selectionAnimation: Animation {
+        reduceMotion
+            ? .easeOut(duration: 0.18)
+            : .smooth(duration: 0.4, extraBounce: 0.15)
     }
 }
 
@@ -152,7 +149,10 @@ private struct FloatingNavItemLabel: View {
                 .font(.caption2.weight(isSelected ? .semibold : .medium))
                 .lineLimit(1)
         }
-        .foregroundStyle(isSelected ? AppTheme.textPrimary : AppTheme.textSecondary.opacity(0.9))
+        .foregroundStyle(AppTheme.textPrimary)
         .frame(minWidth: 64, minHeight: 44)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .contentShape(Capsule(style: .continuous))
     }
 }
