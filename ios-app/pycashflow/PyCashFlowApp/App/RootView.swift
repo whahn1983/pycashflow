@@ -73,15 +73,15 @@ private extension RootView {
             FloatingNavItem(title: "Dashboard", systemImage: "house", section: .dashboard),
             FloatingNavItem(title: "Balance", systemImage: "dollarsign.circle", section: .balance),
             FloatingNavItem(title: "Schedules", systemImage: "calendar", section: .schedules),
-            FloatingNavItem(title: "Settings", systemImage: "gearshape", section: .settings)
+            FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3", section: .scenarios)
         ]
     }
 
     var moreNavItems: [FloatingNavItem] {
         [
-            FloatingNavItem(title: "Scenarios", systemImage: "slider.horizontal.3", section: .scenarios),
             FloatingNavItem(title: "Holds", systemImage: "pause.circle", section: .holds),
-            FloatingNavItem(title: "AI Insights", systemImage: "sparkles", section: .aiInsights)
+            FloatingNavItem(title: "AI Insights", systemImage: "sparkles", section: .aiInsights),
+            FloatingNavItem(title: "Settings", systemImage: "gearshape", section: .settings)
         ]
     }
 

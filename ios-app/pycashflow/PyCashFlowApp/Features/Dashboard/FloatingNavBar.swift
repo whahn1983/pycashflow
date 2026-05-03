@@ -15,12 +15,12 @@ struct FloatingNavBar: View {
     var body: some View {
         VStack(spacing: 8) {
             if isMoreExpanded {
-                HStack(spacing: 4) {
+                VStack(spacing: 4) {
                     ForEach(overflowItems) { item in
                         navButton(for: item)
                     }
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
                 .transition(.move(edge: .bottom).combined(with: .opacity))
