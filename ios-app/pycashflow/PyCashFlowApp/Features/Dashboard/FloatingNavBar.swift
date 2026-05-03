@@ -20,27 +20,7 @@ struct FloatingNavBar: View {
     }
 
     private var navContent: some View {
-        HStack(spacing: 4) {
-            ForEach(primaryItems) { item in
-                navButton(for: item)
-            }
-
-            if !overflowItems.isEmpty {
-                Button {
-                    isMoreExpanded.toggle()
-                } label: {
-                    FloatingNavItemLabel(
-                        item: FloatingNavItem(title: "More", systemImage: "ellipsis", section: selectedSection)
-                    )
-                }
-                .buttonStyle(FloatingNavButtonStyle(isSelected: isMoreExpanded))
-                .disabled(isDisabled)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .glassEffect(.regular.interactive().tint(.white.opacity(0.08)), in: Capsule(style: .continuous))
-        .overlay(alignment: .topTrailing) {
+        VStack(alignment: .trailing, spacing: 8) {
             if isMoreExpanded {
                 VStack(spacing: 8) {
                     ForEach(overflowItems) { item in
@@ -50,10 +30,29 @@ struct FloatingNavBar: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 10)
                 .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
-                .offset(x: -6, y: -104)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(1)
             }
+
+            HStack(spacing: 4) {
+                ForEach(primaryItems) { item in
+                    navButton(for: item)
+                }
+
+                if !overflowItems.isEmpty {
+                    Button {
+                        isMoreExpanded.toggle()
+                    } label: {
+                        FloatingNavItemLabel(
+                            item: FloatingNavItem(title: "More", systemImage: "ellipsis", section: selectedSection)
+                        )
+                    }
+                    .buttonStyle(FloatingNavButtonStyle(isSelected: isMoreExpanded))
+                    .disabled(isDisabled)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .glassEffect(.regular.interactive().tint(.white.opacity(0.08)), in: Capsule(style: .continuous))
         }
     }
 
