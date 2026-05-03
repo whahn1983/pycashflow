@@ -42,6 +42,11 @@ struct RootView: View {
         .task {
             await session.bootstrap()
         }
+        .onChange(of: session.isAuthenticated) { _, isAuthenticated in
+            if isAuthenticated {
+                selectedSection = .dashboard
+            }
+        }
         .preferredColorScheme(.dark)
     }
 }
