@@ -20,26 +20,27 @@ struct FloatingNavBar: View {
     }
 
     private var navContent: some View {
-        ZStack(alignment: .topTrailing) {
-            HStack(spacing: 4) {
-                ForEach(primaryItems) { item in
-                    navButton(for: item)
-                }
-
-                if !overflowItems.isEmpty {
-                    Button {
-                        isMoreExpanded.toggle()
-                    } label: {
-                        FloatingNavItemLabel(item: FloatingNavItem(title: "More", systemImage: "ellipsis", section: selectedSection))
-                    }
-                    .buttonStyle(FloatingNavButtonStyle(isSelected: isMoreExpanded))
-                    .disabled(isDisabled)
-                }
+        HStack(spacing: 4) {
+            ForEach(primaryItems) { item in
+                navButton(for: item)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .glassEffect(.regular.interactive().tint(.white.opacity(0.08)), in: Capsule(style: .continuous))
 
+            if !overflowItems.isEmpty {
+                Button {
+                    isMoreExpanded.toggle()
+                } label: {
+                    FloatingNavItemLabel(
+                        item: FloatingNavItem(title: "More", systemImage: "ellipsis", section: selectedSection)
+                    )
+                }
+                .buttonStyle(FloatingNavButtonStyle(isSelected: isMoreExpanded))
+                .disabled(isDisabled)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .glassEffect(.regular.interactive().tint(.white.opacity(0.08)), in: Capsule(style: .continuous))
+        .overlay(alignment: .topTrailing) {
             if isMoreExpanded {
                 VStack(spacing: 8) {
                     ForEach(overflowItems) { item in
@@ -49,8 +50,9 @@ struct FloatingNavBar: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 10)
                 .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
-                .offset(x: -6, y: -98)
+                .offset(x: -6, y: -104)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(1)
             }
         }
     }
@@ -111,9 +113,11 @@ private struct FloatingNavItemLabel: View {
         VStack(spacing: 2) {
             Image(systemName: item.systemImage)
                 .font(.system(size: 18, weight: .semibold))
+                .frame(height: 18, alignment: .center)
             Text(item.title)
                 .font(.caption2.weight(.medium))
                 .lineLimit(1)
+                .frame(height: 11, alignment: .center)
         }
         .foregroundStyle(AppTheme.textPrimary)
         .frame(minWidth: 54, minHeight: 42)
