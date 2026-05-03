@@ -32,7 +32,7 @@ struct FloatingNavBar: View {
                 } label: {
                     FloatingNavItemLabel(item: item)
                 }
-                .buttonStyle(FloatingNavButtonStyle())
+                .buttonStyle(FloatingNavButtonStyle(isSelected: selectedSection == item.section))
                 .disabled(isDisabled)
             }
         }
@@ -65,7 +65,7 @@ struct GuestSettingsButton: View {
                 .foregroundStyle(AppTheme.textPrimary)
                 .frame(width: 48, height: 48)
         }
-        .buttonStyle(FloatingNavButtonStyle())
+        .buttonStyle(FloatingNavButtonStyle(isSelected: selectedSection == section))
         .disabled(isDisabled)
         .glassEffect(.regular.interactive(), in: Circle())
     }
@@ -97,13 +97,27 @@ private struct FloatingNavItemLabel: View {
 }
 
 private struct FloatingNavButtonStyle: ButtonStyle {
+    let isSelected: Bool
+
     func makeBody(configuration: Configuration) -> some View {
+        let pressed = configuration.isPressed
+
         configuration.label
             .background(
-                Capsule(style: .continuous)
-                    .fill(configuration.isPressed ? AppTheme.accent.opacity(0.25) : Color.clear)
+                ZStack {
+                    if isSelected || pressed {
+                        Capsule(style: .continuous)
+                            .fill(AppTheme.accent.opacity(pressed ? 0.30 : 0.22))
+                            .overlay(
+                                Capsule(style: .continuous)
+                                    .stroke(.white.opacity(pressed ? 0.28 : 0.18), lineWidth: 1)
+                            )
+                            .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
+                    }
+                }
             )
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .scaleEffect(pressed ? 0.96 : 1)
+            .animation(.easeOut(duration: 0.12), value: pressed)
+            .animation(.easeOut(duration: 0.18), value: isSelected)
     }
 }
