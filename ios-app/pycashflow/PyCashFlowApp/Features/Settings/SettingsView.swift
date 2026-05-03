@@ -14,11 +14,10 @@ struct SettingsView: View {
                 if let settings {
                     infoRow(label: "Signed in as", value: settings.user.email)
                     infoRow(label: "Backend Version", value: settings.app.version)
-                    infoRow(label: "AI Configured", value: settings.ai.configured ? "Yes" : "No")
+                    infoRow(label: "AI Configured", value: aiConfiguredValue(settings.ai))
                 }
 
                 infoRow(label: "Mode", value: session.appMode.label)
-                infoRow(label: "API", value: session.currentBaseURL.absoluteString)
 
                 if let billing = session.billingStatus {
                     infoRow(
@@ -26,7 +25,7 @@ struct SettingsView: View {
                         value: "\(billing.subscription_status ?? "inactive") via \(billing.subscription_source ?? "none")"
                     )
                     if let expiry = billing.subscription_expiry {
-                        infoRow(label: "Subscription expiry", value: expiry)
+                        infoRow(label: "Subscription expiry", value: Self.formatFriendlyDateTime(expiry))
                     }
                 }
 
@@ -106,6 +105,36 @@ struct SettingsView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .cardRow()
+    }
+
+
+    private func aiConfiguredValue(_ ai: SettingsDTO.SettingsAIDTO) -> String {
+        guard ai.configured else { return "No" }
+        if let model = ai.model, !model.isEmpty {
+            return "Yes, \(model)"
+        }
+        return "Yes"
+    }
+
+    private static let dateTimeParser: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static let friendlyDateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        formatter.doesRelativeDateFormatting = true
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        return formatter
+    }()
+
+    static func formatFriendlyDateTime(_ raw: String) -> String {
+        guard let date = dateTimeParser.date(from: raw) else { return raw }
+        return friendlyDateTimeFormatter.string(from: date)
     }
 
     private func load() async {
