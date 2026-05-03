@@ -30,6 +30,7 @@ final class SessionManager: ObservableObject {
     @Published var accessState: AccessState = .unknown
     @Published var appMode: AppMode = SessionManager.loadMode()
     @Published var selfHostedBaseURLText: String = SessionManager.loadSelfHostedURL().absoluteString
+    @Published var isNavigationInteractionLocked = false
 
     var isAuthenticated: Bool { token != nil }
     var currentBaseURL: URL { APIClient.shared.baseURL }

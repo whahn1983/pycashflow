@@ -82,6 +82,11 @@ struct AIInsightsView: View {
         .refreshable { await load() }
         .appBackground()
         .navigationTitle("AI Insights")
+        .onDisappear {
+            if isRefreshing == false {
+                session.isNavigationInteractionLocked = false
+            }
+        }
     }
 
     private func infoRow(label: String, value: String) -> some View {
@@ -136,7 +141,11 @@ struct AIInsightsView: View {
     private func refreshInsights() async {
         guard let token = session.token else { return }
         isRefreshing = true
-        defer { isRefreshing = false }
+        session.isNavigationInteractionLocked = true
+        defer {
+            isRefreshing = false
+            session.isNavigationInteractionLocked = false
+        }
         do {
             let response: APIEnvelope<InsightsDTO> = try await APIClient.shared.request(
                 "insights/refresh",

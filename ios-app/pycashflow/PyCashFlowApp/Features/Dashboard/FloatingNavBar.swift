@@ -8,6 +8,7 @@ import SwiftUI
 struct FloatingNavBar: View {
     let items: [FloatingNavItem]
     @Binding var selectedSection: AppSection
+    let isDisabled: Bool
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -32,6 +33,7 @@ struct FloatingNavBar: View {
                     FloatingNavItemLabel(item: item)
                 }
                 .buttonStyle(FloatingNavButtonStyle())
+                .disabled(isDisabled)
             }
         }
         .padding(.horizontal, 10)
@@ -43,6 +45,7 @@ struct FloatingNavBar: View {
 /// as the only navigation affordance for guest users (Settings access).
 struct GuestSettingsButton: View {
     @Binding var selectedSection: AppSection
+    let isDisabled: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -63,6 +66,7 @@ struct GuestSettingsButton: View {
                 .frame(width: 48, height: 48)
         }
         .buttonStyle(FloatingNavButtonStyle())
+        .disabled(isDisabled)
         .glassEffect(.regular.interactive(), in: Circle())
     }
 }
