@@ -29,7 +29,7 @@ struct FloatingNavBar: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 10)
-                .glassEffect(.regular.interactive().tint(AppTheme.surface.opacity(0.45)), in: Capsule(style: .continuous))
+                .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
