@@ -11,13 +11,9 @@ struct AIInsightsView: View {
             ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let insights {
-                    if let model = insights.model, !model.isEmpty {
-                        infoRow(label: "Model", value: model)
-                    }
                     if let lastUpdated = insights.last_updated, !lastUpdated.isEmpty {
                         infoRow(label: "Last Updated", value: Self.formatLastUpdated(lastUpdated))
                     }
-                    infoRow(label: "AI Configured", value: insights.configured ? "Yes" : "No")
                 }
 
                 if let items = insights?.insights, !items.isEmpty {
