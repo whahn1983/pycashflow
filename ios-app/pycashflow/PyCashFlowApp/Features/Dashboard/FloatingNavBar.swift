@@ -122,6 +122,7 @@ private struct FloatingNavItemLabel: View {
         .frame(minWidth: 54, minHeight: 42)
         .padding(.horizontal, 9)
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
     }
 }
 
