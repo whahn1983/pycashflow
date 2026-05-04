@@ -14,7 +14,7 @@ COPY constraints.txt constraints.txt
 # install everything except greenlet
 RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt
 
-RUN apk --no-cache add curl su-exec tzdata
+RUN apk --no-cache add su-exec tzdata
 
 # Create a dedicated non-root runtime user and group
 RUN addgroup -S appgroup && adduser -S -G appgroup appuser
@@ -38,7 +38,7 @@ RUN mkdir -p /app/app/data && \
 ENV PYTHONPATH=/app
 ENV DATABASE_URL=sqlite:////app/app/data/db.sqlite
 
-HEALTHCHECK CMD curl --fail http://localhost:5000
+HEALTHCHECK CMD python -c "import sys, urllib.request; sys.exit(0) if urllib.request.urlopen('http://localhost:5000', timeout=5).getcode() < 400 else sys.exit(1)"
 
 EXPOSE 5000
 
