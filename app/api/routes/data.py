@@ -141,7 +141,7 @@ def _project_data(user_id: int):
     skips = Skip.query.filter_by(user_id=user_id).all()
     scenarios = Scenario.query.filter_by(user_id=user_id).all()
 
-    trans, run, run_scenario = update_cash(balance_amount, schedules, holds, skips, scenarios, commit=False)
+    trans, run, run_scenario = update_cash(balance_amount, schedules, holds, skips, scenarios, commit=True)
     result = (balance, balance_amount, trans, run, run_scenario)
     cache[user_id] = result
     return result
