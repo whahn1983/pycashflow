@@ -1330,6 +1330,24 @@ def ai_settings():
     return redirect(url_for('main.settings'))
 
 
+@main.route('/ai_settings/remove', methods=['POST'])
+@login_required
+@admin_required
+def ai_settings_remove():
+    """Remove the user's stored OpenAI API key and model so the configured
+    DigitalOcean fallback (if any) is used instead."""
+    ai_config = AISettings.query.filter_by(user_id=current_user.id).first()
+    if not ai_config or not ai_config.api_key:
+        flash('No API key is currently saved', 'error')
+        return redirect(url_for('main.settings'))
+
+    ai_config.api_key = None
+    ai_config.model_version = None
+    db.session.commit()
+    flash('OpenAI API key removed')
+    return redirect(url_for('main.settings'))
+
+
 @main.route('/ai_insights', methods=['POST'])
 @login_required
 @admin_required

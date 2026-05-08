@@ -457,3 +457,47 @@ class TestRefreshEndpointProviderAndLimit:
             if row_dt.tzinfo is None:
                 row_dt = row_dt.replace(tzinfo=timezone.utc)
             assert (datetime.now(timezone.utc) - row_dt) < timedelta(minutes=1)
+
+
+class TestRemoveApiKeyRoute:
+    def test_remove_clears_key_and_model_and_falls_back_to_digitalocean(
+        self, auth_client, flask_app, clean_ai_settings, monkeypatch
+    ):
+        user_id = clean_ai_settings
+        cached_payload = '{"insights": [{"title": "kept"}]}'
+        cached_ts = datetime.now(timezone.utc)
+        with flask_app.app_context():
+            _db.session.add(AISettings(
+                user_id=user_id,
+                api_key=encrypt_password("sk-user"),
+                model_version="gpt-4o",
+                last_insights=cached_payload,
+                last_updated=cached_ts,
+            ))
+            _db.session.commit()
+
+        resp = auth_client.post("/ai_settings/remove", follow_redirects=False)
+        assert resp.status_code in (302, 303)
+
+        with flask_app.app_context():
+            row = AISettings.query.filter_by(user_id=user_id).first()
+            assert row is not None
+            assert row.api_key is None
+            assert row.model_version is None
+            # Cached insights and the 24h refresh window are shared with the
+            # DigitalOcean provider and must be preserved.
+            assert row.last_insights == cached_payload
+            assert row.last_updated is not None
+
+            # With the user key cleared and DO env vars set, provider must
+            # fall back to DigitalOcean.
+            monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run")
+            monkeypatch.setenv("DO_AI_API_KEY", "do-secret")
+            provider = select_provider(row)
+            assert provider is not None
+            assert provider["kind"] == "digitalocean"
+
+    def test_remove_when_no_key_saved_is_a_noop(self, auth_client, clean_ai_settings):
+        # No AISettings row at all — endpoint should redirect without 500.
+        resp = auth_client.post("/ai_settings/remove", follow_redirects=False)
+        assert resp.status_code in (302, 303)
