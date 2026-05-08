@@ -95,6 +95,22 @@ class TestAuthenticatedGetRoutes:
         assert resp.status_code in (301, 302)
         assert "/" in resp.headers.get("Location", "")
 
+    def test_index_shows_ai_not_configured_only_when_no_provider(self, auth_client, monkeypatch):
+        monkeypatch.delenv("DO_AI_BASE_URL", raising=False)
+        monkeypatch.delenv("DO_AI_API_KEY", raising=False)
+
+        resp = auth_client.get("/", follow_redirects=True)
+        assert resp.status_code == 200
+        assert b"AI insights are not configured yet." in resp.data
+
+    def test_index_hides_ai_not_configured_when_do_provider_set(self, auth_client, monkeypatch):
+        monkeypatch.setenv("DO_AI_BASE_URL", "https://example.digitalocean.com")
+        monkeypatch.setenv("DO_AI_API_KEY", "test-key")
+
+        resp = auth_client.get("/", follow_redirects=True)
+        assert resp.status_code == 200
+        assert b"AI insights are not configured yet." not in resp.data
+
 
 class TestSignupLinkBehavior:
     def test_login_create_account_defaults_to_builtin_signup(self, client):

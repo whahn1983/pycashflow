@@ -108,21 +108,21 @@ def index():
     ai_config = AISettings.query.filter_by(user_id=user_id).first()
     ai_insights_data = None
     ai_last_updated = None
-    has_ai_key = False
+    ai_provider_configured = False
     if ai_config:
-        has_ai_key = bool(ai_config.api_key)
         ai_last_updated = ai_config.last_updated
         if ai_config.last_insights:
             try:
                 ai_insights_data = json.loads(ai_config.last_insights)
             except (json.JSONDecodeError, ValueError) as exc:
                 logger.warning("Could not parse cached AI insights for user %s: %s", user_id, exc)
+    ai_provider_configured = select_provider(ai_config) is not None
 
     if current_user.admin:
         return render_template('index.html', title='Index', todaydate=todaydate, balance=balance.amount,
                            minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON,
                            ai_insights_data=ai_insights_data, ai_last_updated=ai_last_updated,
-                           has_ai_key=has_ai_key, cash_risk=cash_risk)
+                           ai_provider_configured=ai_provider_configured, cash_risk=cash_risk)
     else:
         return render_template('index_guest.html', title='Index', todaydate=todaydate, balance=balance.amount,
                            minbalance=minbalance, min_scenario=min_scenario, graphJSON=graphJSON,

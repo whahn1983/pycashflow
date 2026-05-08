@@ -158,7 +158,7 @@
 
         <!-- AI-generated insights (replaced on refresh) -->
         <div id="ai-insights-list">
-        {% if not has_ai_key %}
+        {% if not ai_provider_configured %}
         <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
             <i class="fa-solid fa-robot" style="font-size: 2rem; margin-bottom: 0.75rem; display: block; color: #6366f1;"></i>
             <p style="margin: 0 0 0.5rem;">AI insights are not configured yet.</p>
