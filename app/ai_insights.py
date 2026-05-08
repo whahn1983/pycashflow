@@ -302,15 +302,15 @@ def select_provider(ai_config):
         has DO_AI_BASE_URL and DO_AI_API_KEY environment variables set.
       - None when no provider is available.
     """
-    if ai_config and ai_config.api_key:
-        return {
-            'kind': 'openai',
-            'api_key': ai_config.api_key,
-            'model': ai_config.model_version or DEFAULT_MODEL,
-        }
     do_base_url = os.environ.get('DO_AI_BASE_URL')
     do_api_key = os.environ.get('DO_AI_API_KEY')
-    if do_base_url and do_api_key:
+    # If a DigitalOcean agent is configured server-side and the user has not
+    # explicitly chosen a model, prefer the DO provider. This avoids accidental
+    # default-model injection (e.g. gpt-4o-mini) when the agent decides the
+    # model on the server side.
+    if do_base_url and do_api_key and (
+        not ai_config or ai_config.model_version in (None, '', DO_DEFAULT_MODEL)
+    ):
         # DigitalOcean GenAI agent endpoints require model="n/a" — the real
         # model is configured on the agent itself.  Always send the placeholder
         # so a stray DO_AI_MODEL env var can't reintroduce the
@@ -320,6 +320,12 @@ def select_provider(ai_config):
             'api_key': do_api_key,
             'base_url': normalize_do_base_url(do_base_url),
             'model': DO_DEFAULT_MODEL,
+        }
+    if ai_config and ai_config.api_key:
+        return {
+            'kind': 'openai',
+            'api_key': ai_config.api_key,
+            'model': ai_config.model_version or DEFAULT_MODEL,
         }
     return None
 

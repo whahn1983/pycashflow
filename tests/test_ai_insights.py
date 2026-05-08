@@ -80,14 +80,21 @@ def _ai_config(api_key="enc-key", model="gpt-4o"):
 
 
 class TestSelectProvider:
-    def test_user_openai_settings_take_precedence(self, monkeypatch):
-        # Even with DO env vars present, user OpenAI settings win.
+    def test_user_openai_settings_take_precedence_when_model_is_explicit(self, monkeypatch):
+        # With an explicit user-selected model, OpenAI settings still win.
         monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run")
         monkeypatch.setenv("DO_AI_API_KEY", "do-secret")
         provider = select_provider(_ai_config(api_key="encrypted", model="gpt-4o"))
         assert provider["kind"] == "openai"
         assert provider["api_key"] == "encrypted"
         assert provider["model"] == "gpt-4o"
+
+    def test_do_agent_preferred_when_user_model_is_not_set(self, monkeypatch):
+        monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run")
+        monkeypatch.setenv("DO_AI_API_KEY", "do-secret")
+        provider = select_provider(_ai_config(api_key="encrypted", model=None))
+        assert provider["kind"] == "digitalocean"
+        assert provider["model"] == DO_DEFAULT_MODEL
 
     def test_user_openai_default_model_when_none(self, monkeypatch):
         provider = select_provider(_ai_config(api_key="encrypted", model=None))
