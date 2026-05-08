@@ -23,7 +23,13 @@ from .files import export, upload, version
 from .getemail import send_account_activation_notification
 from .getemail import send_password_setup_email
 from .crypto_utils import encrypt_password, decrypt_password
-from .ai_insights import fetch_insights, validate_model
+from .ai_insights import (
+    fetch_insights,
+    fetch_insights_for_provider,
+    is_refresh_due,
+    select_provider,
+    validate_model,
+)
 from .password_setup import create_password_setup_link
 from .totp_utils import (
     generate_totp_secret, encrypt_totp_secret, decrypt_totp_secret,
@@ -1328,13 +1334,20 @@ def ai_settings():
 @login_required
 @admin_required
 def ai_insights():
-    """Query OpenAI for cash flow insights on demand and cache the result."""
+    """Query the configured AI provider for cash flow insights on demand and
+    cache the result.  Limited to one refresh per user per 24 hours."""
     user_id = current_user.id
 
     ai_config = AISettings.query.filter_by(user_id=user_id).first()
-    if not ai_config or not ai_config.api_key:
+    provider = select_provider(ai_config)
+    if not provider:
         return Response(json.dumps({'error': 'No OpenAI API key configured. Please add one in Settings.'}),
                         status=400, mimetype='application/json')
+
+    last_updated = ai_config.last_updated if ai_config else None
+    cached_insights = ai_config.last_insights if ai_config else None
+    if cached_insights and not is_refresh_due(last_updated):
+        return Response(cached_insights, status=200, mimetype='application/json')
 
     balance_record = Balance.query.filter_by(user_id=user_id).order_by(desc(Balance.date), desc(Balance.id)).first()
     current_balance = float(balance_record.amount) if balance_record else 0.0
@@ -1344,11 +1357,14 @@ def ai_insights():
     skips = Skip.query.filter_by(user_id=user_id).all()
 
     try:
-        insights_json = fetch_insights(ai_config.api_key, current_balance, schedules, holds, skips, model=ai_config.model_version)
+        insights_json = fetch_insights_for_provider(provider, current_balance, schedules, holds, skips)
     except Exception as e:
         logger.exception("AI insights generation failed for user %s", user_id)
         return Response(json.dumps({'error': 'An error occurred generating insights. Please try again later.'}), status=500, mimetype='application/json')
 
+    if ai_config is None:
+        ai_config = AISettings(user_id=user_id)
+        db.session.add(ai_config)
     ai_config.last_insights = insights_json
     ai_config.last_updated = datetime.now(timezone.utc)
     db.session.commit()

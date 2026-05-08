@@ -10,7 +10,11 @@ from flask import request, g
 from app import db
 from app.models import Schedule, Scenario, Balance, Hold, Skip, AISettings
 from app.cashflow import update_cash, calculate_cash_risk_score
-from app.ai_insights import fetch_insights
+from app.ai_insights import (
+    fetch_insights_for_provider,
+    is_refresh_due,
+    select_provider,
+)
 from app.files import version
 
 from app.api import api
@@ -750,8 +754,23 @@ def api_insights_refresh():
 
     user_id = _effective_user_id()
     ai_config = AISettings.query.filter_by(user_id=user_id).first()
-    if not ai_config or not ai_config.api_key:
+    provider = select_provider(ai_config)
+    if not provider:
         return validation_error({"api_key": "No OpenAI API key configured"})
+
+    last_updated = ai_config.last_updated if ai_config else None
+    cached_insights = ai_config.last_insights if ai_config else None
+    if cached_insights and not is_refresh_due(last_updated):
+        try:
+            parsed = json.loads(cached_insights)
+        except (json.JSONDecodeError, ValueError, TypeError):
+            parsed = None
+        return api_ok({
+            "configured": bool(ai_config and ai_config.api_key),
+            "insights": parsed,
+            "last_updated": _datetime(ai_config.last_updated) if ai_config else None,
+            "model": ai_config.model_version if ai_config else None,
+        })
 
     balance_record = _latest_balance(user_id)
     current_balance = float(balance_record.amount) if balance_record else 0.0
@@ -761,13 +780,21 @@ def api_insights_refresh():
     skips = Skip.query.filter_by(user_id=user_id).all()
 
     try:
-        insights_json = fetch_insights(ai_config.api_key, current_balance, schedules, holds, skips, model=ai_config.model_version)
+        insights_json = fetch_insights_for_provider(provider, current_balance, schedules, holds, skips)
         parsed = json.loads(insights_json)
     except Exception:
         return validation_error({"insights": "Unable to generate AI insights"}, message="AI insights generation failed")
 
+    if ai_config is None:
+        ai_config = AISettings(user_id=user_id)
+        db.session.add(ai_config)
     ai_config.last_insights = insights_json
     ai_config.last_updated = datetime.now(timezone.utc)
     db.session.commit()
 
-    return api_ok({"configured": True, "insights": parsed, "last_updated": _datetime(ai_config.last_updated), "model": ai_config.model_version})
+    return api_ok({
+        "configured": bool(ai_config.api_key),
+        "insights": parsed,
+        "last_updated": _datetime(ai_config.last_updated),
+        "model": ai_config.model_version,
+    })

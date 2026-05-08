@@ -5,7 +5,8 @@ gpt-4o-mini for risk, pattern, and observation insights.
 """
 import json
 import logging
-from datetime import datetime, timedelta
+import os
+from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 from openai import OpenAI
 
@@ -216,6 +217,8 @@ def build_payload(current_balance, schedules, holds, skips):
 
 
 DEFAULT_MODEL = 'gpt-4o-mini'
+DO_DEFAULT_MODEL = 'n/a'
+REFRESH_INTERVAL = timedelta(hours=24)
 
 
 def validate_model(api_key, model_name):
@@ -237,20 +240,66 @@ def validate_model(api_key, model_name):
         return False, f"Could not validate model: {exc}"
 
 
-def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips, model=None):
-    """
-    Decrypt the API key, build the payload, call OpenAI, and return the raw
-    JSON string of insights.
+def normalize_do_base_url(url):
+    """Ensure a DigitalOcean AI base URL ends with ``/api/v1/`` and has no
+    duplicated slashes between segments."""
+    if not url:
+        return url
+    base = url.strip().rstrip('/')
+    if not base.endswith('/api/v1'):
+        base = base + '/api/v1'
+    return base + '/'
 
-    Raises ValueError for configuration errors, Exception for API errors.
-    """
-    api_key = decrypt_password(encrypted_api_key)
-    payload = build_payload(current_balance, schedules, holds, skips)
-    selected_model = model if model else DEFAULT_MODEL
 
-    client = OpenAI(api_key=api_key)
+def select_provider(ai_config):
+    """Decide which AI provider to use for this user.
+
+    Returns one of:
+      - {"kind": "openai", "api_key": <encrypted>, "model": <name>} when the
+        user has their own OpenAI settings configured.
+      - {"kind": "digitalocean", "api_key": <plain>, "base_url": <url>,
+         "model": <name>} when the user has no OpenAI settings but the server
+        has DO_AI_BASE_URL and DO_AI_API_KEY environment variables set.
+      - None when no provider is available.
+    """
+    if ai_config and ai_config.api_key:
+        return {
+            'kind': 'openai',
+            'api_key': ai_config.api_key,
+            'model': ai_config.model_version or DEFAULT_MODEL,
+        }
+    do_base_url = os.environ.get('DO_AI_BASE_URL')
+    do_api_key = os.environ.get('DO_AI_API_KEY')
+    if do_base_url and do_api_key:
+        return {
+            'kind': 'digitalocean',
+            'api_key': do_api_key,
+            'base_url': normalize_do_base_url(do_base_url),
+            'model': os.environ.get('DO_AI_MODEL') or DO_DEFAULT_MODEL,
+        }
+    return None
+
+
+def is_refresh_due(last_updated, now=None):
+    """Return True when AI insights are eligible for a refresh.
+
+    Insights may refresh at most once per 24 hours per user.  A missing
+    timestamp (first run, or never refreshed) is always eligible.
+    """
+    if last_updated is None:
+        return True
+    if now is None:
+        now = datetime.now(timezone.utc)
+    # last_updated read back from the DB may be naive — treat as UTC.
+    if last_updated.tzinfo is None:
+        last_updated = last_updated.replace(tzinfo=timezone.utc)
+    return (now - last_updated) >= REFRESH_INTERVAL
+
+
+def _run_completion(client, model, payload):
+    """Send the system prompt + JSON payload and return the raw JSON string."""
     response = client.chat.completions.create(
-        model=selected_model,
+        model=model,
         messages=[
             {'role': 'system', 'content': SYSTEM_PROMPT},
             {'role': 'user', 'content': json.dumps(payload)},
@@ -258,3 +307,39 @@ def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips, 
         response_format={'type': 'json_object'},
     )
     return response.choices[0].message.content
+
+
+def _client_for_provider(provider):
+    if provider['kind'] == 'openai':
+        api_key = decrypt_password(provider['api_key'])
+        return OpenAI(api_key=api_key)
+    if provider['kind'] == 'digitalocean':
+        return OpenAI(api_key=provider['api_key'], base_url=provider['base_url'])
+    raise ValueError(f"Unknown AI provider kind: {provider.get('kind')!r}")
+
+
+def fetch_insights_for_provider(provider, current_balance, schedules, holds, skips):
+    """Build the payload and call the AI service indicated by ``provider``.
+
+    Reuses the OpenAI Python SDK for both bring-your-own-key and the DO
+    OpenAI-compatible endpoint.  Returns the raw JSON string.
+    """
+    client = _client_for_provider(provider)
+    payload = build_payload(current_balance, schedules, holds, skips)
+    return _run_completion(client, provider['model'], payload)
+
+
+def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips, model=None):
+    """
+    Decrypt the API key, build the payload, call OpenAI, and return the raw
+    JSON string of insights.
+
+    Kept for backward compatibility with callers that already hold an
+    encrypted user-supplied OpenAI key.
+    """
+    provider = {
+        'kind': 'openai',
+        'api_key': encrypted_api_key,
+        'model': model or DEFAULT_MODEL,
+    }
+    return fetch_insights_for_provider(provider, current_balance, schedules, holds, skips)
