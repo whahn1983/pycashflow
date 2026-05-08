@@ -24,6 +24,7 @@ from .getemail import send_account_activation_notification
 from .getemail import send_password_setup_email
 from .crypto_utils import encrypt_password, decrypt_password
 from .ai_insights import (
+    AIProviderError,
     fetch_insights,
     fetch_insights_for_provider,
     is_refresh_due,
@@ -1376,7 +1377,10 @@ def ai_insights():
 
     try:
         insights_json = fetch_insights_for_provider(provider, current_balance, schedules, holds, skips)
-    except Exception as e:
+    except AIProviderError as e:
+        logger.warning("AI insights generation rejected for user %s: %s", user_id, e.original or e)
+        return Response(json.dumps({'error': e.user_message}), status=502, mimetype='application/json')
+    except Exception:
         logger.exception("AI insights generation failed for user %s", user_id)
         return Response(json.dumps({'error': 'An error occurred generating insights. Please try again later.'}), status=500, mimetype='application/json')
 

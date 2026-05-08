@@ -24,10 +24,13 @@ from app.api.routes import data as _api_data_module
 from app.ai_insights import (
     DEFAULT_MODEL,
     DO_DEFAULT_MODEL,
+    AIProviderError,
+    _is_subscription_tier_error,
     fetch_insights_for_provider,
     is_refresh_due,
     normalize_do_base_url,
     select_provider,
+    validate_model,
 )
 from app.crypto_utils import encrypt_password
 from app.models import AISettings
@@ -105,11 +108,12 @@ class TestSelectProvider:
     def test_falls_back_when_user_record_has_no_api_key(self, monkeypatch):
         monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run/")
         monkeypatch.setenv("DO_AI_API_KEY", "do-secret")
+        # DO_AI_MODEL must be ignored — agent endpoints require model="n/a".
         monkeypatch.setenv("DO_AI_MODEL", "llama-3")
         # AISettings exists but api_key is None
         provider = select_provider(_ai_config(api_key=None, model=None))
         assert provider["kind"] == "digitalocean"
-        assert provider["model"] == "llama-3"
+        assert provider["model"] == DO_DEFAULT_MODEL
         assert provider["base_url"] == "https://example.do.run/api/v1/"
 
     def test_returns_none_when_no_user_key_and_no_do_env(self, monkeypatch):
@@ -331,6 +335,7 @@ class TestRefreshEndpointProviderAndLimit:
     def test_uses_digitalocean_when_user_key_missing_and_env_set(self, client, flask_app, clean_ai_settings, monkeypatch):
         monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run/")
         monkeypatch.setenv("DO_AI_API_KEY", "do-secret")
+        # DO_AI_MODEL must be ignored — agent endpoints require model="n/a".
         monkeypatch.setenv("DO_AI_MODEL", "do-model")
 
         captured = {}
@@ -349,7 +354,7 @@ class TestRefreshEndpointProviderAndLimit:
         assert resp.status_code == 200, resp.get_json()
         assert captured["provider"]["kind"] == "digitalocean"
         assert captured["provider"]["base_url"] == "https://example.do.run/api/v1/"
-        assert captured["provider"]["model"] == "do-model"
+        assert captured["provider"]["model"] == DO_DEFAULT_MODEL
 
         # And it should have created an AISettings row with last_updated set
         # so the cache check works on subsequent calls.
@@ -520,3 +525,190 @@ class TestRemoveApiKeyRoute:
         # No AISettings row at all — endpoint should redirect without 500.
         resp = auth_client.post("/ai_settings/remove", follow_redirects=False)
         assert resp.status_code in (302, 303)
+
+
+# ── Provider error classification ────────────────────────────────────────────
+
+
+class _FakeAuthError(Exception):
+    """Stand-in for openai.AuthenticationError that bypasses the SDK's
+    httpx.Response-bound constructor.  Subclasses the real class so the
+    isinstance() checks in fetch_insights_for_provider still match."""
+
+    def __new__(cls, message, body=None):
+        from openai import AuthenticationError
+        # Build a real subclass instance without invoking the real __init__
+        # (which would require a live httpx.Response).
+        kls = type("_TestAuthError", (AuthenticationError,), {})
+        inst = Exception.__new__(kls)
+        Exception.__init__(inst, message)
+        inst.body = body
+        return inst
+
+
+def _make_permission_error(message, body=None):
+    from openai import PermissionDeniedError
+    kls = type("_TestPermErr", (PermissionDeniedError,), {})
+    inst = Exception.__new__(kls)
+    Exception.__init__(inst, message)
+    inst.body = body
+    return inst
+
+
+def _make_not_found_error(message, body=None):
+    from openai import NotFoundError
+    kls = type("_TestNotFound", (NotFoundError,), {})
+    inst = Exception.__new__(kls)
+    Exception.__init__(inst, message)
+    inst.body = body
+    return inst
+
+
+# The exact wrapped body the user reported: a 401 envelope from the DO GenAI
+# gateway whose "error" string contains a 403 "subscription tier" rejection.
+_WRAPPED_TIER_BODY = {
+    "error": (
+        "Error code: 403 - {'error': {'message': 'this model is not "
+        "available for your subscription tier', 'type': 'forbidden_error'}, "
+        "'message': 'this model is not available for your subscription "
+        "tier', 'status_code': 403}"
+    ),
+    "code": 401,
+}
+
+
+class TestIsSubscriptionTierError:
+    def test_detects_wrapped_401_with_inner_403_tier_message(self):
+        exc = _FakeAuthError("Error code: 401", body=_WRAPPED_TIER_BODY)
+        assert _is_subscription_tier_error(exc) is True
+
+    def test_detects_dict_error_with_message_key(self):
+        body = {"error": {"message": "this model is not available for your subscription tier"}}
+        exc = _FakeAuthError("oops", body=body)
+        assert _is_subscription_tier_error(exc) is True
+
+    def test_does_not_match_plain_invalid_key(self):
+        body = {"error": {"message": "Incorrect API key provided"}}
+        exc = _FakeAuthError("Error code: 401", body=body)
+        assert _is_subscription_tier_error(exc) is False
+
+    def test_handles_missing_body(self):
+        exc = _FakeAuthError("boom", body=None)
+        assert _is_subscription_tier_error(exc) is False
+
+
+class TestFetchInsightsErrorClassification:
+    def _patch_client_to_raise(self, monkeypatch, exc):
+        class FakeClient:
+            def __init__(self, *, api_key, base_url=None):
+                def _raise(**_kwargs):
+                    raise exc
+                self.chat = SimpleNamespace(
+                    completions=SimpleNamespace(create=_raise)
+                )
+
+        monkeypatch.setattr(_ai_insights_module, "OpenAI", FakeClient)
+        monkeypatch.setattr(
+            _ai_insights_module, "build_payload",
+            lambda *a, **kw: {"today": "2026-05-08"},
+        )
+        monkeypatch.setattr(
+            _ai_insights_module, "decrypt_password", lambda enc: "plain",
+        )
+
+    def test_wrapped_tier_401_becomes_subscription_tier_error(self, monkeypatch):
+        wrapped = _FakeAuthError("Error code: 401", body=_WRAPPED_TIER_BODY)
+        self._patch_client_to_raise(monkeypatch, wrapped)
+        provider = {"kind": "openai", "api_key": "ENC", "model": "gpt-4o"}
+        with pytest.raises(AIProviderError) as ei:
+            fetch_insights_for_provider(provider, 0.0, [], [], [])
+        assert "subscription tier" in ei.value.user_message.lower()
+        assert ei.value.original is wrapped
+
+    def test_plain_authentication_error_signals_bad_key(self, monkeypatch):
+        exc = _FakeAuthError(
+            "Error code: 401",
+            body={"error": {"message": "Incorrect API key provided"}},
+        )
+        self._patch_client_to_raise(monkeypatch, exc)
+        provider = {"kind": "openai", "api_key": "ENC", "model": "gpt-4o"}
+        with pytest.raises(AIProviderError) as ei:
+            fetch_insights_for_provider(provider, 0.0, [], [], [])
+        msg = ei.value.user_message.lower()
+        assert "api key" in msg
+        assert "subscription tier" not in msg
+
+    def test_permission_denied_becomes_provider_error(self, monkeypatch):
+        exc = _make_permission_error(
+            "Error code: 403",
+            body={"error": {"message": "model not available for your subscription tier"}},
+        )
+        self._patch_client_to_raise(monkeypatch, exc)
+        provider = {"kind": "openai", "api_key": "ENC", "model": "gpt-4o"}
+        with pytest.raises(AIProviderError) as ei:
+            fetch_insights_for_provider(provider, 0.0, [], [], [])
+        assert "subscription tier" in ei.value.user_message.lower()
+
+    def test_not_found_includes_model_name(self, monkeypatch):
+        exc = _make_not_found_error("Error code: 404", body={})
+        self._patch_client_to_raise(monkeypatch, exc)
+        provider = {"kind": "openai", "api_key": "ENC", "model": "made-up"}
+        with pytest.raises(AIProviderError) as ei:
+            fetch_insights_for_provider(provider, 0.0, [], [], [])
+        assert "made-up" in ei.value.user_message
+
+
+class TestValidateModelTierError:
+    def test_validate_model_handles_permission_denied(self, monkeypatch):
+        exc = _make_permission_error(
+            "Error code: 403",
+            body={"error": {"message": "model not available for your subscription tier"}},
+        )
+
+        class FakeClient:
+            def __init__(self, *, api_key, base_url=None):
+                self.models = SimpleNamespace(retrieve=lambda _name: (_ for _ in ()).throw(exc))
+
+        monkeypatch.setattr(_ai_insights_module, "OpenAI", FakeClient)
+        ok, msg = validate_model("sk-test", "gpt-4o")
+        assert ok is False
+        assert "subscription tier" in msg.lower()
+
+    def test_validate_model_handles_wrapped_tier_in_auth_error(self, monkeypatch):
+        # The DO gateway pattern: AuthenticationError carrying a wrapped 403
+        # tier rejection in its body.  Should classify as a tier issue, not
+        # an invalid key.
+        exc = _FakeAuthError("Error code: 401", body=_WRAPPED_TIER_BODY)
+
+        class FakeClient:
+            def __init__(self, *, api_key, base_url=None):
+                self.models = SimpleNamespace(retrieve=lambda _name: (_ for _ in ()).throw(exc))
+
+        monkeypatch.setattr(_ai_insights_module, "OpenAI", FakeClient)
+        ok, msg = validate_model("sk-test", "gpt-4o")
+        assert ok is False
+        assert "subscription tier" in msg.lower()
+        assert "invalid api key" not in msg.lower()
+
+
+class TestRefreshEndpointSurfacesProviderError:
+    def test_subscription_tier_error_returned_as_validation_error(
+        self, client, flask_app, clean_ai_settings, monkeypatch
+    ):
+        monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run")
+        monkeypatch.setenv("DO_AI_API_KEY", "do-secret")
+
+        def _raise(provider, *args, **kwargs):
+            raise AIProviderError(
+                "The selected AI model is not available for your subscription "
+                "tier. Choose a different model in AI Settings."
+            )
+
+        monkeypatch.setattr(_api_data_module, "fetch_insights_for_provider", _raise)
+
+        token = _login(client)
+        resp = client.post("/api/v1/insights/refresh", headers=_bearer(token))
+        assert resp.status_code == 422
+        body = resp.get_json()
+        assert body["code"] == "validation_error"
+        assert "subscription tier" in body["fields"]["insights"].lower()

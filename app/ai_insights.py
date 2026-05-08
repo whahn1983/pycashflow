@@ -221,19 +221,59 @@ DO_DEFAULT_MODEL = 'n/a'
 REFRESH_INTERVAL = timedelta(hours=24)
 
 
+class AIProviderError(Exception):
+    """Raised when an AI provider request fails with a user-fixable cause.
+
+    ``user_message`` is sanitised and safe to surface in API responses /
+    flash messages.  ``original`` is the underlying provider exception, kept
+    for logging only.
+    """
+
+    def __init__(self, user_message, *, original=None):
+        super().__init__(user_message)
+        self.user_message = user_message
+        self.original = original
+
+
+def _is_subscription_tier_error(exc):
+    """Detect the wrapped 'model not available for your subscription tier' case.
+
+    The DigitalOcean GenAI gateway forwards upstream OpenAI 403s by stuffing
+    them inside a 401 envelope, so the OpenAI SDK raises AuthenticationError
+    even though the API key is fine — the model is the real problem.  Walk
+    the exception body and message to spot that pattern so we can reclassify.
+    """
+    candidates = [str(exc)]
+    body = getattr(exc, 'body', None)
+    if isinstance(body, dict):
+        err = body.get('error')
+        if isinstance(err, str):
+            candidates.append(err)
+        elif isinstance(err, dict):
+            msg = err.get('message')
+            if isinstance(msg, str):
+                candidates.append(msg)
+    haystack = ' '.join(candidates).lower()
+    return 'subscription tier' in haystack or 'forbidden_error' in haystack
+
+
 def validate_model(api_key, model_name):
     """
     Check whether model_name is a valid model accessible with the given API key.
     Returns (True, None) if valid, (False, error_message) otherwise.
     """
-    from openai import NotFoundError, AuthenticationError
+    from openai import NotFoundError, AuthenticationError, PermissionDeniedError
     client = OpenAI(api_key=api_key)
     try:
         client.models.retrieve(model_name)
         return True, None
     except NotFoundError:
         return False, f"Model '{model_name}' does not exist or is not accessible with this API key."
-    except AuthenticationError:
+    except PermissionDeniedError:
+        return False, f"Model '{model_name}' is not available for your subscription tier."
+    except AuthenticationError as exc:
+        if _is_subscription_tier_error(exc):
+            return False, f"Model '{model_name}' is not available for your subscription tier."
         return False, "Invalid API key — could not validate the model."
     except Exception as exc:
         logger.warning("Unexpected error validating model %r: %s", model_name, exc)
@@ -271,11 +311,15 @@ def select_provider(ai_config):
     do_base_url = os.environ.get('DO_AI_BASE_URL')
     do_api_key = os.environ.get('DO_AI_API_KEY')
     if do_base_url and do_api_key:
+        # DigitalOcean GenAI agent endpoints require model="n/a" — the real
+        # model is configured on the agent itself.  Always send the placeholder
+        # so a stray DO_AI_MODEL env var can't reintroduce the
+        # 'this model is not available for your subscription tier' rejection.
         return {
             'kind': 'digitalocean',
             'api_key': do_api_key,
             'base_url': normalize_do_base_url(do_base_url),
-            'model': os.environ.get('DO_AI_MODEL') or DO_DEFAULT_MODEL,
+            'model': DO_DEFAULT_MODEL,
         }
     return None
 
@@ -338,10 +382,39 @@ def fetch_insights_for_provider(provider, current_balance, schedules, holds, ski
 
     Reuses the OpenAI Python SDK for both bring-your-own-key and the DO
     OpenAI-compatible endpoint.  Returns the raw JSON string.
+
+    Raises ``AIProviderError`` with a user-friendly message for the common
+    fixable cases (bad key, model not available for the subscription tier,
+    model not found).  Other exceptions propagate unchanged.
     """
+    from openai import AuthenticationError, NotFoundError, PermissionDeniedError
+
     client = _client_for_provider(provider)
     payload = build_payload(current_balance, schedules, holds, skips)
-    return _run_completion(client, provider['model'], payload, provider['kind'])
+    try:
+        return _run_completion(client, provider['model'], payload, provider['kind'])
+    except (AuthenticationError, PermissionDeniedError) as exc:
+        if _is_subscription_tier_error(exc):
+            raise AIProviderError(
+                "The selected AI model is not available for your subscription "
+                "tier. Choose a different model in AI Settings.",
+                original=exc,
+            ) from exc
+        if isinstance(exc, AuthenticationError):
+            raise AIProviderError(
+                "The AI provider rejected the API key. Verify it in AI Settings.",
+                original=exc,
+            ) from exc
+        raise AIProviderError(
+            "The AI provider denied this request. The selected model may not "
+            "be available for your subscription tier.",
+            original=exc,
+        ) from exc
+    except NotFoundError as exc:
+        raise AIProviderError(
+            f"The configured AI model ({provider.get('model')!r}) was not found.",
+            original=exc,
+        ) from exc
 
 
 def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips, model=None):
