@@ -11,6 +11,7 @@ from app import db
 from app.models import Schedule, Scenario, Balance, Hold, Skip, AISettings
 from app.cashflow import update_cash, calculate_cash_risk_score
 from app.ai_insights import (
+    AIProviderError,
     fetch_insights_for_provider,
     is_refresh_due,
     select_provider,
@@ -783,6 +784,8 @@ def api_insights_refresh():
     try:
         insights_json = fetch_insights_for_provider(provider, current_balance, schedules, holds, skips)
         parsed = json.loads(insights_json)
+    except AIProviderError as e:
+        return validation_error({"insights": e.user_message}, message="AI insights generation failed")
     except Exception:
         return validation_error({"insights": "Unable to generate AI insights"}, message="AI insights generation failed")
 
