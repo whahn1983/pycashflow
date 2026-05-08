@@ -218,7 +218,7 @@ def build_payload(current_balance, schedules, holds, skips):
 
 DEFAULT_MODEL = 'gpt-4o-mini'
 DO_DEFAULT_MODEL = 'n/a'
-REFRESH_INTERVAL = timedelta(hours=24)
+REFRESH_INTERVAL = timedelta(hours=2)
 
 
 class AIProviderError(Exception):
@@ -333,7 +333,7 @@ def select_provider(ai_config):
 def is_refresh_due(last_updated, now=None):
     """Return True when AI insights are eligible for a refresh.
 
-    Insights may refresh at most once per 24 hours per user.  A missing
+    Insights may refresh at most once per 2 hours per user.  A missing
     timestamp (first run, or never refreshed) is always eligible.
     """
     if last_updated is None:

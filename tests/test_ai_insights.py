@@ -2,7 +2,7 @@
 Unit tests for the AI insights helper layer:
   - normalize_do_base_url
   - select_provider (user OpenAI vs DigitalOcean fallback vs none)
-  - is_refresh_due (24-hour limit)
+  - is_refresh_due (2-hour limit)
   - fetch_insights_for_provider client construction
   - /api/v1/insights/refresh end-to-end honors the provider/refresh policy
 
@@ -145,24 +145,24 @@ class TestIsRefreshDue:
     def test_missing_timestamp_is_due(self):
         assert is_refresh_due(None) is True
 
-    def test_within_24_hours_is_not_due(self):
+    def test_within_2_hours_is_not_due(self):
         now = datetime.now(timezone.utc)
         recent = now - timedelta(hours=1)
         assert is_refresh_due(recent, now=now) is False
 
-    def test_just_under_24_hours_is_not_due(self):
+    def test_just_under_2_hours_is_not_due(self):
         now = datetime.now(timezone.utc)
-        recent = now - timedelta(hours=23, minutes=59)
+        recent = now - timedelta(hours=1, minutes=59)
         assert is_refresh_due(recent, now=now) is False
 
-    def test_exactly_24_hours_is_due(self):
+    def test_exactly_2_hours_is_due(self):
         now = datetime.now(timezone.utc)
-        boundary = now - timedelta(hours=24)
+        boundary = now - timedelta(hours=2)
         assert is_refresh_due(boundary, now=now) is True
 
-    def test_older_than_24_hours_is_due(self):
+    def test_older_than_2_hours_is_due(self):
         now = datetime.now(timezone.utc)
-        old = now - timedelta(days=2)
+        old = now - timedelta(hours=3)
         assert is_refresh_due(old, now=now) is True
 
     def test_handles_naive_timestamp_as_utc(self):
@@ -263,7 +263,7 @@ class TestFetchInsightsForProvider:
         assert '"today": "2026-05-08"' in messages[1]["content"]
 
 
-# ── End-to-end: /api/v1/insights/refresh respects provider + 24h limit ───────
+# ── End-to-end: /api/v1/insights/refresh respects provider + 2h limit ───────
 
 
 def _login(client, email="admin@test.local", password="testpass123"):
@@ -373,7 +373,7 @@ class TestRefreshEndpointProviderAndLimit:
 
     def test_recent_refresh_returns_cached_without_calling_provider(self, client, flask_app, clean_ai_settings, monkeypatch):
         # Even though DO env is present and would otherwise be used, a refresh
-        # less than 24 hours ago must skip the AI call entirely.
+        # less than 2 hours ago must skip the AI call entirely.
         monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run")
         monkeypatch.setenv("DO_AI_API_KEY", "do-secret")
 
@@ -515,7 +515,7 @@ class TestRemoveApiKeyRoute:
             assert row is not None
             assert row.api_key is None
             assert row.model_version is None
-            # Cached insights and the 24h refresh window are shared with the
+            # Cached insights and the 2h refresh window are shared with the
             # DigitalOcean provider and must be preserved.
             assert row.last_insights == cached_payload
             assert row.last_updated is not None
