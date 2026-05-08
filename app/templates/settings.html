@@ -564,7 +564,7 @@
                 </form>
                 {% if ai_configured %}
                 <form action="{{url_for('main.ai_settings_remove')}}" method="POST"
-                      onsubmit="return confirm('Remove the saved OpenAI API key and model? AI Insights will fall back to the DigitalOcean service if it is configured on the server.');"
+                      onsubmit="return confirm('Remove the saved OpenAI API key and model? Future refreshes will use the DigitalOcean service if it is configured on the server.');"
                       style="margin-top: 0.75rem;">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button class="btn-modern" type="submit" style="width: 100%; background: var(--danger, #dc2626); color: white; border: none;">

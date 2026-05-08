@@ -464,13 +464,15 @@ class TestRemoveApiKeyRoute:
         self, auth_client, flask_app, clean_ai_settings, monkeypatch
     ):
         user_id = clean_ai_settings
+        cached_payload = '{"insights": [{"title": "kept"}]}'
+        cached_ts = datetime.now(timezone.utc)
         with flask_app.app_context():
             _db.session.add(AISettings(
                 user_id=user_id,
                 api_key=encrypt_password("sk-user"),
                 model_version="gpt-4o",
-                last_insights='{"insights": []}',
-                last_updated=datetime.now(timezone.utc),
+                last_insights=cached_payload,
+                last_updated=cached_ts,
             ))
             _db.session.commit()
 
@@ -482,8 +484,10 @@ class TestRemoveApiKeyRoute:
             assert row is not None
             assert row.api_key is None
             assert row.model_version is None
-            assert row.last_insights is None
-            assert row.last_updated is None
+            # Cached insights and the 24h refresh window are shared with the
+            # DigitalOcean provider and must be preserved.
+            assert row.last_insights == cached_payload
+            assert row.last_updated is not None
 
             # With the user key cleared and DO env vars set, provider must
             # fall back to DigitalOcean.

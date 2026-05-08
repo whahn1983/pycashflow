@@ -1343,8 +1343,6 @@ def ai_settings_remove():
 
     ai_config.api_key = None
     ai_config.model_version = None
-    ai_config.last_updated = None
-    ai_config.last_insights = None
     db.session.commit()
     flash('OpenAI API key removed')
     return redirect(url_for('main.settings'))
