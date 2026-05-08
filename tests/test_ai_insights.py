@@ -377,6 +377,46 @@ class TestRefreshEndpointProviderAndLimit:
         body = resp.get_json()["data"]
         assert body["insights"] == json.loads(cached_payload)
 
+    def test_invalid_cached_json_within_window_regenerates(self, client, flask_app, clean_ai_settings, monkeypatch):
+        # A malformed cached payload inside the 24-hour window must not lock
+        # the user out — treat it as a cache miss and regenerate immediately.
+        monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run")
+        monkeypatch.setenv("DO_AI_API_KEY", "do-secret")
+
+        user_id = clean_ai_settings
+        recent = datetime.now(timezone.utc) - timedelta(hours=1)
+        with flask_app.app_context():
+            _db.session.add(AISettings(
+                user_id=user_id,
+                api_key=None,
+                model_version=None,
+                last_updated=recent,
+                last_insights="not-json{",
+            ))
+            _db.session.commit()
+
+        called = {"count": 0}
+
+        def fake_fetch(provider, *args, **kwargs):
+            called["count"] += 1
+            return '{"insights": [{"title": "fresh"}]}'
+
+        monkeypatch.setattr(
+            _api_data_module, "fetch_insights_for_provider",
+            fake_fetch,
+        )
+
+        token = _login(client)
+        resp = client.post("/api/v1/insights/refresh", headers=_bearer(token))
+        assert resp.status_code == 200, resp.get_json()
+        assert called["count"] == 1
+        body = resp.get_json()["data"]
+        assert body["insights"] == {"insights": [{"title": "fresh"}]}
+
+        with flask_app.app_context():
+            row = AISettings.query.filter_by(user_id=user_id).first()
+            assert row.last_insights == '{"insights": [{"title": "fresh"}]}'
+
     def test_stale_refresh_calls_provider_and_updates_timestamp(self, client, flask_app, clean_ai_settings, monkeypatch):
         monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run")
         monkeypatch.setenv("DO_AI_API_KEY", "do-secret")
