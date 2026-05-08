@@ -108,11 +108,12 @@ class TestSelectProvider:
     def test_falls_back_when_user_record_has_no_api_key(self, monkeypatch):
         monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run/")
         monkeypatch.setenv("DO_AI_API_KEY", "do-secret")
+        # DO_AI_MODEL must be ignored — agent endpoints require model="n/a".
         monkeypatch.setenv("DO_AI_MODEL", "llama-3")
         # AISettings exists but api_key is None
         provider = select_provider(_ai_config(api_key=None, model=None))
         assert provider["kind"] == "digitalocean"
-        assert provider["model"] == "llama-3"
+        assert provider["model"] == DO_DEFAULT_MODEL
         assert provider["base_url"] == "https://example.do.run/api/v1/"
 
     def test_returns_none_when_no_user_key_and_no_do_env(self, monkeypatch):
@@ -334,6 +335,7 @@ class TestRefreshEndpointProviderAndLimit:
     def test_uses_digitalocean_when_user_key_missing_and_env_set(self, client, flask_app, clean_ai_settings, monkeypatch):
         monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run/")
         monkeypatch.setenv("DO_AI_API_KEY", "do-secret")
+        # DO_AI_MODEL must be ignored — agent endpoints require model="n/a".
         monkeypatch.setenv("DO_AI_MODEL", "do-model")
 
         captured = {}
@@ -352,7 +354,7 @@ class TestRefreshEndpointProviderAndLimit:
         assert resp.status_code == 200, resp.get_json()
         assert captured["provider"]["kind"] == "digitalocean"
         assert captured["provider"]["base_url"] == "https://example.do.run/api/v1/"
-        assert captured["provider"]["model"] == "do-model"
+        assert captured["provider"]["model"] == DO_DEFAULT_MODEL
 
         # And it should have created an AISettings row with last_updated set
         # so the cache check works on subsequent calls.

@@ -311,11 +311,15 @@ def select_provider(ai_config):
     do_base_url = os.environ.get('DO_AI_BASE_URL')
     do_api_key = os.environ.get('DO_AI_API_KEY')
     if do_base_url and do_api_key:
+        # DigitalOcean GenAI agent endpoints require model="n/a" — the real
+        # model is configured on the agent itself.  Always send the placeholder
+        # so a stray DO_AI_MODEL env var can't reintroduce the
+        # 'this model is not available for your subscription tier' rejection.
         return {
             'kind': 'digitalocean',
             'api_key': do_api_key,
             'base_url': normalize_do_base_url(do_base_url),
-            'model': os.environ.get('DO_AI_MODEL') or DO_DEFAULT_MODEL,
+            'model': DO_DEFAULT_MODEL,
         }
     return None
 
