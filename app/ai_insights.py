@@ -296,14 +296,29 @@ def is_refresh_due(last_updated, now=None):
     return (now - last_updated) >= REFRESH_INTERVAL
 
 
-def _run_completion(client, model, payload):
-    """Send the system prompt + JSON payload and return the raw JSON string."""
+def _build_messages(provider_kind, payload):
+    """Compose the chat messages for the given provider.
+
+    DigitalOcean GenAI agents reject system and developer messages — agent
+    instructions are configured at the agent level on the platform. Fold the
+    prompt into the user message so the model still sees the rules.
+    """
+    payload_json = json.dumps(payload)
+    if provider_kind == 'digitalocean':
+        return [
+            {'role': 'user', 'content': f"{SYSTEM_PROMPT}\n\n{payload_json}"},
+        ]
+    return [
+        {'role': 'system', 'content': SYSTEM_PROMPT},
+        {'role': 'user', 'content': payload_json},
+    ]
+
+
+def _run_completion(client, model, payload, provider_kind='openai'):
+    """Send the prompt + JSON payload and return the raw JSON string."""
     response = client.chat.completions.create(
         model=model,
-        messages=[
-            {'role': 'system', 'content': SYSTEM_PROMPT},
-            {'role': 'user', 'content': json.dumps(payload)},
-        ],
+        messages=_build_messages(provider_kind, payload),
         response_format={'type': 'json_object'},
     )
     return response.choices[0].message.content
@@ -326,7 +341,7 @@ def fetch_insights_for_provider(provider, current_balance, schedules, holds, ski
     """
     client = _client_for_provider(provider)
     payload = build_payload(current_balance, schedules, holds, skips)
-    return _run_completion(client, provider['model'], payload)
+    return _run_completion(client, provider['model'], payload, provider['kind'])
 
 
 def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips, model=None):
