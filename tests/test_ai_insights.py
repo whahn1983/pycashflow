@@ -408,9 +408,9 @@ class TestRefreshEndpointProviderAndLimit:
         body = resp.get_json()["data"]
         assert body["insights"] == json.loads(cached_payload)
 
-    def test_invalid_cached_json_within_window_regenerates(self, client, flask_app, clean_ai_settings, monkeypatch):
-        # A malformed cached payload inside the 24-hour window must not lock
-        # the user out — treat it as a cache miss and regenerate immediately.
+    def test_invalid_cached_json_within_window_returns_without_regenerating(self, client, flask_app, clean_ai_settings, monkeypatch):
+        # A malformed cached payload inside the 2-hour window should not trigger
+        # a provider call, and must preserve the existing last_updated timestamp.
         monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run")
         monkeypatch.setenv("DO_AI_API_KEY", "do-secret")
 
@@ -440,13 +440,16 @@ class TestRefreshEndpointProviderAndLimit:
         token = _login(client)
         resp = client.post("/api/v1/insights/refresh", headers=_bearer(token))
         assert resp.status_code == 200, resp.get_json()
-        assert called["count"] == 1
+        assert called["count"] == 0
         body = resp.get_json()["data"]
-        assert body["insights"] == {"insights": [{"title": "fresh"}]}
+        assert body["insights"] is None
 
         with flask_app.app_context():
             row = AISettings.query.filter_by(user_id=user_id).first()
-            assert row.last_insights == '{"insights": [{"title": "fresh"}]}'
+            assert row.last_insights == "not-json{"
+            assert row.last_updated is not None
+            row_dt = row.last_updated if row.last_updated.tzinfo else row.last_updated.replace(tzinfo=timezone.utc)
+            assert abs((row_dt - recent).total_seconds()) < 5
 
     def test_stale_refresh_calls_provider_and_updates_timestamp(self, client, flask_app, clean_ai_settings, monkeypatch):
         monkeypatch.setenv("DO_AI_BASE_URL", "https://example.do.run")

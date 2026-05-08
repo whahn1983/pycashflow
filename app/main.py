@@ -1365,8 +1365,8 @@ def ai_insights():
 
     last_updated = ai_config.last_updated if ai_config else None
     cached_insights = ai_config.last_insights if ai_config else None
-    if cached_insights and not is_refresh_due(last_updated):
-        return Response(cached_insights, status=200, mimetype='application/json')
+    if not is_refresh_due(last_updated):
+        return Response(cached_insights or json.dumps({'insights': None}), status=200, mimetype='application/json')
 
     balance_record = Balance.query.filter_by(user_id=user_id).order_by(desc(Balance.date), desc(Balance.id)).first()
     current_balance = float(balance_record.amount) if balance_record else 0.0
