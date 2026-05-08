@@ -761,18 +761,17 @@ def api_insights_refresh():
 
     last_updated = ai_config.last_updated if ai_config else None
     cached_insights = ai_config.last_insights if ai_config else None
-    if cached_insights and not is_refresh_due(last_updated):
+    if not is_refresh_due(last_updated):
         try:
-            parsed = json.loads(cached_insights)
+            parsed = json.loads(cached_insights) if cached_insights else None
         except (json.JSONDecodeError, ValueError, TypeError):
             parsed = None
-        if parsed is not None:
-            return api_ok({
-                "configured": bool(ai_config and ai_config.api_key),
-                "insights": parsed,
-                "last_updated": _datetime(ai_config.last_updated) if ai_config else None,
-                "model": ai_config.model_version if ai_config else None,
-            })
+        return api_ok({
+            "configured": bool(ai_config and ai_config.api_key),
+            "insights": parsed,
+            "last_updated": _datetime(ai_config.last_updated) if ai_config else None,
+            "model": ai_config.model_version if ai_config else None,
+        })
 
     balance_record = _latest_balance(user_id)
     current_balance = float(balance_record.amount) if balance_record else 0.0
