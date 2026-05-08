@@ -765,12 +765,13 @@ def api_insights_refresh():
             parsed = json.loads(cached_insights)
         except (json.JSONDecodeError, ValueError, TypeError):
             parsed = None
-        return api_ok({
-            "configured": bool(ai_config and ai_config.api_key),
-            "insights": parsed,
-            "last_updated": _datetime(ai_config.last_updated) if ai_config else None,
-            "model": ai_config.model_version if ai_config else None,
-        })
+        if parsed is not None:
+            return api_ok({
+                "configured": bool(ai_config and ai_config.api_key),
+                "insights": parsed,
+                "last_updated": _datetime(ai_config.last_updated) if ai_config else None,
+                "model": ai_config.model_version if ai_config else None,
+            })
 
     balance_record = _latest_balance(user_id)
     current_balance = float(balance_record.amount) if balance_record else 0.0
