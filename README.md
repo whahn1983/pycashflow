@@ -66,11 +66,11 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - **Multi-Account Isolation**: Complete data separation between account owners
 
 ### AI-Powered Cash Flow Insights
-- **OpenAI Integration**: On-demand analysis of your 90-day cash flow projection via OpenAI
-- **Model Selection**: Choose any OpenAI model (e.g. `gpt-4o`, `gpt-4o-mini`) in settings; defaults to `gpt-4o-mini` when left blank
+- **Dual AI Provider Support**: Uses your OpenAI API key when configured, or a server-managed DigitalOcean GenAI agent fallback when available
+- **Provider Routing**: If a DigitalOcean agent is configured and no explicit model is set, refreshes prefer the DigitalOcean provider; otherwise the saved OpenAI key/model is used
 - **Typed Insights**: Categorized as **Cash Risk**, **Risk**, **Pattern**, or **Observation** with color-coded badges
 - **Cash Risk Score**: Deterministic 0–100 score computed on every refresh — no AI required; always displayed as a mandatory card in the AI Insights section and as an inline indicator on the Lowest Balance card
-- **On-Demand Refresh**: Insights are only generated when you click Refresh, keeping API costs minimal
+- **Refresh Cooldown**: AI insights refresh at most once every 2 hours per account; requests inside the window return cached insights
 - **Staleness Indicator**: Last-updated timestamp shown so you always know how current the analysis is
 - **Secure Key Storage**: Your OpenAI API key is encrypted at rest using the same Fernet/APP_SECRET pattern as email passwords
 - **Guest Visibility**: Cached insights are visible to guest users (view-only); only account owners can trigger a refresh
@@ -570,19 +570,26 @@ All monetary values are returned as **decimal strings** (e.g. `"1234.56"`) to av
 
 ## AI Insights
 
-PyCashFlow integrates with the OpenAI API to provide on-demand cash flow analysis directly on your dashboard.
+PyCashFlow supports two AI provider paths for on-demand cash flow analysis:
+
+- **OpenAI (user-managed):** account owner stores an encrypted OpenAI API key and optional model override.
+- **DigitalOcean GenAI Agent (server-managed):** optional fallback driven by server environment variables when available.
 
 ### How It Works
 
-1. The account owner adds their OpenAI API key in **Settings → AI Insights**
-2. The key is encrypted using Fernet symmetric encryption (same `APP_SECRET` used for email passwords) before being stored in the database
-3. On the dashboard, click **Refresh** to trigger a live query to OpenAI
-4. The AI analyzes a 90-day projection of your schedule (not scenarios) including:
+1. The account owner can add an OpenAI API key in **Settings → AI Insights** (optional when server-managed DigitalOcean is available)
+2. User-provided keys are encrypted using Fernet symmetric encryption (same `APP_SECRET` used for email passwords) before being stored in the database
+3. On refresh, provider selection follows this policy:
+   - If a DigitalOcean agent is configured **and** the user has not set an explicit model, DigitalOcean is preferred
+   - Otherwise, the user-configured OpenAI provider is used
+4. Click **Refresh** on the dashboard/API to trigger a provider call only when the cooldown allows it
+5. The AI analyzes a 90-day projection of your schedule (not scenarios) including:
    - Current balance
    - Schedule of recurring transactions (name, amount, frequency, type)
    - Lowest projected balance within 90 days
-5. Results are cached in the database and displayed as color-coded insight cards
-6. Guest users can view cached insights but cannot trigger a refresh
+6. Results are cached in the database and displayed as color-coded insight cards
+7. Refreshes are limited to one successful provider call per 2-hour window; during cooldown the cached payload is returned
+8. Guest users can view cached insights but cannot trigger a refresh
 
 ### Cash Risk Score
 
@@ -637,7 +644,7 @@ When an OpenAI API key is configured and insights are refreshed, the AI also gen
 4. Optionally enter an **OpenAI Model** name (e.g. `gpt-4o`, `gpt-4o-mini`). Leave the field blank to use the default model (`gpt-4o-mini`)
 5. Return to the dashboard and click **Refresh** to generate your first analysis
 
-> **Note**: AI queries are only made when you click Refresh, keeping costs minimal. The last-updated timestamp on the card shows how stale the cached results are.
+> **Note**: Refresh is on-demand and subject to a 2-hour cooldown. If a refresh is requested before cooldown expires, the API returns cached insights without updating the timestamp.
 
 ---
 

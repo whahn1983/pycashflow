@@ -33,8 +33,8 @@ Authorization: Bearer <raw_token>
 Tokens are issued by `POST /api/v1/auth/login`. The raw token is returned
 once — only its SHA-256 hash is stored server-side. **Default TTL: 30 days.**
 
-After 30 days the token expires silently. The client must re-authenticate.
-There is no refresh endpoint.
+After 30 days the token expires silently. The client must re-authenticate
+(or rotate via `POST /api/v1/auth/refresh` before expiry).
 
 ### Session Cookie (secondary)
 
@@ -954,6 +954,8 @@ The following endpoints are now implemented and available for mobile clients:
 
 Additional behavior updates:
 - Pagination query params `limit` / `offset` are now supported on list endpoints.
+- AI insights provider routing supports both user-managed OpenAI keys and a server-managed DigitalOcean fallback.
+- `POST /api/v1/insights/refresh` is rate-limited by a per-user 2-hour cooldown; within that window the API returns cached insights and preserves `last_updated`.
 - `/dashboard` now includes both legacy `risk` and serialized `risk_v2`; `risk` is deprecated.
 - Guests remain read-only and receive `403 forbidden` on mutation endpoints.
 
