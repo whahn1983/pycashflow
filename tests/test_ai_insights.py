@@ -172,9 +172,12 @@ class TestFetchInsightsForProvider:
                 captured["api_key"] = api_key
                 captured["base_url"] = base_url
                 self.chat = SimpleNamespace(completions=SimpleNamespace(
-                    create=lambda **kwargs: SimpleNamespace(
-                        choices=[SimpleNamespace(message=SimpleNamespace(
-                            content='{"insights": []}'))]
+                    create=lambda **kwargs: (
+                        captured.update(create_kwargs=kwargs)
+                        or SimpleNamespace(
+                            choices=[SimpleNamespace(message=SimpleNamespace(
+                                content='{"insights": []}'))]
+                        )
                     )
                 ))
 
@@ -196,6 +199,13 @@ class TestFetchInsightsForProvider:
         assert captured["api_key"] == "do-plain-key"
         assert captured["base_url"] == "https://example.do.run/api/v1/"
 
+        # DO GenAI agents reject system/developer messages — only a single
+        # user message should be sent, with the prompt folded in.
+        messages = captured["create_kwargs"]["messages"]
+        assert [m["role"] for m in messages] == ["user"]
+        assert _ai_insights_module.SYSTEM_PROMPT in messages[0]["content"]
+        assert '"today": "2026-05-08"' in messages[0]["content"]
+
     def test_openai_decrypts_user_key_and_uses_no_base_url(self, monkeypatch):
         captured = {}
 
@@ -204,9 +214,12 @@ class TestFetchInsightsForProvider:
                 captured["api_key"] = api_key
                 captured["base_url"] = base_url
                 self.chat = SimpleNamespace(completions=SimpleNamespace(
-                    create=lambda **kwargs: SimpleNamespace(
-                        choices=[SimpleNamespace(message=SimpleNamespace(
-                            content='{"insights": []}'))]
+                    create=lambda **kwargs: (
+                        captured.update(create_kwargs=kwargs)
+                        or SimpleNamespace(
+                            choices=[SimpleNamespace(message=SimpleNamespace(
+                                content='{"insights": []}'))]
+                        )
                     )
                 ))
 
@@ -231,6 +244,12 @@ class TestFetchInsightsForProvider:
         assert out == '{"insights": []}'
         assert captured["api_key"] == "decrypted-ENC"
         assert captured["base_url"] is None
+
+        # OpenAI proper still gets the system message.
+        messages = captured["create_kwargs"]["messages"]
+        assert [m["role"] for m in messages] == ["system", "user"]
+        assert messages[0]["content"] == _ai_insights_module.SYSTEM_PROMPT
+        assert '"today": "2026-05-08"' in messages[1]["content"]
 
 
 # ── End-to-end: /api/v1/insights/refresh respects provider + 24h limit ───────
