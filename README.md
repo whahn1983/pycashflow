@@ -1,4 +1,4 @@
-![logo](./app/static/app_logo_rounded.png)
+<img src="./app/static/app_logo_rounded.png" alt="PyCashFlow logo" width="220" />
 
 # PyCashFlow
 
