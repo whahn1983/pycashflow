@@ -1,4 +1,4 @@
-![logo](./app/static/apple-touch-icon.png)
+![logo](./app/static/app_logo_rounded.png)
 
 # PyCashFlow
 
