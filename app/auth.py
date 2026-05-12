@@ -291,6 +291,11 @@ def signup_post():
             # Don't fail registration if email notification fails
             logger.warning("Failed to send new user notification for %s: %s", email, exc)
 
+    flash(
+        'Account created successfully! You will receive an email to set your password. '
+        'Once your password is set, you can log in here or on the iOS app.',
+        'success',
+    )
     return redirect(url_for('auth.login'))
 
 

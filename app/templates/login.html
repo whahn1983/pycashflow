@@ -18,13 +18,23 @@
         </h2>
 
         <!-- Flash messages -->
-        {% with messages = get_flashed_messages() %}
+        {% with messages = get_flashed_messages(with_categories=True) %}
         {% if messages %}
-            <div class="alert alert-dismissible fade show" role="alert" style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--text-primary); border-radius: var(--radius-md); margin-bottom: 1.5rem;">
-                <i class="fa-solid fa-circle-exclamation"></i>
-                {{ messages[0] }}
+            {% for category, message in messages %}
+            {% if category == 'success' %}
+            <div class="alert alert-dismissible fade show" role="alert" style="background-color: rgba(16, 185, 129, 0.1); border: 1px solid var(--success); color: var(--text-primary); border-radius: var(--radius-md); margin-bottom: 1.5rem;">
+                <i class="fa-solid fa-circle-check"></i>
+                {{ message }}
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
+            {% else %}
+            <div class="alert alert-dismissible fade show" role="alert" style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--text-primary); border-radius: var(--radius-md); margin-bottom: 1.5rem;">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                {{ message }}
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+            {% endfor %}
         {% endif %}
         {% endwith %}
 
