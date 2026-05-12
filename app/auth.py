@@ -291,11 +291,6 @@ def signup_post():
             # Don't fail registration if email notification fails
             logger.warning("Failed to send new user notification for %s: %s", email, exc)
 
-    flash(
-        'Account created successfully! You will receive an email to set your password. '
-        'Once your password is set, you can log in here or on the iOS app.',
-        'success',
-    )
     return redirect(url_for('auth.login'))
 
 
@@ -340,7 +335,11 @@ def set_password(token: str):
     user.password = generate_password_hash(password, method="scrypt")
     user.is_active = True
     db.session.commit()
-    flash("Password setup complete. Please sign in.")
+    flash(
+        "Account created successfully! You will receive an email to set your password. "
+        "You can sign in here or on the iOS app.",
+        "success",
+    )
     return redirect(url_for("auth.login"))
 
 
