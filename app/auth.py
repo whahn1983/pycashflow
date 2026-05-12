@@ -128,7 +128,7 @@ def forgot_password():
             flash("Password reset is currently unavailable. Please contact support.")
             return render_template('forgot_password.html')
 
-    flash(success_message)
+    flash(success_message, 'success')
     return redirect(url_for('auth.login'))
 
 
