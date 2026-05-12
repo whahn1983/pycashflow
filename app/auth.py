@@ -335,7 +335,10 @@ def set_password(token: str):
     user.password = generate_password_hash(password, method="scrypt")
     user.is_active = True
     db.session.commit()
-    flash("Password setup complete. Please sign in.")
+    flash(
+        "Password successfully set! You can sign in here or on the iOS app.",
+        "success",
+    )
     return redirect(url_for("auth.login"))
 
 
