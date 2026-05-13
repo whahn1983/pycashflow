@@ -703,6 +703,8 @@ def api_settings():
         py_version = ""
 
     ai_config = AISettings.query.filter_by(user_id=user_id).first()
+    provider = select_provider(ai_config)
+    provider_kind = provider["kind"] if provider else None
     return api_ok({
         "user": {
             "id": user.id,
@@ -717,7 +719,8 @@ def api_settings():
             "python_version": py_version,
         },
         "ai": {
-            "configured": bool(ai_config and ai_config.api_key),
+            "configured": provider is not None,
+            "provider": provider_kind,
             "model": ai_config.model_version if ai_config else None,
             "last_updated": _datetime(ai_config.last_updated) if ai_config else None,
         },
