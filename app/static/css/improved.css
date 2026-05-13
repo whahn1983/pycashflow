@@ -108,6 +108,13 @@ body::before {
   gap: 0.5rem;
 }
 
+.navbar-improved .brand .brand-logo {
+  height: 1.75rem;
+  width: 1.75rem;
+  border-radius: 0.375rem;
+  display: block;
+}
+
 .navbar-improved .nav-link {
   color: var(--text-secondary);
   text-decoration: none;
