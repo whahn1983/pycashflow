@@ -7,6 +7,9 @@ struct SettingsView: View {
     @State private var newPassword = ""
     @State private var errorText: String?
     @State private var showPasswordFields = false
+    @State private var inAppBrowserURL: URL?
+
+    private static let userGuideURL = URL(string: "https://pycashflow.com/user_guide")!
 
     var body: some View {
         ScrollView {
@@ -45,8 +48,10 @@ struct SettingsView: View {
                 .surfaceCard()
 
                 if let moreSettingsURL {
-                    Link("More Settings", destination: moreSettingsURL)
-                        .buttonStyle(PrimaryButtonStyle())
+                    Button("More Settings") {
+                        inAppBrowserURL = moreSettingsURL
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
                 }
 
                 Button("Refresh Subscription Status") { Task { await session.refreshSubscriptionState(forceProfileRefresh: true) } }
@@ -73,10 +78,13 @@ struct SettingsView: View {
         .task { await load() }
         .refreshable { await load() }
         .appBackground()
+        .inAppBrowser(url: $inAppBrowserURL)
         .navigationTitle("Settings")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Link(destination: URL(string: "https://pycashflow.com/user_guide")!) {
+                Button {
+                    inAppBrowserURL = Self.userGuideURL
+                } label: {
                     Image(systemName: "questionmark.circle")
                         .accessibilityLabel("User Guide")
                 }

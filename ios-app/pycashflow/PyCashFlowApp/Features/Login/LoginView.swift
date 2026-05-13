@@ -21,7 +21,10 @@ struct LoginView: View {
     @State private var isPasskeyLoading = false
     @State private var showPasswordLoginFields = false
     @State private var showPasskeyEmailField = false
+    @State private var inAppBrowserURL: URL?
     @FocusState private var focusedField: Field?
+
+    private static let forgotPasswordURL = URL(string: "https://cash.hahn3.com/forgot-password")!
 
     var body: some View {
         ScrollView {
@@ -78,6 +81,13 @@ struct LoginView: View {
                             .padding(12)
                             .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
                             .foregroundStyle(AppTheme.textPrimary)
+
+                        Button("Forgot password?") {
+                            inAppBrowserURL = Self.forgotPasswordURL
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(AppTheme.accent)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     } else if challenge != nil {
                         TextField("6-digit code or backup code", text: $twoFACode)
                             .textInputAutocapitalization(.never)
@@ -188,6 +198,7 @@ struct LoginView: View {
         // user is typing. `.immediately` keeps scroll-to-dismiss UX without
         // the conflicting drag recognizer.
         .scrollDismissesKeyboard(.immediately)
+        .inAppBrowser(url: $inAppBrowserURL)
         .onAppear {
             selfHostedURL = session.selfHostedBaseURLText
         }
