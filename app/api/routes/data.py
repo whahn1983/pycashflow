@@ -732,21 +732,20 @@ def api_settings():
 def api_insights():
     user_id = _effective_user_id()
     ai_config = AISettings.query.filter_by(user_id=user_id).first()
-    if not ai_config:
-        return api_ok({"configured": False, "insights": None, "last_updated": None})
+    provider = select_provider(ai_config)
 
     insights = None
-    if ai_config.last_insights:
+    if ai_config and ai_config.last_insights:
         try:
             insights = json.loads(ai_config.last_insights)
         except (json.JSONDecodeError, ValueError):
             insights = None
 
     return api_ok({
-        "configured": bool(ai_config.api_key),
+        "configured": provider is not None,
         "insights": insights,
-        "last_updated": _datetime(ai_config.last_updated),
-        "model": ai_config.model_version,
+        "last_updated": _datetime(ai_config.last_updated) if ai_config else None,
+        "model": ai_config.model_version if ai_config else None,
     })
 
 
@@ -770,7 +769,7 @@ def api_insights_refresh():
         except (json.JSONDecodeError, ValueError, TypeError):
             parsed = None
         return api_ok({
-            "configured": bool(ai_config and ai_config.api_key),
+            "configured": provider is not None,
             "insights": parsed,
             "last_updated": _datetime(ai_config.last_updated) if ai_config else None,
             "model": ai_config.model_version if ai_config else None,
@@ -799,7 +798,7 @@ def api_insights_refresh():
     db.session.commit()
 
     return api_ok({
-        "configured": bool(ai_config.api_key),
+        "configured": provider is not None,
         "insights": parsed,
         "last_updated": _datetime(ai_config.last_updated),
         "model": ai_config.model_version,
