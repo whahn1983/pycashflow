@@ -185,6 +185,7 @@ struct SettingsDTO: Decodable {
 
     struct SettingsAIDTO: Decodable {
         let configured: Bool
+        let provider: String?
         let model: String?
         let last_updated: String?
     }

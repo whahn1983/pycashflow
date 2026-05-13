@@ -117,6 +117,9 @@ struct SettingsView: View {
 
 
     private func aiConfiguredValue(_ ai: SettingsDTO.SettingsAIDTO) -> String {
+        if ai.provider == "digitalocean", session.appMode == .cloud {
+            return "PyCashFlow Cloud AI"
+        }
         guard ai.configured else { return "No" }
         if let model = ai.model, !model.isEmpty {
             return "Yes, \(model)"
