@@ -169,15 +169,10 @@ struct LoginView: View {
                     }
                     .surfaceCard()
                 } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Using PyCashFlow Cloud hosted service.")
-                            .foregroundStyle(AppTheme.textSecondary)
-                        NavigationLink("Activate or Restore Cloud Subscription") {
-                            SubscriptionPaywallView()
-                        }
-                        .buttonStyle(PrimaryButtonStyle())
+                    NavigationLink("Sign up for PyCashFlow Cloud") {
+                        SubscriptionPaywallView()
                     }
-                    .surfaceCard()
+                    .buttonStyle(PrimaryButtonStyle())
                 }
 
             }
