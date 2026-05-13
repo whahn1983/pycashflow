@@ -24,7 +24,15 @@ struct LoginView: View {
     @State private var inAppBrowserURL: URL?
     @FocusState private var focusedField: Field?
 
-    private static let forgotPasswordURL = URL(string: "https://cash.hahn3.com/forgot-password")!
+    private var forgotPasswordURL: URL? {
+        guard var components = URLComponents(url: session.currentBaseURL, resolvingAgainstBaseURL: false) else {
+            return nil
+        }
+        components.path = "/forgot-password"
+        components.query = nil
+        components.fragment = nil
+        return components.url
+    }
 
     var body: some View {
         ScrollView {
@@ -83,7 +91,7 @@ struct LoginView: View {
                             .foregroundStyle(AppTheme.textPrimary)
 
                         Button("Forgot password?") {
-                            inAppBrowserURL = Self.forgotPasswordURL
+                            inAppBrowserURL = forgotPasswordURL
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(AppTheme.accent)
