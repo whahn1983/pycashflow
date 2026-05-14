@@ -8,6 +8,8 @@ final class APIClient {
         let config = URLSessionConfiguration.ephemeral
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.urlCache = nil
+        config.timeoutIntervalForRequest = 240
+        config.timeoutIntervalForResource = 240
         return URLSession(configuration: config)
     }()
 
