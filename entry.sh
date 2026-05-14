@@ -111,15 +111,17 @@ else
 fi
 
 GUNICORN_WORKERS="${RESOLVED_GUNICORN_WORKERS}"
-GUNICORN_TIMEOUT="${GUNICORN_TIMEOUT:-120}"
+GUNICORN_TIMEOUT="${GUNICORN_TIMEOUT:-240}"
+GUNICORN_THREADS="${GUNICORN_THREADS:-8}"
 
-echo "Starting Gunicorn: workers=${GUNICORN_WORKERS}, timeout=${GUNICORN_TIMEOUT}, bind=0.0.0.0:5000"
+echo "Starting Gunicorn: workers=${GUNICORN_WORKERS}, threads=${GUNICORN_THREADS}, timeout=${GUNICORN_TIMEOUT}, bind=0.0.0.0:5000"
 
 # Run gunicorn as appuser (exec replaces the root shell — no root process remains)
 exec su-exec appuser gunicorn \
     --bind 0.0.0.0:5000 \
     --workers "${GUNICORN_WORKERS}" \
-    --worker-class sync \
+    --worker-class gthread \
+    --threads "${GUNICORN_THREADS}" \
     --timeout "${GUNICORN_TIMEOUT}" \
     --access-logfile - \
     --error-logfile - \
