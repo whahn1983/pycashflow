@@ -90,7 +90,8 @@ SYSTEM_PROMPT = (
     "- risk: a specific future event/date where projected balance is below zero.\n"
     "- pattern: recurring behavior across multiple transactions that passes the significance rules above.\n"
     "- observation: a noteworthy non-recurring fact that is neither a risk nor a recurring pattern.\n"
-    "- expense category breakdown: mandatory — always the LAST insight. Use type 'observation'. Build it as follows:\n"
+    "- expense category breakdown: mandatory — always the LAST insight. Use type 'pattern'. This card is exempt from the "
+    "pattern significance rules above (the 10% threshold and 14-day clustering rules do not apply to it). Build it as follows:\n"
     "  * Consider ONLY schedule_table entries where type is 'expense'. Ignore all income entries.\n"
     "  * Group the expenses into major spending categories by inferring the category from each entry's name (for example: "
     "Housing, Utilities, Groceries, Subscriptions, Insurance, Transportation, Loan Payments, Dining, Healthcare, Payroll, "
@@ -122,10 +123,10 @@ SYSTEM_PROMPT = (
     "- low: noteworthy but limited urgency/actionability.\n"
     "Do not let severity decide whether an insight exists; determine validity using the rules above first.\n\n"
     "The cash_risk insight is ALWAYS required as the first entry in the insights array, regardless of other findings. "
-    "The expense category breakdown observation is ALWAYS required as the LAST entry in the insights array whenever there is "
+    "The expense category breakdown pattern is ALWAYS required as the LAST entry in the insights array whenever there is "
     "at least one expense in schedule_table, regardless of other findings. "
     "Return up to 4 additional insights between them. Neither the cash_risk insight nor the expense category breakdown "
-    "observation counts toward the 4-insight limit."
+    "pattern counts toward the 4-insight limit."
 )
 
 
