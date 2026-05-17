@@ -39,7 +39,9 @@ from app.models import (
     TextSettings as _TextSettings,
     PasskeyCredential as _PasskeyCredential,
     PasswordSetupToken as _PasswordSetupToken,
+    PlaidConnection as _PlaidConnection,
 )  # noqa: E402
+from app import plaid_service as _plaid_service  # noqa: E402
 from app.password_setup import (  # noqa: E402
     build_password_setup_url as _build_password_setup_url,
     create_password_setup_token as _create_password_setup_token,
@@ -161,3 +163,33 @@ def password_setup_helpers():
 def billing_routes_module():
     """Return billing routes module captured before any module stubs are installed."""
     return _billing_routes
+
+
+@pytest.fixture(scope="session")
+def plaid_connection_model():
+    """Return the real PlaidConnection model captured before stubs are installed."""
+    return _PlaidConnection
+
+
+@pytest.fixture(scope="session")
+def plaid_service_module():
+    """Return the real plaid_service module captured before stubs are installed."""
+    return _plaid_service
+
+
+@pytest.fixture(autouse=True)
+def _reset_plaid_config(flask_app):
+    """Ensure Plaid is not configured by default in tests; restore after each test."""
+    snapshot = {
+        k: flask_app.config.get(k, "")
+        for k in (
+            "PLAID_CLIENT_ID",
+            "PLAID_SECRET",
+            "PLAID_ENV",
+            "PLAID_PRODUCTS",
+            "PLAID_COUNTRY_CODES",
+            "PLAID_REDIRECT_URI",
+        )
+    }
+    yield
+    flask_app.config.update(snapshot)

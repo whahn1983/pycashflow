@@ -51,6 +51,22 @@
             <i class="fa-solid fa-gear"></i> Configure Email
         </button>
     </div>
+
+    <!-- Plaid Balance Sync Card - Admins Only -->
+    <div class="metric-card" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#plaidmodal">
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <div style="width: 3rem; height: 3rem; background: linear-gradient(135deg, #6366f1, #818cf8); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                <i class="fa-solid fa-building-columns"></i>
+            </div>
+            <div>
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-primary);">Plaid Balance Sync</h3>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">Connect a single bank account via Plaid to auto-update your balance</p>
+            </div>
+        </div>
+        <button class="btn-primary-modern btn-modern" style="width: 100%;" onclick="event.stopPropagation();" data-bs-toggle="modal" data-bs-target="#plaidmodal">
+            <i class="fa-solid fa-gear"></i> Manage Plaid Connection
+        </button>
+    </div>
     {% endif %}
 
     {% if current_user.is_global_admin %}
@@ -774,6 +790,183 @@
         </div>
     </div>
 </div>
+{% endif %}
+
+{% if current_user.admin %}
+<!-- Plaid Balance Sync Modal - Admins Only -->
+<div class="modal fade modal-modern" id="plaidmodal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-building-columns"></i> Plaid Balance Sync
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="plaid-status-area">
+                    <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Loading Plaid status...
+                    </p>
+                </div>
+                <div id="plaid-error" style="display:none; margin-top: 1rem; padding: 0.75rem;
+                    background-color: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger);
+                    border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.875rem;"></div>
+                <p style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 1rem;">
+                    Only one Plaid account sync is supported. PyCashFlow stores only minimal
+                    connection metadata, never your bank credentials or queried balances. Plaid
+                    Link handles all credential entry inside Plaid's secure flow.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+<script>
+(function() {
+    "use strict";
+    var modalEl = document.getElementById('plaidmodal');
+    var statusArea = document.getElementById('plaid-status-area');
+    var errorArea = document.getElementById('plaid-error');
+    if (!modalEl || !statusArea) return;
+
+    function setError(msg) {
+        if (!errorArea) return;
+        if (!msg) { errorArea.style.display = 'none'; errorArea.textContent = ''; return; }
+        errorArea.textContent = msg;
+        errorArea.style.display = 'block';
+    }
+
+    function escapeHtml(text) {
+        if (text == null) return '';
+        return String(text).replace(/[&<>"']/g, function(c) {
+            return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+        });
+    }
+
+    function fetchJSON(url, options) {
+        options = options || {};
+        options.headers = options.headers || {};
+        options.headers['Accept'] = 'application/json';
+        options.credentials = 'same-origin';
+        return fetch(url, options).then(function(resp) {
+            return resp.json().catch(function() { return {}; }).then(function(body) {
+                return { ok: resp.ok, status: resp.status, body: body };
+            });
+        });
+    }
+
+    function renderNotConfigured() {
+        statusArea.innerHTML =
+            '<div style="padding: 0.75rem; background-color: rgba(239,68,68,0.08); border-left: 4px solid var(--danger); border-radius: var(--radius-md);">' +
+            '<p style="margin: 0 0 0.25rem 0; font-weight: 600;">Plaid setup: not configured</p>' +
+            '<p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">' +
+            'Plaid is not configured. Set PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV, and PLAID_PRODUCTS.' +
+            '</p></div>';
+    }
+
+    function renderConnected(conn) {
+        var lastSync = conn.last_balance_sync_at ? conn.last_balance_sync_at : 'never';
+        var html =
+            '<div style="padding: 0.75rem; background-color: rgba(16,185,129,0.08); border-left: 4px solid var(--success); border-radius: var(--radius-md); margin-bottom: 1rem;">' +
+            '<p style="margin: 0 0 0.25rem 0; font-weight: 600;">Plaid setup: configured</p>' +
+            '<p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">A Plaid account is currently connected.</p>' +
+            '</div>' +
+            '<dl style="display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; font-size: 0.875rem; margin-bottom: 1rem;">' +
+            '<dt style="color: var(--text-secondary);">Institution:</dt><dd style="margin:0;">' + escapeHtml(conn.institution_name || '—') + '</dd>' +
+            '<dt style="color: var(--text-secondary);">Account:</dt><dd style="margin:0;">' + escapeHtml(conn.account_name || '—') + '</dd>' +
+            '<dt style="color: var(--text-secondary);">Mask:</dt><dd style="margin:0;">' + escapeHtml(conn.account_mask || '—') + '</dd>' +
+            '<dt style="color: var(--text-secondary);">Type:</dt><dd style="margin:0;">' + escapeHtml(conn.account_type || '—') + (conn.account_subtype ? ' / ' + escapeHtml(conn.account_subtype) : '') + '</dd>' +
+            '<dt style="color: var(--text-secondary);">Last sync:</dt><dd style="margin:0;">' + escapeHtml(lastSync) + '</dd>' +
+            '<dt style="color: var(--text-secondary);">Status:</dt><dd style="margin:0;">' + escapeHtml(conn.last_sync_status || '—') + '</dd>' +
+            '</dl>' +
+            '<button id="plaid-remove-btn" type="button" class="btn-modern" style="background: linear-gradient(135deg, #ef4444, #f87171); color: white; border: none; width: 100%;">' +
+            '<i class="fa-solid fa-link-slash"></i> Remove Plaid Account</button>';
+        statusArea.innerHTML = html;
+        document.getElementById('plaid-remove-btn').addEventListener('click', removeConnection);
+    }
+
+    function renderConfiguredNotConnected() {
+        statusArea.innerHTML =
+            '<div style="padding: 0.75rem; background-color: rgba(16,185,129,0.08); border-left: 4px solid var(--success); border-radius: var(--radius-md); margin-bottom: 1rem;">' +
+            '<p style="margin: 0 0 0.25rem 0; font-weight: 600;">Plaid setup: configured</p>' +
+            '<p style="margin: 0; font-size: 0.875rem; color: var(--text-secondary);">No Plaid account is connected yet.</p>' +
+            '</div>' +
+            '<button id="plaid-connect-btn" type="button" class="btn-primary-modern btn-modern" style="width:100%;">' +
+            '<i class="fa-solid fa-link"></i> Connect Plaid Account</button>';
+        document.getElementById('plaid-connect-btn').addEventListener('click', startLink);
+    }
+
+    function loadStatus() {
+        setError('');
+        statusArea.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">' +
+            '<i class="fa-solid fa-spinner fa-spin"></i> Loading Plaid status...</p>';
+        return fetchJSON('/api/v1/plaid/status').then(function(resp) {
+            if (!resp.ok) {
+                setError('Could not load Plaid status.');
+                return;
+            }
+            var data = (resp.body && resp.body.data) || {};
+            if (!data.configured) {
+                renderNotConfigured();
+                return;
+            }
+            if (data.connected && data.connection) {
+                renderConnected(data.connection);
+            } else {
+                renderConfiguredNotConnected();
+            }
+        });
+    }
+
+    function startLink() {
+        setError('');
+        if (typeof Plaid === 'undefined' || !Plaid.create) {
+            setError('Plaid Link script failed to load.');
+            return;
+        }
+        fetchJSON('/api/v1/plaid/link-token', { method: 'POST' }).then(function(resp) {
+            if (!resp.ok || !resp.body || !resp.body.data || !resp.body.data.link_token) {
+                setError((resp.body && resp.body.error) || 'Could not start Plaid Link.');
+                return;
+            }
+            var handler = Plaid.create({
+                token: resp.body.data.link_token,
+                onSuccess: function(public_token, metadata) {
+                    fetchJSON('/api/v1/plaid/exchange-token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ public_token: public_token, metadata: metadata }),
+                    }).then(function(r) {
+                        if (!r.ok) {
+                            setError((r.body && r.body.error) || 'Could not save Plaid connection.');
+                        }
+                        loadStatus();
+                    });
+                },
+                onExit: function(err) {
+                    if (err) setError('Plaid Link exited with an error.');
+                }
+            });
+            handler.open();
+        });
+    }
+
+    function removeConnection() {
+        if (!confirm('Remove the connected Plaid account?')) return;
+        setError('');
+        fetchJSON('/api/v1/plaid/remove', { method: 'POST' }).then(function(resp) {
+            if (!resp.ok && resp.status !== 204) {
+                setError((resp.body && resp.body.error) || 'Could not remove Plaid account.');
+            }
+            loadStatus();
+        });
+    }
+
+    modalEl.addEventListener('show.bs.modal', loadStatus);
+})();
+</script>
 {% endif %}
 
 {% endblock %}

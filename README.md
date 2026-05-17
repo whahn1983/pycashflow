@@ -80,6 +80,11 @@ PyCashFlow is a powerful, multi-user web application designed to help individual
 - **Configurable Search**: Customizable subject lines and balance delimiter patterns
 - **Scheduled Processing**: Automated cron job checks emails every minute
 - **Multi-User Support**: Per-user email configurations and processing
+- **Plaid Balance Sync (optional)**: Connect a single bank account via Plaid Link
+  and refresh today's balance from `/accounts/balance/get` on dashboard load.
+  Only minimal connection metadata (encrypted access token + selected account)
+  is stored — no transactions, no raw Plaid payloads, no queried balances.
+  See [Plaid Balance Integration](#plaid-balance-integration).
 
 ### Modern Authentication
 - **Traditional Login**: Email/password authentication with Scrypt password hashing
@@ -449,7 +454,74 @@ Multiple methods for keeping your balance current:
 
 - **Manual Entry**: Set balance for any specific date
 - **Email Import**: Automatic extraction from bank notification emails
+- **Plaid Balance Sync**: Connect a single bank account via Plaid Link and
+  refresh today's balance on every dashboard load (see below)
 - **Historical Tracking**: View balance history over time
+
+---
+
+## Plaid Balance Integration
+
+PyCashFlow can refresh the current user's balance from a single connected
+bank account via [Plaid](https://plaid.com). The feature is **off by default**
+and is only enabled when all required environment variables are present.
+
+### Configuration
+
+Add to `.env`:
+
+```bash
+PLAID_CLIENT_ID=your-client-id
+PLAID_SECRET=your-secret
+PLAID_ENV=sandbox            # sandbox | development | production
+PLAID_PRODUCTS=auth          # comma-separated; "balance" is NOT valid here
+PLAID_COUNTRY_CODES=US
+PLAID_REDIRECT_URI=          # optional; set only if your Plaid app requires OAuth
+```
+
+Get keys from the [Plaid Dashboard](https://dashboard.plaid.com). The settings
+page shows **Plaid setup: configured** once all four required values are set,
+or **Plaid setup: not configured** otherwise. Use the least-data Plaid product
+appropriate for your account (typically `auth`); **do not** include
+`transactions`.
+
+### How the balance update works
+
+- Settings → **Plaid Balance Sync** → **Connect Plaid Account** opens Plaid Link.
+- On success, the public token is exchanged for an access token (encrypted at
+  rest with `APP_SECRET`) and the selected depository account's metadata is
+  stored. Only one active connection per user is allowed; remove it before
+  connecting a new one.
+- On every dashboard load (web `/` and `GET /api/v1/dashboard`),
+  `update_plaid_balance_for_user()` calls `/accounts/balance/get`:
+  - Uses `balances.available` if present.
+  - Falls back to `balances.current` if available is `null`.
+  - If both are `null`, the existing balance row is **not** overwritten and
+    a non-sensitive status is recorded on the connection.
+- The existing PyCashFlow `balance` table is the system of record. Today's
+  row is upserted (one balance per day per user); no separate Plaid balance
+  history is kept.
+- Errors are swallowed by the dashboard call site — Plaid problems never
+  break dashboard load.
+
+### Scope and non-goals
+
+- **No transaction storage** and no Plaid Transactions product usage.
+- **No raw Plaid payloads** are persisted or logged.
+- **No background jobs** are added for Plaid in this phase.
+- **No iOS changes** are included in this phase.
+- Only **depository** (checking/savings/cash-management) accounts are accepted
+  to avoid using a credit-card current balance as if it were available cash.
+
+### Running the migration
+
+The integration adds a single `plaid_connections` table.
+
+```bash
+flask db current
+flask db heads
+flask db upgrade
+```
 
 ---
 

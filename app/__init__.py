@@ -47,6 +47,16 @@ def create_app():
     app.config["APPLE_BUNDLE_ID"] = os.environ.get("APPLE_BUNDLE_ID", "")
     app.config["APPLE_ENVIRONMENT"] = os.environ.get("APPLE_ENVIRONMENT", "production")
 
+    # Plaid Balance integration config (optional feature).
+    # Treated as "configured" only when CLIENT_ID, SECRET, ENV, and PRODUCTS
+    # are all populated; see app.plaid_service.plaid_is_configured().
+    app.config["PLAID_CLIENT_ID"] = os.environ.get("PLAID_CLIENT_ID", "").strip()
+    app.config["PLAID_SECRET"] = os.environ.get("PLAID_SECRET", "").strip()
+    app.config["PLAID_ENV"] = os.environ.get("PLAID_ENV", "").strip().lower()
+    app.config["PLAID_PRODUCTS"] = os.environ.get("PLAID_PRODUCTS", "").strip()
+    app.config["PLAID_COUNTRY_CODES"] = os.environ.get("PLAID_COUNTRY_CODES", "US").strip()
+    app.config["PLAID_REDIRECT_URI"] = os.environ.get("PLAID_REDIRECT_URI", "").strip()
+
     basedir = os.path.abspath(os.path.dirname(__file__))
 
     # Prefer a stable SECRET_KEY from the environment so sessions survive restarts.

@@ -17,6 +17,8 @@ from app.ai_insights import (
     select_provider,
 )
 from app.files import version
+from app.plaid_service import safe_update_plaid_balance_for_user
+from app.models import User
 
 from app.api import api
 from app.api.auth_utils import api_login_required, get_api_user
@@ -42,6 +44,15 @@ _MAX_NAME_LEN = 100
 def _effective_user_id() -> int:
     user = get_api_user()
     return user.owner_user_id or user.account_owner_id or user.id
+
+
+def _balance_owner_user():
+    """Return the user object whose balance is the source of truth."""
+    user = get_api_user()
+    effective_id = _effective_user_id()
+    if effective_id == user.id:
+        return user
+    return User.query.get(effective_id)
 
 
 def _forbid_guest_writes():
@@ -156,6 +167,9 @@ def _project_data(user_id: int):
 @api_login_required
 def api_dashboard():
     user_id = _effective_user_id()
+    # Refresh today's balance from Plaid before computing projections. Never
+    # raises — Plaid errors or missing config leave existing data intact.
+    safe_update_plaid_balance_for_user(_balance_owner_user())
     balance, balance_amount, trans, run, _run_scenario = _project_data(user_id)
 
     cash_risk = calculate_cash_risk_score(balance_amount, run)

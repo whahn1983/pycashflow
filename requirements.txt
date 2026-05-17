@@ -19,3 +19,4 @@ qrcode[pil]
 Flask-Limiter
 Flask-WTF
 psycopg2-binary
+plaid-python

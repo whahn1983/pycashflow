@@ -21,3 +21,4 @@ register_error_handlers(api)
 from .routes import auth  # noqa: E402, F401
 from .routes import data  # noqa: E402, F401
 from .routes import billing  # noqa: E402, F401
+from .routes import plaid  # noqa: E402, F401

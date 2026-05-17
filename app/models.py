@@ -248,6 +248,59 @@ class PasswordSetupToken(db.Model):
     user = db.relationship('User', backref='password_setup_tokens')
 
 
+class PlaidConnection(db.Model):
+    """Minimal Plaid Item/account metadata for the Balance integration.
+
+    Stores only the connection info needed to call /accounts/balance/get for
+    a single depository account per user. The encrypted access token is the
+    only sensitive field; queried balances and raw Plaid payloads are never
+    persisted here.
+    """
+
+    __tablename__ = 'plaid_connections'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    encrypted_access_token = db.Column(db.Text, nullable=False)
+    plaid_item_id = db.Column(db.String(255), nullable=False)
+    plaid_account_id = db.Column(db.String(255), nullable=False)
+    institution_id = db.Column(db.String(100), nullable=True)
+    institution_name = db.Column(db.String(255), nullable=True)
+    account_name = db.Column(db.String(255), nullable=True)
+    account_mask = db.Column(db.String(10), nullable=True)
+    account_type = db.Column(db.String(50), nullable=True)
+    account_subtype = db.Column(db.String(50), nullable=True)
+    iso_currency_code = db.Column(db.String(10), nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    last_balance_sync_at = db.Column(db.DateTime, nullable=True)
+    last_sync_status = db.Column(db.String(64), nullable=True)
+    last_sync_error = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+
+    user = db.relationship('User', backref='plaid_connections')
+
+    __table_args__ = (
+        # Only one active Plaid connection per user.
+        db.Index(
+            'uq_plaid_connection_active_user',
+            'user_id',
+            unique=True,
+            sqlite_where=db.text('is_active = 1'),
+            postgresql_where=db.text('is_active'),
+        ),
+    )
+
+
 class Subscription(db.Model):
     """Normalized provider subscription state tied to account owner users."""
 
