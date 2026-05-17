@@ -809,6 +809,12 @@
                         <i class="fa-solid fa-spinner fa-spin"></i> Loading Plaid status...
                     </p>
                 </div>
+                <div id="plaid-oauth-resume" style="display:none; margin-top: 1rem; padding: 0.75rem;
+                    background-color: rgba(99,102,241,0.08); border-left: 4px solid #6366f1;
+                    border-radius: var(--radius-md); font-size: 0.875rem;">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span id="plaid-oauth-resume-text">Completing Plaid connection&hellip;</span>
+                </div>
                 <div id="plaid-error" style="display:none; margin-top: 1rem; padding: 0.75rem;
                     background-color: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger);
                     border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.875rem;"></div>
@@ -829,13 +835,38 @@
     var modalEl = document.getElementById('plaidmodal');
     var statusArea = document.getElementById('plaid-status-area');
     var errorArea = document.getElementById('plaid-error');
+    var oauthResumeArea = document.getElementById('plaid-oauth-resume');
+    var oauthResumeText = document.getElementById('plaid-oauth-resume-text');
     if (!modalEl || !statusArea) return;
+
+    // sessionStorage key for the in-flight Plaid Link token. Scoped to
+    // PyCashFlow + Plaid so it cannot collide with other apps. We use
+    // sessionStorage (not localStorage) so the token is bound to the tab
+    // session and cleared when the tab closes.
+    var LINK_TOKEN_STORAGE_KEY = 'pycashflow_plaid_link_token';
+
+    function storeLinkToken(token) {
+        try { sessionStorage.setItem(LINK_TOKEN_STORAGE_KEY, token); } catch (e) {}
+    }
+    function readLinkToken() {
+        try { return sessionStorage.getItem(LINK_TOKEN_STORAGE_KEY); } catch (e) { return null; }
+    }
+    function clearLinkToken() {
+        try { sessionStorage.removeItem(LINK_TOKEN_STORAGE_KEY); } catch (e) {}
+    }
 
     function setError(msg) {
         if (!errorArea) return;
         if (!msg) { errorArea.style.display = 'none'; errorArea.textContent = ''; return; }
         errorArea.textContent = msg;
         errorArea.style.display = 'block';
+    }
+
+    function setOAuthResume(msg) {
+        if (!oauthResumeArea) return;
+        if (!msg) { oauthResumeArea.style.display = 'none'; return; }
+        if (oauthResumeText) oauthResumeText.textContent = msg;
+        oauthResumeArea.style.display = 'block';
     }
 
     function escapeHtml(text) {
@@ -855,6 +886,40 @@
                 return { ok: resp.ok, status: resp.status, body: body };
             });
         });
+    }
+
+    function hasOAuthReturnParam() {
+        // Plaid's OAuth redirect appends ``oauth_state_id`` to the redirect URI.
+        // It may live in the query string or, less commonly, the hash fragment.
+        try {
+            var params = new URLSearchParams(window.location.search || '');
+            if (params.get('oauth_state_id')) return true;
+            var hash = (window.location.hash || '').replace(/^#/, '');
+            if (hash) {
+                var hashParams = new URLSearchParams(hash);
+                if (hashParams.get('oauth_state_id')) return true;
+            }
+        } catch (e) {}
+        // The settings card uses ``plaid_oauth_return=1`` as a stable hint.
+        try {
+            var p2 = new URLSearchParams(window.location.search || '');
+            if (p2.get('plaid_oauth_return')) return true;
+        } catch (e) {}
+        return false;
+    }
+
+    function cleanupOAuthUrl() {
+        // Remove Plaid OAuth tracking params from the visible URL so a reload
+        // does not re-trigger resume. Uses replaceState so back-button history
+        // stays untouched.
+        if (!window.history || !window.history.replaceState) return;
+        try {
+            var url = new URL(window.location.href);
+            url.searchParams.delete('oauth_state_id');
+            url.searchParams.delete('plaid_oauth_return');
+            var cleaned = url.pathname + (url.search ? url.search : '') + (url.hash || '');
+            window.history.replaceState({}, document.title, cleaned);
+        } catch (e) {}
     }
 
     function renderNotConfigured() {
@@ -920,6 +985,45 @@
         });
     }
 
+    function exchangePublicToken(public_token, metadata) {
+        return fetchJSON('/api/v1/plaid/exchange-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ public_token: public_token, metadata: metadata }),
+        }).then(function(r) {
+            // Always drop the stored token after a completed Link flow so
+            // we never accidentally reuse it for a different attempt.
+            clearLinkToken();
+            if (!r.ok) {
+                setError((r.body && r.body.error) || 'Could not save Plaid connection.');
+            }
+            setOAuthResume('');
+            loadStatus();
+        });
+    }
+
+    function buildHandlerConfig(linkToken, receivedRedirectUri) {
+        var cfg = {
+            token: linkToken,
+            onSuccess: function(public_token, metadata) {
+                exchangePublicToken(public_token, metadata);
+            },
+            onExit: function(err) {
+                setOAuthResume('');
+                if (err) {
+                    setError('Plaid Link did not complete. Please try again.');
+                }
+                // If the user exited mid-OAuth, the stored link_token is no
+                // longer usable for resume; clear it so the next attempt
+                // starts fresh.
+                if (receivedRedirectUri) clearLinkToken();
+            },
+            onEvent: function() { /* no-op; never log Plaid event payloads */ }
+        };
+        if (receivedRedirectUri) cfg.receivedRedirectUri = receivedRedirectUri;
+        return cfg;
+    }
+
     function startLink() {
         setError('');
         if (typeof Plaid === 'undefined' || !Plaid.create) {
@@ -931,26 +1035,35 @@
                 setError((resp.body && resp.body.error) || 'Could not start Plaid Link.');
                 return;
             }
-            var handler = Plaid.create({
-                token: resp.body.data.link_token,
-                onSuccess: function(public_token, metadata) {
-                    fetchJSON('/api/v1/plaid/exchange-token', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ public_token: public_token, metadata: metadata }),
-                    }).then(function(r) {
-                        if (!r.ok) {
-                            setError((r.body && r.body.error) || 'Could not save Plaid connection.');
-                        }
-                        loadStatus();
-                    });
-                },
-                onExit: function(err) {
-                    if (err) setError('Plaid Link exited with an error.');
-                }
-            });
+            var linkToken = resp.body.data.link_token;
+            storeLinkToken(linkToken);
+            var handler = Plaid.create(buildHandlerConfig(linkToken, null));
             handler.open();
         });
+    }
+
+    function resumeOAuth() {
+        // Called on page load when Plaid has redirected the user back from
+        // an OAuth institution. We must re-create Plaid Link with the
+        // ORIGINAL link_token and the full return URL as receivedRedirectUri.
+        var linkToken = readLinkToken();
+        if (!linkToken) {
+            setError('Your Plaid session expired. Please start the connection again.');
+            cleanupOAuthUrl();
+            return;
+        }
+        if (typeof Plaid === 'undefined' || !Plaid.create) {
+            setError('Plaid Link script failed to load.');
+            return;
+        }
+        setOAuthResume('Completing Plaid connection…');
+        var handler = Plaid.create(
+            buildHandlerConfig(linkToken, window.location.href)
+        );
+        handler.open();
+        // The bank-supplied params have served their purpose; clean them up
+        // now that Plaid Link has the URL it needed.
+        cleanupOAuthUrl();
     }
 
     function removeConnection() {
@@ -965,6 +1078,33 @@
     }
 
     modalEl.addEventListener('show.bs.modal', loadStatus);
+
+    // If we just returned from an OAuth institution, automatically open
+    // the Plaid settings modal and resume Plaid Link. The user should not
+    // have to click Connect again.
+    if (hasOAuthReturnParam()) {
+        var openAndResume = function() {
+            try {
+                if (window.bootstrap && window.bootstrap.Modal) {
+                    var inst = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+                    modalEl.addEventListener('shown.bs.modal', resumeOAuth, { once: true });
+                    inst.show();
+                    return;
+                }
+            } catch (e) {}
+            // Fallback: at least scroll the user back to the Plaid card.
+            try {
+                var card = document.querySelector('[data-bs-target="#plaidmodal"]');
+                if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth' });
+            } catch (e) {}
+            resumeOAuth();
+        };
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            openAndResume();
+        } else {
+            document.addEventListener('DOMContentLoaded', openAndResume, { once: true });
+        }
+    }
 })();
 </script>
 {% endif %}
