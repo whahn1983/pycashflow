@@ -197,9 +197,9 @@ class TestLinkTokenRequest:
                 token = plaid_service.create_link_token_for_user(user)
             assert token == "link-sandbox-xyz"
             req = self._captured_request(mock_client)
-            assert req.get("redirect_uri") == (
-                "https://app.example.com/settings?plaid_oauth_return=1"
-            )
+            # Plaid rejects redirect_uri values containing a query string, so
+            # the service must strip it before calling /link/token/create.
+            assert req.get("redirect_uri") == "https://app.example.com/settings"
             _deconfigure_plaid(flask_app)
 
     def test_omits_redirect_uri_when_not_configured(self, flask_app, plaid_user):

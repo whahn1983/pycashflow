@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 from datetime import date, datetime, timezone
 from typing import Optional
+from urllib.parse import urlsplit, urlunsplit
 
 from flask import current_app, g
 from sqlalchemy import desc
@@ -233,7 +234,14 @@ def create_link_token_for_user(user) -> str:
     )
     redirect_uri = _config("PLAID_REDIRECT_URI")
     if redirect_uri:
-        request_kwargs["redirect_uri"] = redirect_uri
+        # Plaid rejects redirect_uri values that include a query string or
+        # fragment ("redirect_uri cannot include query"). The dashboard-
+        # registered URI is the bare path; OAuth-return params are appended
+        # by Plaid on the way back, not configured here.
+        parts = urlsplit(redirect_uri)
+        request_kwargs["redirect_uri"] = urlunsplit(
+            (parts.scheme, parts.netloc, parts.path, "", "")
+        )
 
     try:
         client = _plaid_client()
