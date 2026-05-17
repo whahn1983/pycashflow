@@ -917,6 +917,17 @@
             var url = new URL(window.location.href);
             url.searchParams.delete('oauth_state_id');
             url.searchParams.delete('plaid_oauth_return');
+            var hash = (url.hash || '').replace(/^#/, '');
+            if (hash) {
+                try {
+                    var hashParams = new URLSearchParams(hash);
+                    if (hashParams.has('oauth_state_id')) {
+                        hashParams.delete('oauth_state_id');
+                        var remaining = hashParams.toString();
+                        url.hash = remaining ? '#' + remaining : '';
+                    }
+                } catch (e) {}
+            }
             var cleaned = url.pathname + (url.search ? url.search : '') + (url.hash || '');
             window.history.replaceState({}, document.title, cleaned);
         } catch (e) {}
