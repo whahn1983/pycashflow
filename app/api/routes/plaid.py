@@ -17,7 +17,7 @@ from flask import request
 
 from app.api import api
 from app.api.auth_utils import api_login_required, get_api_user
-from app.api.errors import api_error
+from app.api.errors import api_error, forbidden
 from app.api.responses import api_ok, api_no_content
 from app.plaid_service import (
     PlaidServiceError,
@@ -31,6 +31,13 @@ from app.plaid_service import (
 
 def _service_error(exc: PlaidServiceError):
     return api_error(exc.user_message, exc.code, exc.status)
+
+
+def _forbid_guest_writes():
+    user = get_api_user()
+    if not user.admin:
+        return forbidden("Guest users are read-only")
+    return None
 
 
 @api.route("/plaid/status", methods=["GET"])
@@ -54,6 +61,8 @@ def api_plaid_link_token():
 @api.route("/plaid/exchange-token", methods=["POST"])
 @api_login_required
 def api_plaid_exchange_token():
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
     user = get_api_user()
     body = request.get_json(silent=True) or {}
     public_token = body.get("public_token")
@@ -68,6 +77,8 @@ def api_plaid_exchange_token():
 @api.route("/plaid/remove", methods=["POST", "DELETE"])
 @api_login_required
 def api_plaid_remove():
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
     user = get_api_user()
     remove_plaid_connection_for_user(user)
     return api_no_content()
@@ -76,6 +87,8 @@ def api_plaid_remove():
 @api.route("/plaid/update-balance", methods=["POST"])
 @api_login_required
 def api_plaid_update_balance():
+    if (resp := _forbid_guest_writes()) is not None:
+        return resp
     user = get_api_user()
     try:
         result = update_plaid_balance_for_user(user)

@@ -308,6 +308,15 @@ def exchange_public_token_for_user(user, public_token: str, metadata: dict) -> P
 
     _validate_account_type(selected)
 
+    account_id_raw = selected.get("id")
+    account_id = account_id_raw.strip() if isinstance(account_id_raw, str) else ""
+    if not account_id:
+        raise PlaidServiceError(
+            "Plaid did not return an account id for the selected account.",
+            code="plaid_missing_account_id",
+            status=422,
+        )
+
     from plaid.exceptions import ApiException
     from plaid.model.item_public_token_exchange_request import (
         ItemPublicTokenExchangeRequest,
@@ -349,7 +358,7 @@ def exchange_public_token_for_user(user, public_token: str, metadata: dict) -> P
         user_id=user.id,
         encrypted_access_token=encrypted,
         plaid_item_id=str(item_id),
-        plaid_account_id=str(selected.get("id") or ""),
+        plaid_account_id=account_id,
         institution_id=str(institution_id) if institution_id else None,
         institution_name=str(institution_name) if institution_name else None,
         account_name=(selected.get("name") or None),

@@ -269,6 +269,40 @@ class TestExchangePublicToken:
             assert ei.value.code == "plaid_select_one_account"
             _deconfigure_plaid(flask_app)
 
+    def test_rejects_when_account_id_missing(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            user = User.query.get(plaid_user)
+            metadata = {
+                "institution": {"institution_id": "i", "name": "n"},
+                "accounts": [
+                    {"type": "depository", "subtype": "checking", "name": "Checking"}
+                ],
+            }
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                with pytest.raises(plaid_service.PlaidServiceError) as ei:
+                    plaid_service.exchange_public_token_for_user(user, "ptok", metadata)
+                assert ei.value.code == "plaid_missing_account_id"
+                assert not mock_client.return_value.item_public_token_exchange.called
+            assert PlaidConnection.query.filter_by(user_id=user.id).count() == 0
+            _deconfigure_plaid(flask_app)
+
+    def test_rejects_when_account_id_blank(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            user = User.query.get(plaid_user)
+            metadata = {
+                "institution": {"institution_id": "i", "name": "n"},
+                "accounts": [
+                    {"id": "   ", "type": "depository", "subtype": "checking"}
+                ],
+            }
+            with pytest.raises(plaid_service.PlaidServiceError) as ei:
+                plaid_service.exchange_public_token_for_user(user, "ptok", metadata)
+            assert ei.value.code == "plaid_missing_account_id"
+            assert PlaidConnection.query.filter_by(user_id=user.id).count() == 0
+            _deconfigure_plaid(flask_app)
+
 
 # ── Remove connection ───────────────────────────────────────────────────────
 
@@ -487,6 +521,115 @@ class TestDashboardIntegration:
             except RuntimeError:
                 pytest.fail("Dashboard should not propagate Plaid errors")
             assert resp.status_code == 200
+        with flask_app.app_context():
+            _deconfigure_plaid(flask_app)
+
+
+# ── Guest write restrictions ────────────────────────────────────────────────
+
+
+class TestGuestWriteRestrictions:
+    """Guest (admin=False) users must not be able to mutate Plaid state."""
+
+    @pytest.fixture()
+    def guest_client(self, flask_app):
+        with flask_app.app_context():
+            owner = User(
+                email=f"plaid-owner-{datetime.utcnow().timestamp()}@test.local",
+                password=generate_password_hash("pw", method="scrypt"),
+                name="Owner",
+                admin=True,
+                is_account_owner=True,
+                is_active=True,
+            )
+            db.session.add(owner)
+            db.session.commit()
+            guest = User(
+                email=f"plaid-guest-{datetime.utcnow().timestamp()}@test.local",
+                password=generate_password_hash("pw", method="scrypt"),
+                name="Guest",
+                admin=False,
+                is_active=True,
+                is_account_owner=False,
+                owner_user_id=owner.id,
+                account_owner_id=owner.id,
+            )
+            db.session.add(guest)
+            db.session.commit()
+            guest_id = guest.id
+            owner_id = owner.id
+
+        c = flask_app.test_client()
+        with c.session_transaction() as sess:
+            sess["_user_id"] = str(guest_id)
+            sess["_fresh"] = True
+
+        yield c
+
+        with flask_app.app_context():
+            PlaidConnection.query.filter(
+                PlaidConnection.user_id.in_([guest_id, owner_id])
+            ).delete(synchronize_session=False)
+            User.query.filter(User.id.in_([guest_id, owner_id])).delete(
+                synchronize_session=False
+            )
+            db.session.commit()
+
+    def test_exchange_token_forbidden_for_guest(self, flask_app, guest_client):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        with patch.object(plaid_service, "_plaid_client") as mock_client:
+            resp = guest_client.post(
+                "/api/v1/plaid/exchange-token",
+                json={
+                    "public_token": "ptok",
+                    "metadata": {
+                        "institution": {"institution_id": "i", "name": "n"},
+                        "accounts": [
+                            {"id": "a", "type": "depository", "subtype": "checking"}
+                        ],
+                    },
+                },
+            )
+            assert resp.status_code == 403
+            assert resp.get_json()["code"] == "forbidden"
+            assert not mock_client.return_value.item_public_token_exchange.called
+        with flask_app.app_context():
+            _deconfigure_plaid(flask_app)
+
+    def test_remove_forbidden_for_guest(self, flask_app, guest_client):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        resp = guest_client.post("/api/v1/plaid/remove")
+        assert resp.status_code == 403
+        assert resp.get_json()["code"] == "forbidden"
+        with flask_app.app_context():
+            _deconfigure_plaid(flask_app)
+
+    def test_remove_delete_forbidden_for_guest(self, flask_app, guest_client):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        resp = guest_client.delete("/api/v1/plaid/remove")
+        assert resp.status_code == 403
+        with flask_app.app_context():
+            _deconfigure_plaid(flask_app)
+
+    def test_update_balance_forbidden_for_guest(self, flask_app, guest_client):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        with patch.object(plaid_service, "update_plaid_balance_for_user") as mock_upd:
+            resp = guest_client.post("/api/v1/plaid/update-balance")
+            assert resp.status_code == 403
+            assert not mock_upd.called
+        with flask_app.app_context():
+            _deconfigure_plaid(flask_app)
+
+    def test_status_allowed_for_guest(self, flask_app, guest_client):
+        """Read-only status endpoint must remain accessible."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        resp = guest_client.get("/api/v1/plaid/status")
+        assert resp.status_code == 200
         with flask_app.app_context():
             _deconfigure_plaid(flask_app)
 
