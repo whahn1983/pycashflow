@@ -38,7 +38,7 @@ RUN mkdir -p /app/app/data && \
 ENV PYTHONPATH=/app
 ENV DATABASE_URL=sqlite:////app/app/data/db.sqlite
 
-HEALTHCHECK CMD python -c "import sys, urllib.request; sys.exit(0) if urllib.request.urlopen('http://localhost:5000', timeout=5).getcode() < 400 else sys.exit(1)"
+HEALTHCHECK CMD python -c "import sys, urllib.request; sys.exit(0) if urllib.request.urlopen('http://localhost:5000/healthz', timeout=5).getcode() < 400 else sys.exit(1)"
 
 EXPOSE 5000
 

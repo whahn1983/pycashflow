@@ -63,6 +63,11 @@ class TestUnauthenticatedAccess:
             }
         }
 
+    def test_healthz_is_public_and_does_not_redirect(self, client):
+        resp = client.get("/healthz", follow_redirects=False)
+        assert resp.status_code == 200
+        assert resp.data == b"ok"
+
 
 # ── Tests: authenticated GET routes ──────────────────────────────────────────
 

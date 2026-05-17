@@ -569,6 +569,15 @@ def apple_app_site_association():
     )
 
 
+@main.route('/healthz', methods=['GET'])
+@limiter.exempt
+def healthz():
+    # Liveness probe for the Docker HEALTHCHECK. Must stay auth-free,
+    # redirect-free, and side-effect-free so it doesn't pollute access logs
+    # or trigger the dashboard Plaid balance refresh.
+    return Response('ok', status=200, mimetype='text/plain')
+
+
 @main.route('/balance', methods=('GET', 'POST'))
 @login_required
 @admin_required
