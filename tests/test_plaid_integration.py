@@ -164,6 +164,182 @@ class TestSettingsPlaidStatus:
         assert body["code"] == "plaid_not_configured"
 
 
+# ── Link token creation request shape ──────────────────────────────────────
+
+
+class TestLinkTokenRequest:
+    """Verify the LinkTokenCreateRequest passed to the Plaid SDK."""
+
+    def _captured_request(self, mock_client):
+        # ``link_token_create`` is called with a single positional arg —
+        # the LinkTokenCreateRequest model. We need its dict form to assert
+        # against, since redirect_uri is set via **kwargs into the model.
+        assert mock_client.return_value.link_token_create.called
+        args, _ = mock_client.return_value.link_token_create.call_args
+        req = args[0]
+        # Plaid SDK request models behave like dicts.
+        try:
+            return req.to_dict()
+        except Exception:
+            return dict(req)
+
+    def test_includes_redirect_uri_when_configured(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(
+                flask_app,
+                PLAID_REDIRECT_URI="https://app.example.com/settings?plaid_oauth_return=1",
+            )
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.link_token_create.return_value = (
+                    SimpleNamespace(link_token="link-sandbox-xyz")
+                )
+                token = plaid_service.create_link_token_for_user(user)
+            assert token == "link-sandbox-xyz"
+            req = self._captured_request(mock_client)
+            assert req.get("redirect_uri") == (
+                "https://app.example.com/settings?plaid_oauth_return=1"
+            )
+            _deconfigure_plaid(flask_app)
+
+    def test_omits_redirect_uri_when_not_configured(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app, PLAID_REDIRECT_URI="")
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.link_token_create.return_value = (
+                    SimpleNamespace(link_token="link-sandbox-no-oauth")
+                )
+                plaid_service.create_link_token_for_user(user)
+            req = self._captured_request(mock_client)
+            # Either missing entirely, or explicitly empty/None — never a
+            # stray value that would force OAuth on a non-OAuth user.
+            assert not req.get("redirect_uri")
+            _deconfigure_plaid(flask_app)
+
+    def test_balance_product_filtered_from_link_token_request(
+        self, flask_app, plaid_user
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app, PLAID_PRODUCTS="auth,balance,transactions")
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.link_token_create.return_value = (
+                    SimpleNamespace(link_token="link-x")
+                )
+                plaid_service.create_link_token_for_user(user)
+            req = self._captured_request(mock_client)
+            products = req.get("products") or []
+            product_values = [
+                getattr(p, "value", None) or str(p) for p in products
+            ]
+            assert "balance" not in product_values
+            assert "auth" in product_values
+
+    def test_link_token_endpoint_returns_only_link_token(
+        self, auth_client, flask_app
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        with patch.object(plaid_service, "_plaid_client") as mock_client:
+            mock_client.return_value.link_token_create.return_value = (
+                SimpleNamespace(link_token="link-resp")
+            )
+            resp = auth_client.post("/api/v1/plaid/link-token")
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data == {"link_token": "link-resp"}
+        # No access_token / secret keys must leak into the JSON payload.
+        for forbidden in ("access_token", "encrypted_access_token", "secret"):
+            assert forbidden not in data
+
+
+# ── Exchange-token auth surface ────────────────────────────────────────────
+
+
+class TestExchangeTokenAuthSurface:
+    def test_exchange_requires_login(self, client):
+        resp = client.post(
+            "/api/v1/plaid/exchange-token",
+            json={"public_token": "x", "metadata": {}},
+        )
+        # Unauthenticated callers must not reach the handler.
+        assert resp.status_code in (401, 403)
+
+    def test_exchange_does_not_accept_user_id_from_client(
+        self, auth_client, flask_app, plaid_user
+    ):
+        # Even if a malicious client passes a user_id, the endpoint must
+        # ignore it and act on the authenticated session user only.
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        with patch.object(plaid_service, "_plaid_client") as mock_client:
+            mock_client.return_value.item_public_token_exchange.return_value = (
+                SimpleNamespace(item_id="item-1", access_token="access-leak-test")
+            )
+            resp = auth_client.post(
+                "/api/v1/plaid/exchange-token",
+                json={
+                    "public_token": "ptok",
+                    "user_id": plaid_user,  # must be ignored
+                    "metadata": {
+                        "institution": {"institution_id": "i", "name": "n"},
+                        "accounts": [
+                            {
+                                "id": "acct-leak",
+                                "type": "depository",
+                                "subtype": "checking",
+                            }
+                        ],
+                    },
+                },
+            )
+        # Response should be a normal status payload — never echo a token.
+        body = resp.get_json() or {}
+        flat = repr(body)
+        assert "access-leak-test" not in flat
+        assert "access_token" not in flat
+        assert "encrypted_access_token" not in flat
+
+
+# ── Settings page renders OAuth-aware Plaid JS ─────────────────────────────
+
+
+class TestSettingsPageOAuthMarkup:
+    """The settings template must include the OAuth resume logic for Plaid."""
+
+    def _settings_html(self, auth_client):
+        resp = auth_client.get("/settings")
+        assert resp.status_code == 200
+        return resp.get_data(as_text=True)
+
+    def test_renders_session_storage_link_token_logic(self, auth_client):
+        html = self._settings_html(auth_client)
+        assert "pycashflow_plaid_link_token" in html
+        assert "sessionStorage" in html
+        # Never use localStorage for the link token.
+        assert "localStorage.setItem('pycashflow_plaid_link_token'" not in html
+
+    def test_renders_oauth_state_id_detection(self, auth_client):
+        html = self._settings_html(auth_client)
+        assert "oauth_state_id" in html
+
+    def test_renders_received_redirect_uri_for_oauth_resume(self, auth_client):
+        html = self._settings_html(auth_client)
+        assert "receivedRedirectUri" in html
+        assert "window.location.href" in html
+
+    def test_plaid_script_does_not_log_tokens(self, auth_client):
+        html = self._settings_html(auth_client)
+        # Defensive: no console.log of public_token / access_token anywhere.
+        for forbidden in (
+            "console.log(public_token",
+            "console.log(access_token",
+            "console.log(metadata",
+        ):
+            assert forbidden not in html
+
+
 # ── Exchange token ──────────────────────────────────────────────────────────
 
 

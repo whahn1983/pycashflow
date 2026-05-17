@@ -476,8 +476,27 @@ PLAID_SECRET=your-secret
 PLAID_ENV=sandbox            # sandbox | development | production
 PLAID_PRODUCTS=auth          # comma-separated; "balance" is NOT valid here
 PLAID_COUNTRY_CODES=US
-PLAID_REDIRECT_URI=          # optional; set only if your Plaid app requires OAuth
+PLAID_REDIRECT_URI=          # required for OAuth institutions (Chase, etc.)
 ```
+
+### OAuth institutions (Chase, etc.)
+
+Some institutions (e.g. Chase) require Plaid's OAuth redirect flow. For these:
+
+- `PLAID_REDIRECT_URI` must be set to a fully-qualified URL pointing back to
+  the PyCashFlow web settings page, for example:
+  `https://app.example.com/settings?plaid_oauth_return=1`
+- The **exact same URI** must also be added to the allowed redirect URIs in
+  your [Plaid Dashboard](https://dashboard.plaid.com). A mismatch (or a
+  missing entry) will cause OAuth institutions to fail to complete the Link
+  flow.
+- After the bank redirect, the settings page detects the `oauth_state_id`
+  query parameter, reopens the Plaid modal automatically, and resumes Plaid
+  Link using the original `link_token` (kept in `sessionStorage`) and the
+  return URL as `receivedRedirectUri`. The user does not need to click
+  Connect again.
+- iOS Plaid setup is intentionally **not** supported in this phase. Users
+  must connect Plaid from the web settings page.
 
 Get keys from the [Plaid Dashboard](https://dashboard.plaid.com). The settings
 page shows **Plaid setup: configured** once all four required values are set,
@@ -512,6 +531,27 @@ appropriate for your account (typically `auth`); **do not** include
 - **No iOS changes** are included in this phase.
 - Only **depository** (checking/savings/cash-management) accounts are accepted
   to avoid using a credit-card current balance as if it were available cash.
+
+### Manual verification checklist
+
+After deploying changes, verify the Plaid flow end-to-end:
+
+- [ ] Set `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, `PLAID_PRODUCTS`,
+  `PLAID_COUNTRY_CODES`, and (for OAuth) `PLAID_REDIRECT_URI`.
+- [ ] Add the exact `PLAID_REDIRECT_URI` value to the Plaid Dashboard
+  allowed redirect URIs.
+- [ ] Open the web Settings page → **Plaid Balance Sync** card → **Connect
+  Plaid Account**.
+- [ ] Test a non-OAuth sandbox institution (e.g. "First Platypus Bank")
+  and confirm the connection completes inline.
+- [ ] Test an OAuth sandbox institution (e.g. Plaid's "OAuth Bank") and
+  confirm the browser is redirected to Plaid, then back to PyCashFlow.
+- [ ] Confirm the user lands on the Settings page and the Plaid modal
+  re-opens automatically with "Completing Plaid connection…".
+- [ ] Confirm `public_token` is exchanged and the connected account row
+  appears in the Plaid card.
+- [ ] Confirm no iOS changes are required — iOS Plaid Link is not
+  supported in this phase.
 
 ### Running the migration
 
