@@ -122,18 +122,35 @@ def _plaid_client():
 
 def _plaid_request_id(api_exception) -> str | None:
     """Extract Plaid request_id from an ApiException body for safe logging."""
+    info = _plaid_error_info(api_exception)
+    return info.get("request_id")
+
+
+def _plaid_error_info(api_exception) -> dict:
+    """Extract safe diagnostic fields from a Plaid ApiException body.
+
+    Returns a dict with any of ``request_id``, ``error_type``, ``error_code``,
+    ``error_message`` that were present. These fields are documented as the
+    error envelope Plaid returns and never contain secrets or access tokens,
+    so they are safe to write to application logs.
+    """
+    info: dict = {}
     try:
         body = getattr(api_exception, "body", None)
-        if body:
-            import json as _json
+        if not body:
+            return info
+        import json as _json
 
-            data = _json.loads(body) if isinstance(body, (str, bytes)) else body
-            rid = data.get("request_id") if isinstance(data, dict) else None
-            if rid:
-                return str(rid)
+        data = _json.loads(body) if isinstance(body, (str, bytes)) else body
+        if not isinstance(data, dict):
+            return info
+        for key in ("request_id", "error_type", "error_code", "error_message"):
+            val = data.get(key)
+            if val:
+                info[key] = str(val)
     except Exception:  # noqa: BLE001 - never let logging break the flow
-        return None
-    return None
+        return info
+    return info
 
 
 # ── Connection lookup ────────────────────────────────────────────────────────
@@ -222,10 +239,20 @@ def create_link_token_for_user(user) -> str:
         client = _plaid_client()
         response = client.link_token_create(LinkTokenCreateRequest(**request_kwargs))
     except ApiException as exc:
+        info = _plaid_error_info(exc)
         logger.warning(
-            "Plaid link_token_create failed for user %s (request_id=%s)",
+            "Plaid link_token_create failed for user %s "
+            "(request_id=%s, error_type=%s, error_code=%s, error_message=%s, "
+            "env=%s, products=%s, country_codes=%s, redirect_uri_set=%s)",
             user.id,
-            _plaid_request_id(exc),
+            info.get("request_id"),
+            info.get("error_type"),
+            info.get("error_code"),
+            info.get("error_message"),
+            _config("PLAID_ENV"),
+            ",".join(get_configured_products()),
+            ",".join(get_configured_country_codes()),
+            bool(_config("PLAID_REDIRECT_URI")),
         )
         raise PlaidServiceError(
             "Could not start Plaid Link. Please try again later.",
@@ -328,10 +355,15 @@ def exchange_public_token_for_user(user, public_token: str, metadata: dict) -> P
             ItemPublicTokenExchangeRequest(public_token=public_token)
         )
     except ApiException as exc:
+        info = _plaid_error_info(exc)
         logger.warning(
-            "Plaid public_token exchange failed for user %s (request_id=%s)",
+            "Plaid public_token exchange failed for user %s "
+            "(request_id=%s, error_type=%s, error_code=%s, error_message=%s)",
             user.id,
-            _plaid_request_id(exc),
+            info.get("request_id"),
+            info.get("error_type"),
+            info.get("error_code"),
+            info.get("error_message"),
         )
         raise PlaidServiceError(
             "Could not finalize Plaid connection. Please try again.",
@@ -392,10 +424,16 @@ def remove_plaid_connection_for_user(user) -> bool:
             client = _plaid_client()
             client.item_remove(ItemRemoveRequest(access_token=access_token))
         except ApiException as exc:
+            info = _plaid_error_info(exc)
             logger.warning(
-                "Plaid item_remove failed for user %s (request_id=%s); deleting local record anyway",
+                "Plaid item_remove failed for user %s "
+                "(request_id=%s, error_type=%s, error_code=%s, error_message=%s); "
+                "deleting local record anyway",
                 user.id,
-                _plaid_request_id(exc),
+                info.get("request_id"),
+                info.get("error_type"),
+                info.get("error_code"),
+                info.get("error_message"),
             )
         except Exception:
             logger.exception(
@@ -491,10 +529,15 @@ def update_plaid_balance_for_user(user) -> dict:
         )
         response = client.accounts_balance_get(request)
     except ApiException as exc:
+        info = _plaid_error_info(exc)
         logger.warning(
-            "Plaid accounts_balance_get failed for user %s (request_id=%s)",
+            "Plaid accounts_balance_get failed for user %s "
+            "(request_id=%s, error_type=%s, error_code=%s, error_message=%s)",
             user.id,
-            _plaid_request_id(exc),
+            info.get("request_id"),
+            info.get("error_type"),
+            info.get("error_code"),
+            info.get("error_message"),
         )
         _record_sync_status(conn, "plaid_api_error", "Plaid balance request failed.")
         db.session.commit()
