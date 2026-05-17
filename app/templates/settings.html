@@ -516,6 +516,17 @@
                         </button>
                     </div>
                 </form>
+                {% if email_config %}
+                <form action="{{url_for('main.email_delete')}}" method="POST"
+                      onsubmit="return confirm('Remove your saved email balance update settings? This cannot be undone.');"
+                      style="margin-top: 0.75rem;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn-danger-modern btn-modern" type="submit" style="width: 100%;">
+                        <i class="fa-solid fa-trash"></i>
+                        Remove Email Settings
+                    </button>
+                </form>
+                {% endif %}
             </div>
         </div>
     </div>
