@@ -764,6 +764,23 @@ def email():
     return redirect(url_for('main.settings'))
 
 
+@main.route('/email/delete', methods=['POST'])
+@login_required
+@admin_required
+def email_delete():
+    # remove the user's email balance update settings
+    user_id = get_effective_user_id()
+    deleted = Email.query.filter_by(user_id=user_id).delete()
+    db.session.commit()
+
+    if deleted:
+        flash('Email balance update settings removed')
+    else:
+        flash('No email balance update settings to remove')
+
+    return redirect(url_for('main.settings'))
+
+
 @main.route('/update_user', methods=['GET', 'POST'])
 @login_required
 @admin_required
