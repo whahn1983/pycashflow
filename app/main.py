@@ -6,7 +6,7 @@ from flask import Blueprint, render_template
 from .models import (
     Schedule, Scenario, Balance, User, Settings, TextSettings, Email, Hold, Skip,
     GlobalEmailSettings, AISettings, PasskeyCredential, UserToken, PasswordSetupToken,
-    Subscription,
+    Subscription, PlaidConnection,
 )
 from app import db, limiter
 from datetime import datetime, timezone
@@ -32,6 +32,7 @@ from .ai_insights import (
     validate_model,
 )
 from .password_setup import create_password_setup_link
+from .plaid_service import safe_update_plaid_balance_for_user
 from .totp_utils import (
     generate_totp_secret, encrypt_totp_secret, decrypt_totp_secret,
     generate_qr_code_b64, verify_totp,
@@ -65,11 +66,22 @@ def get_effective_user_id():
         return current_user.id
 
 
+def _get_balance_owner_user():
+    """Return the User whose balance is the source of truth for the request."""
+    effective_id = get_effective_user_id()
+    if effective_id == current_user.id:
+        return current_user._get_current_object()
+    return User.query.get(effective_id)
+
+
 @main.route('/', methods=('GET', 'POST'))
 @login_required
 def index():
     # Get effective user ID (account owner for guests, self for owners)
     user_id = get_effective_user_id()
+
+    # Refresh today's balance from Plaid (no-op if not configured/connected).
+    safe_update_plaid_balance_for_user(_get_balance_owner_user())
 
     # get today's date
     todaydate = datetime.today().strftime('%A, %B %d, %Y')
@@ -841,6 +853,7 @@ def _delete_user_owned_rows(user_ids):
         PasskeyCredential,
         AISettings,
         Subscription,
+        PlaidConnection,
         Email,
         Skip,
         Hold,
