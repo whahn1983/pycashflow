@@ -191,7 +191,7 @@ def test_web_set_password_route_completes_setup(
         follow_redirects=True,
     )
     assert resp.status_code == 200
-    assert b"Password setup complete. Please sign in." in resp.data
+    assert b"Password successfully set! You can sign in here or on the iOS app." in resp.data
 
     with flask_app.app_context():
         db_user = user_model.query.filter_by(email="web-setup@test.local").first()
