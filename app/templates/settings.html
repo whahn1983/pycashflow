@@ -1009,14 +1009,43 @@
         });
     }
 
+    var PLAID_OAUTH_LINK_TOKEN_KEY = 'plaid.oauth.link_token';
+
+    function storeOAuthLinkToken(linkToken) {
+        try {
+            if (window.sessionStorage && linkToken) {
+                window.sessionStorage.setItem(PLAID_OAUTH_LINK_TOKEN_KEY, linkToken);
+            }
+        } catch (e) {}
+    }
+
+    function loadOAuthLinkToken() {
+        try {
+            if (window.sessionStorage) {
+                return window.sessionStorage.getItem(PLAID_OAUTH_LINK_TOKEN_KEY) || '';
+            }
+        } catch (e) {}
+        return '';
+    }
+
+    function clearOAuthLinkToken() {
+        try {
+            if (window.sessionStorage) {
+                window.sessionStorage.removeItem(PLAID_OAUTH_LINK_TOKEN_KEY);
+            }
+        } catch (e) {}
+    }
+
     function buildHandlerConfig(linkToken, receivedRedirectUri) {
         var cfg = {
             token: linkToken,
             onSuccess: function(public_token, metadata) {
+                clearOAuthLinkToken();
                 exchangePublicToken(public_token, metadata);
             },
             onExit: function(err) {
                 setOAuthResume('');
+                clearOAuthLinkToken();
                 if (err) {
                     setError('Plaid Link did not complete. Please try again.');
                 }
@@ -1039,6 +1068,7 @@
                 return;
             }
             var linkToken = resp.body.data.link_token;
+            storeOAuthLinkToken(linkToken);
             var handler = Plaid.create(buildHandlerConfig(linkToken, null));
             handler.open();
         });
@@ -1050,22 +1080,20 @@
             return;
         }
         setOAuthResume('Completing Plaid connection…');
-        fetchJSON('/api/v1/plaid/link-token', { method: 'POST' }).then(function(resp) {
-            if (!resp.ok || !resp.body || !resp.body.data || !resp.body.data.link_token) {
-                setOAuthResume('');
-                setError((resp.body && resp.body.error) || 'Your Plaid session expired. Please start the connection again.');
-                cleanupOAuthUrl();
-                return;
-            }
-            var linkToken = resp.body.data.link_token;
-            var handler = Plaid.create(
-                buildHandlerConfig(linkToken, window.location.href)
-            );
-            handler.open();
-            // The bank-supplied params have served their purpose; clean them up
-            // now that Plaid Link has the URL it needed.
+        var linkToken = loadOAuthLinkToken();
+        if (!linkToken) {
+            setOAuthResume('');
+            setError('Your Plaid session expired. Please start the connection again.');
             cleanupOAuthUrl();
-        });
+            return;
+        }
+        var handler = Plaid.create(
+            buildHandlerConfig(linkToken, window.location.href)
+        );
+        handler.open();
+        // The bank-supplied params have served their purpose; clean them up
+        // now that Plaid Link has the URL it needed.
+        cleanupOAuthUrl();
     }
 
     function removeConnection() {
