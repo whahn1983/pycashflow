@@ -1017,12 +1017,25 @@
                 window.sessionStorage.setItem(PLAID_OAUTH_LINK_TOKEN_KEY, linkToken);
             }
         } catch (e) {}
+        // OAuth institutions can bounce back in a different tab/webview where
+        // sessionStorage is empty; keep a same-origin fallback for resume.
+        try {
+            if (window.localStorage && linkToken) {
+                window.localStorage.setItem(PLAID_OAUTH_LINK_TOKEN_KEY, linkToken);
+            }
+        } catch (e) {}
     }
 
     function loadOAuthLinkToken() {
         try {
             if (window.sessionStorage) {
-                return window.sessionStorage.getItem(PLAID_OAUTH_LINK_TOKEN_KEY) || '';
+                var sessionToken = window.sessionStorage.getItem(PLAID_OAUTH_LINK_TOKEN_KEY) || '';
+                if (sessionToken) return sessionToken;
+            }
+        } catch (e) {}
+        try {
+            if (window.localStorage) {
+                return window.localStorage.getItem(PLAID_OAUTH_LINK_TOKEN_KEY) || '';
             }
         } catch (e) {}
         return '';
@@ -1032,6 +1045,11 @@
         try {
             if (window.sessionStorage) {
                 window.sessionStorage.removeItem(PLAID_OAUTH_LINK_TOKEN_KEY);
+            }
+        } catch (e) {}
+        try {
+            if (window.localStorage) {
+                window.localStorage.removeItem(PLAID_OAUTH_LINK_TOKEN_KEY);
             }
         } catch (e) {}
     }
