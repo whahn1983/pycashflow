@@ -246,6 +246,9 @@ def build_payload(current_balance, schedules, holds, skips):
 DEFAULT_MODEL = 'gpt-4o-mini'
 DO_DEFAULT_MODEL = 'n/a'
 REFRESH_INTERVAL = timedelta(hours=2)
+MAX_INSIGHTS_JSON_BYTES = 128 * 1024
+MAX_INSIGHT_COUNT = 12
+MAX_FIELD_LENGTH = 2000
 
 
 class AIProviderError(Exception):
@@ -260,6 +263,62 @@ class AIProviderError(Exception):
         super().__init__(user_message)
         self.user_message = user_message
         self.original = original
+
+
+class AIInsightsFormatError(Exception):
+    """Raised when provider output is not valid/storable insights JSON."""
+
+    def __init__(self, user_message):
+        super().__init__(user_message)
+        self.user_message = user_message
+
+
+def normalize_and_validate_insights_json(raw_json: str) -> tuple[str, dict]:
+    """Validate provider JSON shape and return canonical JSON + parsed dict.
+
+    Accepts rich, multi-card responses (including long category breakdown cards)
+    while rejecting malformed/non-object payloads.
+    """
+    if not isinstance(raw_json, str) or not raw_json.strip():
+        raise AIInsightsFormatError("AI returned an empty response.")
+    if len(raw_json.encode("utf-8")) > MAX_INSIGHTS_JSON_BYTES:
+        raise AIInsightsFormatError("AI response was too large to cache safely.")
+
+    try:
+        payload = json.loads(raw_json)
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise AIInsightsFormatError("AI returned invalid JSON.") from exc
+
+    if not isinstance(payload, dict):
+        raise AIInsightsFormatError("AI response must be a JSON object.")
+
+    insights = payload.get("insights")
+    if insights is None:
+        insights = []
+    if not isinstance(insights, list):
+        raise AIInsightsFormatError("AI insights payload must include an insights array.")
+    if len(insights) > MAX_INSIGHT_COUNT:
+        raise AIInsightsFormatError("AI returned too many insight cards.")
+
+    normalized_insights = []
+    for item in insights:
+        if not isinstance(item, dict):
+            raise AIInsightsFormatError("Each insight must be a JSON object.")
+        normalized = {
+            "type": str(item.get("type") or "").strip(),
+            "severity": str(item.get("severity") or "").strip(),
+            "title": str(item.get("title") or "").strip(),
+            "description": str(item.get("description") or "").strip(),
+        }
+        if not all(normalized.values()):
+            raise AIInsightsFormatError("Each insight must include type, severity, title, and description.")
+        for key in ("type", "severity", "title", "description"):
+            if len(normalized[key]) > MAX_FIELD_LENGTH:
+                raise AIInsightsFormatError(f"AI insight field '{key}' is too long.")
+        normalized_insights.append(normalized)
+
+    normalized_payload = {"insights": normalized_insights}
+    return json.dumps(normalized_payload), normalized_payload
 
 
 def _is_subscription_tier_error(exc):

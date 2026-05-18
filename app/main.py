@@ -28,6 +28,8 @@ from .ai_insights import (
     fetch_insights,
     fetch_insights_for_provider,
     is_refresh_due,
+    AIInsightsFormatError,
+    normalize_and_validate_insights_json,
     select_provider,
     validate_model,
 )
@@ -1416,8 +1418,12 @@ def ai_insights():
 
     try:
         insights_json = fetch_insights_for_provider(provider, current_balance, schedules, holds, skips)
+        insights_json, _parsed = normalize_and_validate_insights_json(insights_json)
     except AIProviderError as e:
         logger.warning("AI insights generation rejected for user %s: %s", user_id, e.original or e)
+        return Response(json.dumps({'error': e.user_message}), status=502, mimetype='application/json')
+    except AIInsightsFormatError as e:
+        logger.warning("AI insights generation returned invalid payload for user %s: %s", user_id, e)
         return Response(json.dumps({'error': e.user_message}), status=502, mimetype='application/json')
     except Exception:
         logger.exception("AI insights generation failed for user %s", user_id)

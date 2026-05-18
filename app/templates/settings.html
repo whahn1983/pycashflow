@@ -891,6 +891,10 @@
         options = options || {};
         options.headers = options.headers || {};
         options.headers['Accept'] = 'application/json';
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta && csrfMeta.getAttribute('content')) {
+            options.headers['X-CSRFToken'] = csrfMeta.getAttribute('content');
+        }
         options.credentials = 'same-origin';
         return fetch(url, options).then(function(resp) {
             return resp.json().catch(function() { return {}; }).then(function(body) {
