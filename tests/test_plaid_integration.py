@@ -313,11 +313,12 @@ class TestSettingsPageOAuthMarkup:
         assert resp.status_code == 200
         return resp.get_data(as_text=True)
 
-    def test_does_not_persist_link_token_in_browser_storage(self, auth_client):
+    def test_uses_session_storage_for_oauth_link_token_resume(self, auth_client):
         html = self._settings_html(auth_client)
-        # Link token should not be persisted in browser storage.
-        assert "sessionStorage" not in html
-        assert "localStorage" not in html
+        # OAuth resume must reuse the original link token from the first launch.
+        assert "sessionStorage" in html
+        assert "plaid.oauth.link_token" in html
+        assert "loadOAuthLinkToken" in html
 
     def test_renders_oauth_state_id_detection(self, auth_client):
         html = self._settings_html(auth_client)
