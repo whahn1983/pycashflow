@@ -1009,7 +1009,10 @@
         });
     }
 
-    var PLAID_OAUTH_LINK_TOKEN_KEY = 'plaid.oauth.link_token';
+    var PLAID_OAUTH_LINK_TOKEN_KEY_PREFIX = 'plaid.oauth.link_token';
+    var PLAID_OAUTH_LINK_TOKEN_LEGACY_KEY = PLAID_OAUTH_LINK_TOKEN_KEY_PREFIX;
+    var PLAID_OAUTH_LINK_TOKEN_KEY =
+        PLAID_OAUTH_LINK_TOKEN_KEY_PREFIX + '.u{{ current_user.id }}';
 
     function storeOAuthLinkToken(linkToken) {
         try {
@@ -1022,6 +1025,8 @@
         try {
             if (window.localStorage && linkToken) {
                 window.localStorage.setItem(PLAID_OAUTH_LINK_TOKEN_KEY, linkToken);
+                // Remove unscoped legacy token to prevent cross-account reuse.
+                window.localStorage.removeItem(PLAID_OAUTH_LINK_TOKEN_LEGACY_KEY);
             }
         } catch (e) {}
     }
@@ -1050,6 +1055,7 @@
         try {
             if (window.localStorage) {
                 window.localStorage.removeItem(PLAID_OAUTH_LINK_TOKEN_KEY);
+                window.localStorage.removeItem(PLAID_OAUTH_LINK_TOKEN_LEGACY_KEY);
             }
         } catch (e) {}
     }
