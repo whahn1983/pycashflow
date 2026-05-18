@@ -6,6 +6,7 @@ gpt-4o-mini for risk, pattern, and observation insights.
 import json
 import logging
 import os
+import hashlib
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 from openai import OpenAI
@@ -349,21 +350,30 @@ def validate_model(api_key, model_name):
     Returns (True, None) if valid, (False, error_message) otherwise.
     """
     from openai import NotFoundError, AuthenticationError, PermissionDeniedError
+    cache_key = hashlib.sha256(f"{api_key}|{model_name}".encode("utf-8")).hexdigest()
+    now = datetime.now(timezone.utc)
+    cached = _MODEL_VALIDATION_CACHE.get(cache_key)
+    if cached and (now - cached[0]) < MODEL_VALIDATION_CACHE_TTL:
+        return cached[1]
+
     client = OpenAI(api_key=api_key)
     try:
         client.models.retrieve(model_name)
-        return True, None
+        result = (True, None)
     except NotFoundError:
-        return False, f"Model '{model_name}' does not exist or is not accessible with this API key."
+        result = (False, f"Model '{model_name}' does not exist or is not accessible with this API key.")
     except PermissionDeniedError:
-        return False, f"Model '{model_name}' is not available for your subscription tier."
+        result = (False, f"Model '{model_name}' is not available for your subscription tier.")
     except AuthenticationError as exc:
         if _is_subscription_tier_error(exc):
-            return False, f"Model '{model_name}' is not available for your subscription tier."
-        return False, "Invalid API key — could not validate the model."
+            result = (False, f"Model '{model_name}' is not available for your subscription tier.")
+        else:
+            result = (False, "Invalid API key — could not validate the model.")
     except Exception as exc:
         logger.warning("Unexpected error validating model %r: %s", model_name, exc)
-        return False, f"Could not validate model: {exc}"
+        result = (False, f"Could not validate model: {exc}")
+    _MODEL_VALIDATION_CACHE[cache_key] = (now, result)
+    return result
 
 
 def normalize_do_base_url(url):
@@ -523,3 +533,5 @@ def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips, 
         'model': model or DEFAULT_MODEL,
     }
     return fetch_insights_for_provider(provider, current_balance, schedules, holds, skips)
+MODEL_VALIDATION_CACHE_TTL = timedelta(minutes=15)
+_MODEL_VALIDATION_CACHE: dict[str, tuple[datetime, tuple[bool, str | None]]] = {}

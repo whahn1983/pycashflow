@@ -1334,6 +1334,7 @@ def global_email_settings():
 @main.route('/ai_settings', methods=['POST'])
 @login_required
 @admin_required
+@limiter.limit("12 per hour")
 def ai_settings():
     """Save the user's OpenAI API key (encrypted) and optional model selection."""
     api_key_input = request.form.get('api_key', '').strip()

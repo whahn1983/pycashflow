@@ -313,12 +313,11 @@ class TestSettingsPageOAuthMarkup:
         assert resp.status_code == 200
         return resp.get_data(as_text=True)
 
-    def test_renders_session_storage_link_token_logic(self, auth_client):
+    def test_does_not_persist_link_token_in_browser_storage(self, auth_client):
         html = self._settings_html(auth_client)
-        assert "pycashflow_plaid_link_token" in html
-        assert "sessionStorage" in html
-        # Never use localStorage for the link token.
-        assert "localStorage.setItem('pycashflow_plaid_link_token'" not in html
+        # Link token should not be persisted in browser storage.
+        assert "sessionStorage" not in html
+        assert "localStorage" not in html
 
     def test_renders_oauth_state_id_detection(self, auth_client):
         html = self._settings_html(auth_client)
@@ -751,12 +750,23 @@ class TestGuestWriteRestrictions:
             )
             db.session.commit()
 
+    def _csrf_headers(self, client):
+        html = client.get("/settings").get_data(as_text=True)
+        marker = 'meta name="csrf-token" content="'
+        idx = html.find(marker)
+        assert idx != -1
+        start = idx + len(marker)
+        end = html.find('"', start)
+        token = html[start:end]
+        return {"X-CSRFToken": token}
+
     def test_exchange_token_forbidden_for_guest(self, flask_app, guest_client):
         with flask_app.app_context():
             _configure_plaid(flask_app)
         with patch.object(plaid_service, "_plaid_client") as mock_client:
             resp = guest_client.post(
                 "/api/v1/plaid/exchange-token",
+                headers=self._csrf_headers(guest_client),
                 json={
                     "public_token": "ptok",
                     "metadata": {
@@ -776,7 +786,7 @@ class TestGuestWriteRestrictions:
     def test_remove_forbidden_for_guest(self, flask_app, guest_client):
         with flask_app.app_context():
             _configure_plaid(flask_app)
-        resp = guest_client.post("/api/v1/plaid/remove")
+        resp = guest_client.post("/api/v1/plaid/remove", headers=self._csrf_headers(guest_client))
         assert resp.status_code == 403
         assert resp.get_json()["code"] == "forbidden"
         with flask_app.app_context():
@@ -785,7 +795,7 @@ class TestGuestWriteRestrictions:
     def test_remove_delete_forbidden_for_guest(self, flask_app, guest_client):
         with flask_app.app_context():
             _configure_plaid(flask_app)
-        resp = guest_client.delete("/api/v1/plaid/remove")
+        resp = guest_client.delete("/api/v1/plaid/remove", headers=self._csrf_headers(guest_client))
         assert resp.status_code == 403
         with flask_app.app_context():
             _deconfigure_plaid(flask_app)
@@ -794,7 +804,7 @@ class TestGuestWriteRestrictions:
         with flask_app.app_context():
             _configure_plaid(flask_app)
         with patch.object(plaid_service, "update_plaid_balance_for_user") as mock_upd:
-            resp = guest_client.post("/api/v1/plaid/update-balance")
+            resp = guest_client.post("/api/v1/plaid/update-balance", headers=self._csrf_headers(guest_client))
             assert resp.status_code == 403
             assert not mock_upd.called
         with flask_app.app_context():
