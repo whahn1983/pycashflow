@@ -15,6 +15,7 @@ None of them return access tokens, encrypted tokens, or raw Plaid payloads.
 
 from flask import request
 
+from app import limiter
 from app.api import api
 from app.api.auth_utils import api_login_required, get_api_user
 from app.api.errors import api_error, forbidden
@@ -49,6 +50,7 @@ def api_plaid_status():
 
 @api.route("/plaid/link-token", methods=["POST"])
 @api_login_required
+@limiter.limit("10 per hour")
 def api_plaid_link_token():
     user = get_api_user()
     try:
@@ -59,7 +61,8 @@ def api_plaid_link_token():
 
 
 @api.route("/plaid/exchange-token", methods=["POST"])
-@api_login_required
+@api_login_required(require_bearer=True)
+@limiter.limit("10 per hour")
 def api_plaid_exchange_token():
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -75,7 +78,8 @@ def api_plaid_exchange_token():
 
 
 @api.route("/plaid/remove", methods=["POST", "DELETE"])
-@api_login_required
+@api_login_required(require_bearer=True)
+@limiter.limit("10 per hour")
 def api_plaid_remove():
     if (resp := _forbid_guest_writes()) is not None:
         return resp
@@ -85,7 +89,8 @@ def api_plaid_remove():
 
 
 @api.route("/plaid/update-balance", methods=["POST"])
-@api_login_required
+@api_login_required(require_bearer=True)
+@limiter.limit("240 per hour")
 def api_plaid_update_balance():
     if (resp := _forbid_guest_writes()) is not None:
         return resp

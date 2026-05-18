@@ -6,6 +6,7 @@ gpt-4o-mini for risk, pattern, and observation insights.
 import json
 import logging
 import os
+import hashlib
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 from openai import OpenAI
@@ -246,6 +247,9 @@ def build_payload(current_balance, schedules, holds, skips):
 DEFAULT_MODEL = 'gpt-4o-mini'
 DO_DEFAULT_MODEL = 'n/a'
 REFRESH_INTERVAL = timedelta(hours=2)
+MAX_INSIGHTS_JSON_BYTES = 128 * 1024
+MAX_INSIGHT_COUNT = 12
+MAX_FIELD_LENGTH = 2000
 
 
 class AIProviderError(Exception):
@@ -260,6 +264,62 @@ class AIProviderError(Exception):
         super().__init__(user_message)
         self.user_message = user_message
         self.original = original
+
+
+class AIInsightsFormatError(Exception):
+    """Raised when provider output is not valid/storable insights JSON."""
+
+    def __init__(self, user_message):
+        super().__init__(user_message)
+        self.user_message = user_message
+
+
+def normalize_and_validate_insights_json(raw_json: str) -> tuple[str, dict]:
+    """Validate provider JSON shape and return canonical JSON + parsed dict.
+
+    Accepts rich, multi-card responses (including long category breakdown cards)
+    while rejecting malformed/non-object payloads.
+    """
+    if not isinstance(raw_json, str) or not raw_json.strip():
+        raise AIInsightsFormatError("AI returned an empty response.")
+    if len(raw_json.encode("utf-8")) > MAX_INSIGHTS_JSON_BYTES:
+        raise AIInsightsFormatError("AI response was too large to cache safely.")
+
+    try:
+        payload = json.loads(raw_json)
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise AIInsightsFormatError("AI returned invalid JSON.") from exc
+
+    if not isinstance(payload, dict):
+        raise AIInsightsFormatError("AI response must be a JSON object.")
+
+    insights = payload.get("insights")
+    if insights is None:
+        insights = []
+    if not isinstance(insights, list):
+        raise AIInsightsFormatError("AI insights payload must include an insights array.")
+    if len(insights) > MAX_INSIGHT_COUNT:
+        raise AIInsightsFormatError("AI returned too many insight cards.")
+
+    normalized_insights = []
+    for item in insights:
+        if not isinstance(item, dict):
+            raise AIInsightsFormatError("Each insight must be a JSON object.")
+        normalized = {
+            "type": str(item.get("type") or "").strip(),
+            "severity": str(item.get("severity") or "").strip(),
+            "title": str(item.get("title") or "").strip(),
+            "description": str(item.get("description") or "").strip(),
+        }
+        if not all(normalized.values()):
+            raise AIInsightsFormatError("Each insight must include type, severity, title, and description.")
+        for key in ("type", "severity", "title", "description"):
+            if len(normalized[key]) > MAX_FIELD_LENGTH:
+                raise AIInsightsFormatError(f"AI insight field '{key}' is too long.")
+        normalized_insights.append(normalized)
+
+    normalized_payload = {"insights": normalized_insights}
+    return json.dumps(normalized_payload), normalized_payload
 
 
 def _is_subscription_tier_error(exc):
@@ -290,21 +350,30 @@ def validate_model(api_key, model_name):
     Returns (True, None) if valid, (False, error_message) otherwise.
     """
     from openai import NotFoundError, AuthenticationError, PermissionDeniedError
+    cache_key = hashlib.sha256(f"{api_key}|{model_name}".encode("utf-8")).hexdigest()
+    now = datetime.now(timezone.utc)
+    cached = _MODEL_VALIDATION_CACHE.get(cache_key)
+    if cached and (now - cached[0]) < MODEL_VALIDATION_CACHE_TTL:
+        return cached[1]
+
     client = OpenAI(api_key=api_key)
     try:
         client.models.retrieve(model_name)
-        return True, None
+        result = (True, None)
     except NotFoundError:
-        return False, f"Model '{model_name}' does not exist or is not accessible with this API key."
+        result = (False, f"Model '{model_name}' does not exist or is not accessible with this API key.")
     except PermissionDeniedError:
-        return False, f"Model '{model_name}' is not available for your subscription tier."
+        result = (False, f"Model '{model_name}' is not available for your subscription tier.")
     except AuthenticationError as exc:
         if _is_subscription_tier_error(exc):
-            return False, f"Model '{model_name}' is not available for your subscription tier."
-        return False, "Invalid API key — could not validate the model."
+            result = (False, f"Model '{model_name}' is not available for your subscription tier.")
+        else:
+            result = (False, "Invalid API key — could not validate the model.")
     except Exception as exc:
         logger.warning("Unexpected error validating model %r: %s", model_name, exc)
-        return False, f"Could not validate model: {exc}"
+        result = (False, f"Could not validate model: {exc}")
+    _MODEL_VALIDATION_CACHE[cache_key] = (now, result)
+    return result
 
 
 def normalize_do_base_url(url):
@@ -464,3 +533,5 @@ def fetch_insights(encrypted_api_key, current_balance, schedules, holds, skips, 
         'model': model or DEFAULT_MODEL,
     }
     return fetch_insights_for_provider(provider, current_balance, schedules, holds, skips)
+MODEL_VALIDATION_CACHE_TTL = timedelta(minutes=15)
+_MODEL_VALIDATION_CACHE: dict[str, tuple[datetime, tuple[bool, str | None]]] = {}

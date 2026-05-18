@@ -41,6 +41,7 @@ from functools import wraps
 
 from flask import g, request
 from flask_login import current_user
+from flask_wtf.csrf import ValidationError, validate_csrf
 
 # Module-level imports: captured at app-creation time, before test stubs.
 from app import db
@@ -150,7 +151,23 @@ def api_login_required(f=None, *, require_bearer: bool = False, enforce_active: 
                 return func(*args, **kwargs)
 
             # 2. Optional session cookie fallback (Flask-Login)
-            if not require_bearer and current_user.is_authenticated:
+            # For routes that require bearer auth, allow a same-origin
+            # session fallback only when a valid CSRF token is supplied.
+            def _session_fallback_allowed() -> bool:
+                if not current_user.is_authenticated:
+                    return False
+                if not require_bearer:
+                    return True
+                csrf_token = request.headers.get("X-CSRFToken", "").strip()
+                if not csrf_token:
+                    return False
+                try:
+                    validate_csrf(csrf_token)
+                except ValidationError:
+                    return False
+                return True
+
+            if _session_fallback_allowed():
                 session_user = current_user._get_current_object()
                 if enforce_active and not enforce_user_access(session_user):
                     return unauthorized("Invalid credentials or account is not active")

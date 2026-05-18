@@ -28,6 +28,8 @@ from .ai_insights import (
     fetch_insights,
     fetch_insights_for_provider,
     is_refresh_due,
+    AIInsightsFormatError,
+    normalize_and_validate_insights_json,
     select_provider,
     validate_model,
 )
@@ -1332,6 +1334,7 @@ def global_email_settings():
 @main.route('/ai_settings', methods=['POST'])
 @login_required
 @admin_required
+@limiter.limit("12 per hour")
 def ai_settings():
     """Save the user's OpenAI API key (encrypted) and optional model selection."""
     api_key_input = request.form.get('api_key', '').strip()
@@ -1416,8 +1419,12 @@ def ai_insights():
 
     try:
         insights_json = fetch_insights_for_provider(provider, current_balance, schedules, holds, skips)
+        insights_json, _parsed = normalize_and_validate_insights_json(insights_json)
     except AIProviderError as e:
         logger.warning("AI insights generation rejected for user %s: %s", user_id, e.original or e)
+        return Response(json.dumps({'error': e.user_message}), status=502, mimetype='application/json')
+    except AIInsightsFormatError as e:
+        logger.warning("AI insights generation returned invalid payload for user %s: %s", user_id, e)
         return Response(json.dumps({'error': e.user_message}), status=502, mimetype='application/json')
     except Exception:
         logger.exception("AI insights generation failed for user %s", user_id)

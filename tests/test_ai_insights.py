@@ -24,10 +24,12 @@ from app.api.routes import data as _api_data_module
 from app.ai_insights import (
     DEFAULT_MODEL,
     DO_DEFAULT_MODEL,
+    AIInsightsFormatError,
     AIProviderError,
     _is_subscription_tier_error,
     fetch_insights_for_provider,
     is_refresh_due,
+    normalize_and_validate_insights_json,
     normalize_do_base_url,
     select_provider,
     validate_model,
@@ -69,6 +71,40 @@ class TestNormalizeDoBaseUrl:
         url = normalize_do_base_url("https://example.do.run//")
         assert "//api/v1" not in url
         assert url.endswith("/api/v1/")
+
+
+class TestNormalizeAndValidateInsightsJson:
+    def test_accepts_rich_multi_card_payload(self):
+        payload = {
+            "insights": [
+                {
+                    "type": "cash_risk",
+                    "severity": "medium",
+                    "title": "Risk snapshot",
+                    "description": "Sentence one. Sentence two with more context.",
+                },
+                {
+                    "type": "pattern",
+                    "severity": "low",
+                    "title": "Expense breakdown by category",
+                    "description": "\n".join([
+                        "• Housing: $2,400/mo",
+                        "• Groceries: $850/mo",
+                        "• Utilities: $420/mo",
+                        "• Transportation: $310/mo",
+                        "• Insurance: $290/mo",
+                    ]),
+                },
+            ]
+        }
+        canonical, parsed = normalize_and_validate_insights_json(json.dumps(payload))
+        assert isinstance(canonical, str)
+        assert parsed["insights"][1]["title"] == "Expense breakdown by category"
+        assert "• Housing" in parsed["insights"][1]["description"]
+
+    def test_rejects_invalid_shape(self):
+        with pytest.raises(AIInsightsFormatError):
+            normalize_and_validate_insights_json('{"insights":"not-a-list"}')
 
 
 # ── select_provider ──────────────────────────────────────────────────────────
@@ -430,7 +466,7 @@ class TestRefreshEndpointProviderAndLimit:
 
         def fake_fetch(provider, *args, **kwargs):
             called["count"] += 1
-            return '{"insights": [{"title": "fresh"}]}'
+            return '{"insights": [{"type":"observation","severity":"low","title":"fresh","description":"ok."}]}'
 
         monkeypatch.setattr(
             _api_data_module, "fetch_insights_for_provider",
@@ -463,7 +499,7 @@ class TestRefreshEndpointProviderAndLimit:
                 api_key=None,
                 model_version=None,
                 last_updated=old,
-                last_insights='{"insights": [{"title": "stale"}]}',
+                last_insights='{"insights": [{"type":"observation","severity":"low","title":"stale","description":"old."}]}',
             ))
             _db.session.commit()
 
@@ -471,7 +507,7 @@ class TestRefreshEndpointProviderAndLimit:
 
         def fake_fetch(provider, *args, **kwargs):
             called["count"] += 1
-            return '{"insights": [{"title": "fresh"}]}'
+            return '{"insights": [{"type":"observation","severity":"low","title":"fresh","description":"ok."}]}'
 
         monkeypatch.setattr(
             _api_data_module, "fetch_insights_for_provider",
@@ -485,7 +521,7 @@ class TestRefreshEndpointProviderAndLimit:
 
         with flask_app.app_context():
             row = AISettings.query.filter_by(user_id=user_id).first()
-            assert row.last_insights == '{"insights": [{"title": "fresh"}]}'
+            assert row.last_insights == '{"insights": [{"type": "observation", "severity": "low", "title": "fresh", "description": "ok."}]}'
             # last_updated was bumped — should be within the last few seconds
             row_dt = row.last_updated
             if row_dt.tzinfo is None:
