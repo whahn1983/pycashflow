@@ -1114,19 +1114,6 @@
         } catch (e) { /* never let diagnostics break the UI */ }
     }
 
-    function formatLinkExitMessage(err) {
-        var display = pickString(err, 'display_message');
-        if (display) return display;
-        var msg = pickString(err, 'error_message');
-        var code = pickString(err, 'error_code');
-        var type = pickString(err, 'error_type');
-        if (code && msg) return 'Plaid Link error (' + code + '): ' + msg;
-        if (msg) return 'Plaid Link error: ' + msg;
-        if (code) return 'Plaid Link error: ' + code;
-        if (type) return 'Plaid Link error: ' + type;
-        return 'Plaid Link did not complete. Please try again.';
-    }
-
     function buildHandlerConfig(linkToken, receivedRedirectUri) {
         var cfg = {
             token: linkToken,
@@ -1145,7 +1132,7 @@
                 clearOAuthResumeInProgress();
                 if (err) {
                     reportLinkExit(err, metadata);
-                    setError(formatLinkExitMessage(err));
+                    setError('Plaid Link did not complete. Please try again.');
                 }
             },
             onEvent: function() { /* no-op; never log Plaid event payloads */ }
