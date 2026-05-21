@@ -422,6 +422,86 @@ class TestSettingsPageOAuthMarkup:
         html = self._settings_html(auth_client)
         assert "Plaid connection session expired" in html
 
+    def test_on_exit_reports_diagnostics_to_server(self, auth_client):
+        html = self._settings_html(auth_client)
+        # Plaid Link surfaces OAuth handoff failures only client-side. The
+        # template must forward whitelisted onExit diagnostics so the server
+        # log captures them.
+        assert "/api/v1/plaid/link-exit" in html
+        assert "reportLinkExit" in html
+        # Must surface Plaid's own display_message when available, not the
+        # generic fallback.
+        assert "display_message" in html
+        assert "formatLinkExitMessage" in html
+
+
+# ── Link exit diagnostics endpoint ─────────────────────────────────────────
+
+
+class TestLinkExitDiagnostics:
+    def test_endpoint_requires_login(self, client):
+        resp = client.post("/api/v1/plaid/link-exit", json={})
+        assert resp.status_code in (401, 403)
+
+    def test_endpoint_logs_whitelisted_fields(self, auth_client, flask_app, caplog):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        import logging as _logging
+        caplog.set_level(_logging.WARNING, logger="app.plaid_service")
+        resp = auth_client.post(
+            "/api/v1/plaid/link-exit",
+            json={
+                "error": {
+                    "error_type": "INVALID_FIELD",
+                    "error_code": "INVALID_FIELD",
+                    "error_message": "redirect_uri must be registered",
+                    "display_message": "Please contact support",
+                },
+                "metadata": {
+                    "status": "requires_credentials",
+                    "link_session_id": "ls-1",
+                    "request_id": "rq-1",
+                    "institution_name": "Bank of America",
+                },
+            },
+        )
+        assert resp.status_code == 204
+        text = "\n".join(r.getMessage() for r in caplog.records)
+        assert "INVALID_FIELD" in text
+        assert "redirect_uri must be registered" in text
+        assert "Bank of America" in text
+        # Must not log unexpected attacker-supplied keys.
+        assert "encrypted_access_token" not in text
+        assert "access_token" not in text
+
+    def test_endpoint_ignores_non_whitelisted_fields(
+        self, auth_client, flask_app, caplog
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        import logging as _logging
+        caplog.set_level(_logging.WARNING, logger="app.plaid_service")
+        resp = auth_client.post(
+            "/api/v1/plaid/link-exit",
+            json={
+                "error": {
+                    "error_type": "ITEM_ERROR",
+                    "secret_exfil": "should-not-appear",
+                    "access_token": "should-not-appear-either",
+                },
+                "metadata": {
+                    "status": "choose_device",
+                    "credit_card_number": "4111111111111111",
+                },
+            },
+        )
+        assert resp.status_code == 204
+        text = "\n".join(r.getMessage() for r in caplog.records)
+        assert "ITEM_ERROR" in text
+        assert "choose_device" in text
+        assert "should-not-appear" not in text
+        assert "4111111111111111" not in text
+
 
 # ── Exchange token ──────────────────────────────────────────────────────────
 

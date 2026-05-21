@@ -1080,6 +1080,53 @@
         } catch (e) {}
     }
 
+    function pickString(obj, key) {
+        if (!obj) return '';
+        var val = obj[key];
+        return typeof val === 'string' ? val : '';
+    }
+
+    function reportLinkExit(err, metadata) {
+        // Plaid Link surfaces failures (especially OAuth handoff issues for
+        // real banks in production) only in the browser. Forward a small,
+        // whitelisted set of fields so they land in the server log.
+        try {
+            var inst = (metadata && metadata.institution) || {};
+            var payload = {
+                error: {
+                    error_type: pickString(err, 'error_type'),
+                    error_code: pickString(err, 'error_code'),
+                    error_message: pickString(err, 'error_message'),
+                    display_message: pickString(err, 'display_message')
+                },
+                metadata: {
+                    status: pickString(metadata, 'status'),
+                    link_session_id: pickString(metadata, 'link_session_id'),
+                    request_id: pickString(metadata, 'request_id'),
+                    institution_name: pickString(inst, 'name')
+                }
+            };
+            fetchJSON('/api/v1/plaid/link-exit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } catch (e) { /* never let diagnostics break the UI */ }
+    }
+
+    function formatLinkExitMessage(err) {
+        var display = pickString(err, 'display_message');
+        if (display) return display;
+        var msg = pickString(err, 'error_message');
+        var code = pickString(err, 'error_code');
+        var type = pickString(err, 'error_type');
+        if (code && msg) return 'Plaid Link error (' + code + '): ' + msg;
+        if (msg) return 'Plaid Link error: ' + msg;
+        if (code) return 'Plaid Link error: ' + code;
+        if (type) return 'Plaid Link error: ' + type;
+        return 'Plaid Link did not complete. Please try again.';
+    }
+
     function buildHandlerConfig(linkToken, receivedRedirectUri) {
         var cfg = {
             token: linkToken,
@@ -1089,7 +1136,7 @@
                 // after the server-side exchange completes.
                 exchangePublicToken(public_token, metadata);
             },
-            onExit: function(err) {
+            onExit: function(err, metadata) {
                 setOAuthResume('');
                 clearOAuthLinkToken();
                 // Final handled exit: now safe to clean the OAuth params and
@@ -1097,7 +1144,8 @@
                 cleanupOAuthUrl();
                 clearOAuthResumeInProgress();
                 if (err) {
-                    setError('Plaid Link did not complete. Please try again.');
+                    reportLinkExit(err, metadata);
+                    setError(formatLinkExitMessage(err));
                 }
             },
             onEvent: function() { /* no-op; never log Plaid event payloads */ }

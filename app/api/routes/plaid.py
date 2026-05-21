@@ -25,6 +25,7 @@ from app.plaid_service import (
     create_link_token_for_user,
     exchange_public_token_for_user,
     get_plaid_connection_status,
+    log_plaid_link_exit_for_user,
     remove_plaid_connection_for_user,
     update_plaid_balance_for_user,
 )
@@ -75,6 +76,22 @@ def api_plaid_exchange_token():
     except PlaidServiceError as exc:
         return _service_error(exc)
     return api_ok(get_plaid_connection_status(user))
+
+
+@api.route("/plaid/link-exit", methods=["POST"])
+@api_login_required
+@limiter.limit("60 per hour")
+def api_plaid_link_exit():
+    """Record a client-side Plaid Link exit for server-side diagnostics.
+
+    Plaid Link surfaces OAuth handoff failures (common for real banks in
+    production) only in the browser. This endpoint accepts a small,
+    whitelisted subset of those fields and writes them to the server log.
+    """
+    user = get_api_user()
+    body = request.get_json(silent=True) or {}
+    log_plaid_link_exit_for_user(user, body)
+    return api_no_content()
 
 
 @api.route("/plaid/remove", methods=["POST", "DELETE"])
