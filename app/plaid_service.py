@@ -278,6 +278,78 @@ def create_link_token_for_user(user) -> str:
     return response.link_token
 
 
+# ── Link client-side event logging ───────────────────────────────────────────
+
+
+# Whitelisted fields we accept from the client. Plaid documents these as the
+# onExit error envelope and metadata; none of them carry credentials, access
+# tokens, or balances, so it is safe to write them to server logs.
+_LINK_EVENT_ERROR_FIELDS = (
+    "error_type",
+    "error_code",
+    "error_message",
+    "display_message",
+)
+_LINK_EVENT_METADATA_FIELDS = (
+    "status",
+    "link_session_id",
+    "request_id",
+    "institution_name",
+)
+
+
+def _sanitize_link_event_payload(payload: dict) -> dict:
+    """Pick only whitelisted, short string fields from a client-supplied payload."""
+    safe: dict = {}
+    if not isinstance(payload, dict):
+        return safe
+    err = payload.get("error")
+    if isinstance(err, dict):
+        for key in _LINK_EVENT_ERROR_FIELDS:
+            val = err.get(key)
+            if isinstance(val, str) and val:
+                safe[key] = val[:255]
+    meta = payload.get("metadata")
+    if isinstance(meta, dict):
+        for key in _LINK_EVENT_METADATA_FIELDS:
+            val = meta.get(key)
+            if isinstance(val, str) and val:
+                safe["metadata_" + key] = val[:255]
+    return safe
+
+
+def log_plaid_link_exit_for_user(user, payload: dict) -> None:
+    """Log client-reported Plaid Link exit diagnostics for a user.
+
+    Plaid Link reports failures (especially OAuth handoff problems for real
+    banks in production) entirely client-side; the server otherwise sees no
+    error. This bridges that gap by accepting a whitelisted subset of the
+    onExit ``err`` + ``metadata`` fields and emitting them to the server log.
+    """
+    safe = _sanitize_link_event_payload(payload or {})
+    if not safe:
+        logger.warning(
+            "Plaid Link exited with no recoverable diagnostics for user %s "
+            "(env=%s, products=%s, country_codes=%s, redirect_uri_set=%s)",
+            getattr(user, "id", None),
+            _config("PLAID_ENV"),
+            ",".join(get_configured_products()),
+            ",".join(get_configured_country_codes()),
+            bool(_config("PLAID_REDIRECT_URI")),
+        )
+        return
+    logger.warning(
+        "Plaid Link exit reported by user %s: %s "
+        "(env=%s, products=%s, country_codes=%s, redirect_uri_set=%s)",
+        getattr(user, "id", None),
+        ", ".join("%s=%s" % (k, v) for k, v in safe.items()),
+        _config("PLAID_ENV"),
+        ",".join(get_configured_products()),
+        ",".join(get_configured_country_codes()),
+        bool(_config("PLAID_REDIRECT_URI")),
+    )
+
+
 # ── Public token exchange ────────────────────────────────────────────────────
 
 
