@@ -36,6 +36,35 @@ def test_passkey_login_verify_without_challenge_redirects(client, monkeypatch):
     assert resp.headers["Location"].endswith("/passkey_login")
 
 
+def test_login_get_stashes_safe_next_in_session(client, monkeypatch):
+    # The Passkey button on /login navigates without a hidden form field, so the
+    # safe next path must survive in session for the post-passkey redirect.
+    monkeypatch.setattr(auth_module, "_passkey_enabled", lambda: True)
+
+    resp = client.get("/login?next=/settings%3Foauth_state_id%3Dabc")
+    assert resp.status_code == 200
+    with client.session_transaction() as sess:
+        assert sess.get("post_login_next") == "/settings?oauth_state_id=abc"
+
+
+def test_login_get_ignores_external_next(client, monkeypatch):
+    monkeypatch.setattr(auth_module, "_passkey_enabled", lambda: True)
+    resp = client.get("/login?next=https://evil.example.com/")
+    assert resp.status_code == 200
+    with client.session_transaction() as sess:
+        assert sess.get("post_login_next") is None
+
+
+def test_passkey_login_get_stashes_safe_next_in_session(client, monkeypatch):
+    monkeypatch.setattr(auth_module, "_WEBAUTHN_AVAILABLE", True)
+    monkeypatch.setattr(auth_module, "_passkey_enabled", lambda: True)
+
+    resp = client.get("/passkey_login?next=/settings%3Foauth_state_id%3Dabc")
+    assert resp.status_code == 200
+    with client.session_transaction() as sess:
+        assert sess.get("post_login_next") == "/settings?oauth_state_id=abc"
+
+
 def test_passkey_register_verify_creates_credential(client, app_ctx, monkeypatch):
     monkeypatch.setattr(auth_module, "_WEBAUTHN_AVAILABLE", True)
     monkeypatch.setattr(auth_module, "_passkey_enabled", lambda: True)

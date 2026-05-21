@@ -474,6 +474,35 @@ class TestLinkExitDiagnostics:
         assert "encrypted_access_token" not in text
         assert "access_token" not in text
 
+    def test_endpoint_scrubs_control_chars_to_prevent_log_injection(
+        self, auth_client, flask_app, caplog
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        import logging as _logging
+        caplog.set_level(_logging.WARNING, logger="app.plaid_service")
+        resp = auth_client.post(
+            "/api/v1/plaid/link-exit",
+            json={
+                "error": {
+                    "error_message": "real msg\nFORGED line",
+                    "error_code": "CODE\r\nINJECT",
+                },
+                "metadata": {
+                    "institution_name": "Bank\x00null\x1b[31m",
+                },
+            },
+        )
+        assert resp.status_code == 204
+        # Every emitted log record must be a single line — the attacker's
+        # CR/LF/NUL must not appear in the message body.
+        for record in caplog.records:
+            msg = record.getMessage()
+            assert "\n" not in msg
+            assert "\r" not in msg
+            assert "\x00" not in msg
+            assert "\x1b" not in msg
+
     def test_endpoint_ignores_non_whitelisted_fields(
         self, auth_client, flask_app, caplog
     ):
