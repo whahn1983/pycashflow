@@ -110,18 +110,23 @@ def _safe_next_path(raw_next: str | None) -> str | None:
 
 @auth.route('/login')
 def login():
-    next_url = _safe_next_path(request.args.get('next'))
+    raw_next = request.args.get('next')
+    next_url = _safe_next_path(raw_next)
     # Stash the safe next path in the session so it survives login methods
     # that don't carry hidden form fields — e.g. the Passkey button, which
     # navigates directly to /passkey_login. When this GET has no ``next``
-    # query param (the typical failed-attempt retry path, since
+    # query param at all (the typical failed-attempt retry path, since
     # ``login_post`` redirects back to ``/login`` without it), fall back to
     # any value already stashed so the original destination is preserved
-    # across retries.
+    # across retries. But if a ``next`` was explicitly supplied and is
+    # invalid/unsafe, drop the stale stash so a prior flow's destination
+    # can't bleed into this one.
     if next_url:
         session['post_login_next'] = next_url
-    else:
+    elif raw_next is None:
         next_url = _safe_next_path(session.get('post_login_next'))
+    else:
+        session.pop('post_login_next', None)
     return render_template(
         'login.html',
         passkey_enabled=_passkey_enabled(),
@@ -437,13 +442,18 @@ def login_passkey():
     if not _passkey_enabled():
         flash('Passkey authentication is not enabled.')
         return redirect(url_for('auth.login'))
-    next_url = _safe_next_path(request.args.get('next'))
+    raw_next = request.args.get('next')
+    next_url = _safe_next_path(raw_next)
     if next_url:
         session['post_login_next'] = next_url
-    # If no ``next`` is provided (e.g. the user clicked the "Sign In with
-    # Passkey" link from ``/login?next=/settings``, which doesn't forward
-    # the query param), leave any previously stashed value alone so the
-    # original post-login destination survives.
+    elif raw_next is not None:
+        # ``next`` was supplied but unsafe — clear any stale stash so a
+        # prior flow's destination can't carry over.
+        session.pop('post_login_next', None)
+    # If no ``next`` is provided at all (e.g. the user clicked the "Sign In
+    # with Passkey" link from ``/login?next=/settings``, which doesn't
+    # forward the query param), leave any previously stashed value alone
+    # so the original post-login destination survives.
     return render_template('passkey_login.html')
 
 

@@ -83,6 +83,36 @@ def test_login_get_preserves_stashed_next_without_query(client, monkeypatch):
         assert sess.get("post_login_next") == "/settings"
 
 
+def test_login_get_invalid_next_clears_stashed_value(client, monkeypatch):
+    # An explicit but unsafe ``next`` must not silently inherit a prior
+    # flow's stashed destination — that would redirect users to an
+    # unrelated page after auth.
+    monkeypatch.setattr(auth_module, "_passkey_enabled", lambda: True)
+
+    resp = client.get("/login?next=/settings")
+    assert resp.status_code == 200
+    with client.session_transaction() as sess:
+        assert sess.get("post_login_next") == "/settings"
+
+    resp = client.get("/login?next=https://evil.example.com/")
+    assert resp.status_code == 200
+    with client.session_transaction() as sess:
+        assert sess.get("post_login_next") is None
+
+
+def test_passkey_login_get_invalid_next_clears_stashed_value(client, monkeypatch):
+    monkeypatch.setattr(auth_module, "_WEBAUTHN_AVAILABLE", True)
+    monkeypatch.setattr(auth_module, "_passkey_enabled", lambda: True)
+
+    resp = client.get("/login?next=/settings")
+    assert resp.status_code == 200
+
+    resp = client.get("/passkey_login?next=https://evil.example.com/")
+    assert resp.status_code == 200
+    with client.session_transaction() as sess:
+        assert sess.get("post_login_next") is None
+
+
 def test_passkey_login_get_preserves_stashed_next_without_query(client, monkeypatch):
     # The "Sign In with Passkey" link on /login doesn't forward the ``next``
     # query parameter, so the stashed destination must persist.
