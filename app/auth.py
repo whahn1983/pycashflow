@@ -113,9 +113,13 @@ def login():
     next_url = _safe_next_path(request.args.get('next'))
     # Stash the safe next path in the session so it survives login methods
     # that don't carry hidden form fields — e.g. the Passkey button, which
-    # navigates directly to /passkey_login.
+    # navigates directly to /passkey_login. Clear any stale value when the
+    # current request has no valid ``next`` so an earlier attempt doesn't
+    # bleed into this one.
     if next_url:
         session['post_login_next'] = next_url
+    else:
+        session.pop('post_login_next', None)
     return render_template(
         'login.html',
         passkey_enabled=_passkey_enabled(),
@@ -434,6 +438,8 @@ def login_passkey():
     next_url = _safe_next_path(request.args.get('next'))
     if next_url:
         session['post_login_next'] = next_url
+    else:
+        session.pop('post_login_next', None)
     return render_template('passkey_login.html')
 
 
