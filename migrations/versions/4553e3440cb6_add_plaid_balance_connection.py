@@ -31,7 +31,7 @@ def upgrade():
     sa.Column('account_type', sa.String(length=50), nullable=True),
     sa.Column('account_subtype', sa.String(length=50), nullable=True),
     sa.Column('iso_currency_code', sa.String(length=10), nullable=True),
-    sa.Column('is_active', sa.Boolean(), server_default=sa.text('1'), nullable=False),
+    sa.Column('is_active', sa.Boolean(), server_default=sa.true(), nullable=False),
     sa.Column('last_balance_sync_at', sa.DateTime(), nullable=True),
     sa.Column('last_sync_status', sa.String(length=64), nullable=True),
     sa.Column('last_sync_error', sa.String(length=255), nullable=True),
