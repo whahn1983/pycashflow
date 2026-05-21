@@ -339,6 +339,89 @@ class TestSettingsPageOAuthMarkup:
         ):
             assert forbidden not in html
 
+    def test_settings_page_renders_with_oauth_return_params(self, auth_client):
+        # The exact landing URL Plaid uses after an OAuth bank redirect.
+        # Must render with 200 and preserve the query string for the JS.
+        resp = auth_client.get("/settings?plaid_oauth_return=1&oauth_state_id=test")
+        assert resp.status_code == 200
+        # Confirm the route did not redirect or strip the params before the
+        # template ran — the JS detection hooks must still be in the HTML.
+        html = resp.get_data(as_text=True)
+        assert "oauth_state_id" in html
+        assert "plaid_oauth_return" in html
+
+    def test_settings_route_does_not_redirect_on_oauth_query(self, auth_client):
+        # A GET to /settings with OAuth params must not 30x — that would
+        # strip oauth_state_id before window.location.href can capture it.
+        resp = auth_client.get(
+            "/settings?plaid_oauth_return=1&oauth_state_id=abc",
+            follow_redirects=False,
+        )
+        assert resp.status_code == 200
+
+    def test_resume_oauth_does_not_create_a_new_link_token(self, auth_client):
+        html = self._settings_html(auth_client)
+        # Pull just the resumeOAuth function body and make sure it does not
+        # call the link-token endpoint. The OAuth resume MUST reuse the
+        # link_token stored before the bank redirect.
+        marker = "function resumeOAuth"
+        idx = html.find(marker)
+        assert idx != -1, "resumeOAuth function not found in settings template"
+        # End at the next top-level function definition.
+        end = html.find("function removeConnection", idx)
+        assert end != -1
+        body = html[idx:end]
+        assert "/api/v1/plaid/link-token" not in body
+        # Confirm receivedRedirectUri is still wired up to window.location.href.
+        assert "receivedRedirectUri" in body
+        assert "window.location.href" in body
+
+    def test_start_link_stores_link_token_in_session_storage(self, auth_client):
+        html = self._settings_html(auth_client)
+        marker = "function startLink"
+        idx = html.find(marker)
+        assert idx != -1
+        end = html.find("function resumeOAuth", idx)
+        assert end != -1
+        body = html[idx:end]
+        # The first launch must persist the link_token before opening Link,
+        # otherwise OAuth resume has nothing to reuse.
+        assert "storeOAuthLinkToken" in body
+
+    def test_url_cleanup_is_deferred_until_exchange_or_exit(self, auth_client):
+        html = self._settings_html(auth_client)
+        # The cleanup function is allowed to exist, but resumeOAuth itself
+        # must NOT call it inline after handler.open(); the only legitimate
+        # callers are exchangePublicToken (success) and the onExit handler.
+        resume_start = html.find("function resumeOAuth")
+        resume_end = html.find("function removeConnection", resume_start)
+        assert resume_start != -1 and resume_end != -1
+        resume_body = html[resume_start:resume_end]
+        # Allow cleanupOAuthUrl in the no-link-token early-return branch,
+        # but make sure it does NOT appear after handler.open() in the
+        # normal-resume path.
+        open_idx = resume_body.find("handler.open()")
+        assert open_idx != -1
+        after_open = resume_body[open_idx:]
+        assert "cleanupOAuthUrl" not in after_open, (
+            "cleanupOAuthUrl must not run synchronously after handler.open(); "
+            "defer it to onSuccess or onExit so Plaid Link is not racing the URL."
+        )
+
+    def test_resume_in_progress_guard_present(self, auth_client):
+        html = self._settings_html(auth_client)
+        # Spec marker — guard exists to prevent duplicate Plaid.create() calls.
+        assert "pycashflow_plaid_oauth_resume_in_progress" in html
+
+    def test_completing_plaid_connection_message_present(self, auth_client):
+        html = self._settings_html(auth_client)
+        # User-facing resume status.
+        assert "Completing Plaid connection" in html
+
+    def test_session_expired_message_present(self, auth_client):
+        html = self._settings_html(auth_client)
+        assert "Plaid connection session expired" in html
+
 
 # ── Exchange token ──────────────────────────────────────────────────────────
 

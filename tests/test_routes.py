@@ -123,6 +123,29 @@ class TestSignupLinkBehavior:
         assert resp.status_code == 200
         assert b'href="/signup"' in resp.data
 
+    def test_login_preserves_safe_next_in_form(self, client):
+        # Plaid's OAuth return is a long /settings?...&oauth_state_id=... URL;
+        # we must round-trip it through the login form so the post-login
+        # redirect lands back on the OAuth-return URL.
+        resp = client.get("/login?next=/settings%3Foauth_state_id%3Dabc")
+        assert resp.status_code == 200
+        # Jinja autoescapes ? as &#63; or leaves as ? depending on context.
+        assert b"name=\"next\"" in resp.data
+        # Make sure the value contains /settings and the oauth_state_id token.
+        assert b"/settings" in resp.data
+        assert b"oauth_state_id" in resp.data
+
+    def test_login_rejects_external_next_url(self, client):
+        resp = client.get("/login?next=https://evil.example.com/")
+        assert resp.status_code == 200
+        # External URLs must not be reflected into the form value.
+        assert b"https://evil.example.com" not in resp.data
+
+    def test_login_rejects_protocol_relative_next(self, client):
+        resp = client.get("/login?next=//evil.example.com/path")
+        assert resp.status_code == 200
+        assert b"//evil.example.com" not in resp.data
+
     def test_login_create_account_uses_external_signup_url(self, client, app_ctx, text_settings_model):
         db = app_ctx
         text_settings_model.query.filter_by(name="external_signup_url").delete()

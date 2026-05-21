@@ -88,12 +88,34 @@ def _external_signup_url() -> str | None:
     return candidate
 
 
+def _safe_next_path(raw_next: str | None) -> str | None:
+    """Return ``raw_next`` if it is a safe relative path on this host.
+
+    Rejects absolute URLs, scheme/netloc redirects, and anything outside
+    a leading "/" path. The full path + query string is preserved so flows
+    like Plaid's OAuth return (``/settings?oauth_state_id=...``) survive a
+    detour through ``/login``.
+    """
+    if not raw_next:
+        return None
+    if not isinstance(raw_next, str):
+        return None
+    if not raw_next.startswith('/') or raw_next.startswith('//'):
+        return None
+    parsed = urlparse(raw_next)
+    if parsed.scheme or parsed.netloc:
+        return None
+    return raw_next
+
+
 @auth.route('/login')
 def login():
+    next_url = _safe_next_path(request.args.get('next'))
     return render_template(
         'login.html',
         passkey_enabled=_passkey_enabled(),
         external_signup_url=_external_signup_url(),
+        next_url=next_url,
     )
 
 
@@ -160,6 +182,14 @@ def login_post():
         flash('Your account is pending approval. Please contact an administrator.')
         return redirect(url_for('auth.login'))
 
+    # Preserve a safe ``next`` URL across the (optional) 2FA step so flows
+    # like the Plaid OAuth redirect can land back on ``/settings?...``.
+    next_url = _safe_next_path(request.form.get('next') or request.args.get('next'))
+    if next_url:
+        session['post_login_next'] = next_url
+    else:
+        session.pop('post_login_next', None)
+
     # If 2FA is enabled, redirect to TOTP verification step
     if user.twofa_enabled:
         session['twofa_pending_user_id'] = user.id
@@ -171,6 +201,9 @@ def login_post():
     session['name'] = user.name
     session['email'] = user.email
 
+    next_target = _safe_next_path(session.pop('post_login_next', None))
+    if next_target:
+        return redirect(next_target)
     return redirect(url_for('main.index'))
 
 
@@ -224,6 +257,9 @@ def login_2fa_post():
     session['name'] = user.name
     session['email'] = user.email
 
+    next_target = _safe_next_path(session.pop('post_login_next', None))
+    if next_target:
+        return redirect(next_target)
     return redirect(url_for('main.index'))
 
 

@@ -483,18 +483,27 @@ PLAID_REDIRECT_URI=          # required for OAuth institutions (Chase, etc.)
 
 Some institutions (e.g. Chase) require Plaid's OAuth redirect flow. For these:
 
-- `PLAID_REDIRECT_URI` must be set to a fully-qualified URL pointing back to
-  the PyCashFlow web settings page, for example:
-  `https://app.example.com/settings?plaid_oauth_return=1`
-- The **exact same URI** must also be added to the allowed redirect URIs in
-  your [Plaid Dashboard](https://dashboard.plaid.com). A mismatch (or a
-  missing entry) will cause OAuth institutions to fail to complete the Link
-  flow.
+- `PLAID_REDIRECT_URI` must be set to a fully-qualified HTTPS URL pointing
+  back to the PyCashFlow web settings page. Any of these forms work:
+  - `https://app.example.com/settings`
+  - `https://app.example.com/settings?plaid_oauth_return=1`
+
+  Any query string and fragment are stripped before the URL is sent to
+  Plaid's `/link/token/create` (Plaid's redirect_uri field does not accept
+  query parameters), so the value that actually reaches Plaid is always the
+  bare path, e.g. `https://app.example.com/settings`.
+- In the [Plaid Dashboard](https://dashboard.plaid.com), allowlist that
+  **bare** URL (without any query string). It must be an exact match,
+  otherwise Plaid will refuse to redirect OAuth users back.
+- On the way back, Plaid appends `oauth_state_id=...` to the URL. The
+  settings page must preserve that query parameter long enough for Plaid
+  Link to resume — see the next bullet.
 - After the bank redirect, the settings page detects the `oauth_state_id`
   query parameter, reopens the Plaid modal automatically, and resumes Plaid
-  Link using the original `link_token` (kept in `sessionStorage`) and the
-  return URL as `receivedRedirectUri`. The user does not need to click
-  Connect again.
+  Link using the original `link_token` (kept in `sessionStorage`/
+  `localStorage`) and `window.location.href` as `receivedRedirectUri`. The
+  user does not need to click Connect again. The URL is cleaned only after
+  the public-token exchange completes (or Plaid Link is exited).
 - iOS Plaid setup is intentionally **not** supported in this phase. Users
   must connect Plaid from the web settings page.
 
@@ -538,18 +547,26 @@ After deploying changes, verify the Plaid flow end-to-end:
 
 - [ ] Set `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, `PLAID_PRODUCTS`,
   `PLAID_COUNTRY_CODES`, and (for OAuth) `PLAID_REDIRECT_URI`.
-- [ ] Add the exact `PLAID_REDIRECT_URI` value to the Plaid Dashboard
-  allowed redirect URIs.
+- [ ] Add the **bare** `PLAID_REDIRECT_URI` value (path only, no query
+  string) to the Plaid Dashboard allowed redirect URIs.
 - [ ] Open the web Settings page → **Plaid Balance Sync** card → **Connect
   Plaid Account**.
 - [ ] Test a non-OAuth sandbox institution (e.g. "First Platypus Bank")
   and confirm the connection completes inline.
 - [ ] Test an OAuth sandbox institution (e.g. Plaid's "OAuth Bank") and
   confirm the browser is redirected to Plaid, then back to PyCashFlow.
-- [ ] Confirm the user lands on the Settings page and the Plaid modal
-  re-opens automatically with "Completing Plaid connection…".
-- [ ] Confirm `public_token` is exchanged and the connected account row
-  appears in the Plaid card.
+- [ ] Confirm the browser lands on `/settings?...&oauth_state_id=...`
+  (the `oauth_state_id` query parameter must still be present in the URL
+  bar when the page renders).
+- [ ] Confirm the Plaid modal re-opens automatically with
+  "Completing Plaid connection…".
+- [ ] Confirm Link resumes automatically (no second click on Connect).
+- [ ] Confirm `onSuccess` fires and the `public_token` is exchanged.
+- [ ] Confirm the connected account row appears in the Plaid card.
+- [ ] Confirm the URL is cleaned only **after** the connection completes
+  (no `oauth_state_id` left over once the card shows the new account).
+- [ ] Confirm no access tokens or public tokens appear in the browser
+  console or server logs.
 - [ ] Confirm no iOS changes are required — iOS Plaid Link is not
   supported in this phase.
 

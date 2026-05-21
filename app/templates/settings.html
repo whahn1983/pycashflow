@@ -1005,6 +1005,10 @@
                 setError((r.body && r.body.error) || 'Could not save Plaid connection.');
             }
             setOAuthResume('');
+            // Strip oauth_state_id / plaid_oauth_return only after Plaid Link has
+            // fully consumed the redirect and the exchange has completed.
+            cleanupOAuthUrl();
+            clearOAuthResumeInProgress();
             loadStatus();
         });
     }
@@ -1013,6 +1017,22 @@
     var PLAID_OAUTH_LINK_TOKEN_LEGACY_KEY = PLAID_OAUTH_LINK_TOKEN_KEY_PREFIX;
     var PLAID_OAUTH_LINK_TOKEN_KEY =
         PLAID_OAUTH_LINK_TOKEN_KEY_PREFIX + '.u{{ current_user.id }}';
+    // Per-page-load guard against duplicate resume attempts (e.g. if the
+    // modal handler fires more than once). Lives in closure so a refresh
+    // gives the user a fresh shot at resuming.
+    var pycashflow_plaid_oauth_resume_in_progress = false;
+
+    function markOAuthResumeInProgress() {
+        pycashflow_plaid_oauth_resume_in_progress = true;
+    }
+
+    function isOAuthResumeInProgress() {
+        return pycashflow_plaid_oauth_resume_in_progress === true;
+    }
+
+    function clearOAuthResumeInProgress() {
+        pycashflow_plaid_oauth_resume_in_progress = false;
+    }
 
     function storeOAuthLinkToken(linkToken) {
         try {
@@ -1065,11 +1085,17 @@
             token: linkToken,
             onSuccess: function(public_token, metadata) {
                 clearOAuthLinkToken();
+                // exchangePublicToken handles URL cleanup + resume flag clear
+                // after the server-side exchange completes.
                 exchangePublicToken(public_token, metadata);
             },
             onExit: function(err) {
                 setOAuthResume('');
                 clearOAuthLinkToken();
+                // Final handled exit: now safe to clean the OAuth params and
+                // release the resume guard so the user can retry from scratch.
+                cleanupOAuthUrl();
+                clearOAuthResumeInProgress();
                 if (err) {
                     setError('Plaid Link did not complete. Please try again.');
                 }
@@ -1099,25 +1125,35 @@
     }
 
     function resumeOAuth() {
+        // Skip if a resume is already underway in this session — prevents
+        // a second Plaid.create() if the modal handler fires twice.
+        if (isOAuthResumeInProgress()) return;
+        markOAuthResumeInProgress();
+
         if (typeof Plaid === 'undefined' || !Plaid.create) {
             setError('Plaid Link script failed to load.');
+            clearOAuthResumeInProgress();
             return;
         }
         setOAuthResume('Completing Plaid connection…');
         var linkToken = loadOAuthLinkToken();
         if (!linkToken) {
             setOAuthResume('');
-            setError('Your Plaid session expired. Please start the connection again.');
+            setError('Plaid connection session expired. Please start the connection again.');
             cleanupOAuthUrl();
+            clearOAuthResumeInProgress();
             return;
         }
+        // Capture window.location.href BEFORE any URL mutation so Plaid.create
+        // receives the original returned URL including oauth_state_id.
+        var receivedRedirectUri = window.location.href;
         var handler = Plaid.create(
-            buildHandlerConfig(linkToken, window.location.href)
+            buildHandlerConfig(linkToken, receivedRedirectUri)
         );
         handler.open();
-        // The bank-supplied params have served their purpose; clean them up
-        // now that Plaid Link has the URL it needed.
-        cleanupOAuthUrl();
+        // URL cleanup is deferred to onSuccess/onExit. Do NOT call
+        // history.replaceState here — Plaid Link may still race against
+        // the URL during the handoff.
     }
 
     function removeConnection() {
