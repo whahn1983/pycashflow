@@ -429,10 +429,11 @@ class TestSettingsPageOAuthMarkup:
         # log captures them.
         assert "/api/v1/plaid/link-exit" in html
         assert "reportLinkExit" in html
-        # Must surface Plaid's own display_message when available, not the
-        # generic fallback.
         assert "display_message" in html
-        assert "formatLinkExitMessage" in html
+        # User-facing message stays generic; detailed error fields go only
+        # to the server log.
+        assert "Plaid Link did not complete. Please try again." in html
+        assert "formatLinkExitMessage" not in html
 
 
 # ── Link exit diagnostics endpoint ─────────────────────────────────────────
