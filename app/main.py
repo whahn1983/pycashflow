@@ -34,7 +34,10 @@ from .ai_insights import (
     validate_model,
 )
 from .password_setup import create_password_setup_link
-from .plaid_service import safe_update_plaid_balance_for_user
+from .plaid_service import (
+    safe_update_plaid_balance_for_user,
+    remove_plaid_connections_for_user_ids,
+)
 from .totp_utils import (
     generate_totp_secret, encrypt_totp_secret, decrypt_totp_secret,
     generate_qr_code_b64, verify_totp,
@@ -902,6 +905,12 @@ def _cascade_delete_user(user):
     guest_ids = [
         guest_id for (guest_id,) in db.session.query(User.id).filter_by(account_owner_id=user_id).all()
     ]
+
+    # Best-effort: tell Plaid the Items are gone so we stop being billed for
+    # the Transactions subscription. Must run before the bulk delete clears
+    # PlaidConnection rows (we need the access tokens).
+    remove_plaid_connections_for_user_ids([user_id] + guest_ids)
+
     _delete_user_owned_rows(guest_ids)
     if guest_ids:
         db.session.query(User).filter(User.id.in_(guest_ids)).delete(synchronize_session=False)
