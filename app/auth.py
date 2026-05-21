@@ -113,13 +113,15 @@ def login():
     next_url = _safe_next_path(request.args.get('next'))
     # Stash the safe next path in the session so it survives login methods
     # that don't carry hidden form fields — e.g. the Passkey button, which
-    # navigates directly to /passkey_login. Clear any stale value when the
-    # current request has no valid ``next`` so an earlier attempt doesn't
-    # bleed into this one.
+    # navigates directly to /passkey_login. When this GET has no ``next``
+    # query param (the typical failed-attempt retry path, since
+    # ``login_post`` redirects back to ``/login`` without it), fall back to
+    # any value already stashed so the original destination is preserved
+    # across retries.
     if next_url:
         session['post_login_next'] = next_url
     else:
-        session.pop('post_login_next', None)
+        next_url = _safe_next_path(session.get('post_login_next'))
     return render_template(
         'login.html',
         passkey_enabled=_passkey_enabled(),
@@ -438,8 +440,10 @@ def login_passkey():
     next_url = _safe_next_path(request.args.get('next'))
     if next_url:
         session['post_login_next'] = next_url
-    else:
-        session.pop('post_login_next', None)
+    # If no ``next`` is provided (e.g. the user clicked the "Sign In with
+    # Passkey" link from ``/login?next=/settings``, which doesn't forward
+    # the query param), leave any previously stashed value alone so the
+    # original post-login destination survives.
     return render_template('passkey_login.html')
 
 

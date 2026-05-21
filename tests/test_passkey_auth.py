@@ -65,6 +65,39 @@ def test_passkey_login_get_stashes_safe_next_in_session(client, monkeypatch):
         assert sess.get("post_login_next") == "/settings?oauth_state_id=abc"
 
 
+def test_login_get_preserves_stashed_next_without_query(client, monkeypatch):
+    # Failed login attempts redirect back to /login without the ``next``
+    # query parameter; the previously stashed destination must survive so a
+    # successful retry still lands on the original page.
+    monkeypatch.setattr(auth_module, "_passkey_enabled", lambda: True)
+
+    resp = client.get("/login?next=/settings")
+    assert resp.status_code == 200
+    with client.session_transaction() as sess:
+        assert sess.get("post_login_next") == "/settings"
+
+    resp = client.get("/login")
+    assert resp.status_code == 200
+    assert b'name="next" value="/settings"' in resp.data
+    with client.session_transaction() as sess:
+        assert sess.get("post_login_next") == "/settings"
+
+
+def test_passkey_login_get_preserves_stashed_next_without_query(client, monkeypatch):
+    # The "Sign In with Passkey" link on /login doesn't forward the ``next``
+    # query parameter, so the stashed destination must persist.
+    monkeypatch.setattr(auth_module, "_WEBAUTHN_AVAILABLE", True)
+    monkeypatch.setattr(auth_module, "_passkey_enabled", lambda: True)
+
+    resp = client.get("/login?next=/settings")
+    assert resp.status_code == 200
+
+    resp = client.get("/passkey_login")
+    assert resp.status_code == 200
+    with client.session_transaction() as sess:
+        assert sess.get("post_login_next") == "/settings"
+
+
 def test_passkey_register_verify_creates_credential(client, app_ctx, monkeypatch):
     monkeypatch.setattr(auth_module, "_WEBAUTHN_AVAILABLE", True)
     monkeypatch.setattr(auth_module, "_passkey_enabled", lambda: True)
