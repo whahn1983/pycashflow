@@ -11,6 +11,7 @@ payloads to callers, and it never logs them either.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime, timezone
 from typing import Optional
 from urllib.parse import urlsplit, urlunsplit
@@ -298,6 +299,15 @@ _LINK_EVENT_METADATA_FIELDS = (
 )
 
 
+# Strip ASCII control characters (incl. CR/LF) so a client-supplied value
+# cannot inject forged log lines when interpolated into a single-line warning.
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _scrub_log_value(val: str) -> str:
+    return _CONTROL_CHARS_RE.sub(" ", val)[:255]
+
+
 def _sanitize_link_event_payload(payload: dict) -> dict:
     """Pick only whitelisted, short string fields from a client-supplied payload."""
     safe: dict = {}
@@ -308,13 +318,13 @@ def _sanitize_link_event_payload(payload: dict) -> dict:
         for key in _LINK_EVENT_ERROR_FIELDS:
             val = err.get(key)
             if isinstance(val, str) and val:
-                safe[key] = val[:255]
+                safe[key] = _scrub_log_value(val)
     meta = payload.get("metadata")
     if isinstance(meta, dict):
         for key in _LINK_EVENT_METADATA_FIELDS:
             val = meta.get(key)
             if isinstance(val, str) and val:
-                safe["metadata_" + key] = val[:255]
+                safe["metadata_" + key] = _scrub_log_value(val)
     return safe
 
 

@@ -111,6 +111,11 @@ def _safe_next_path(raw_next: str | None) -> str | None:
 @auth.route('/login')
 def login():
     next_url = _safe_next_path(request.args.get('next'))
+    # Stash the safe next path in the session so it survives login methods
+    # that don't carry hidden form fields — e.g. the Passkey button, which
+    # navigates directly to /passkey_login.
+    if next_url:
+        session['post_login_next'] = next_url
     return render_template(
         'login.html',
         passkey_enabled=_passkey_enabled(),
@@ -426,6 +431,9 @@ def login_passkey():
     if not _passkey_enabled():
         flash('Passkey authentication is not enabled.')
         return redirect(url_for('auth.login'))
+    next_url = _safe_next_path(request.args.get('next'))
+    if next_url:
+        session['post_login_next'] = next_url
     return render_template('passkey_login.html')
 
 
@@ -516,6 +524,9 @@ def login_passkey_post():
     session['name'] = user.name
     session['email'] = user.email
 
+    next_target = _safe_next_path(session.pop('post_login_next', None))
+    if next_target:
+        return redirect(next_target)
     return redirect(url_for('main.index'))
 
 
