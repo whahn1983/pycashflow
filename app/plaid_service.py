@@ -595,10 +595,8 @@ def update_plaid_balance_for_user(user) -> dict:
         return result
 
     from plaid.exceptions import ApiException
-    from plaid.model.accounts_balance_get_request import AccountsBalanceGetRequest
-    from plaid.model.accounts_balance_get_request_options import (
-        AccountsBalanceGetRequestOptions,
-    )
+    from plaid.model.accounts_get_request import AccountsGetRequest
+    from plaid.model.accounts_get_request_options import AccountsGetRequestOptions
 
     try:
         access_token = decrypt_password(conn.encrypted_access_token)
@@ -611,17 +609,21 @@ def update_plaid_balance_for_user(user) -> dict:
             cache[user.id] = result
         return result
 
+    # Use /accounts/get rather than /accounts/balance/get: the latter requires
+    # the "balance" product authorization, while /accounts/get is included
+    # with "transactions" and returns the same available/current balance
+    # fields (refreshed as part of regular transaction sync).
     try:
         client = _plaid_client()
-        request = AccountsBalanceGetRequest(
+        request = AccountsGetRequest(
             access_token=access_token,
-            options=AccountsBalanceGetRequestOptions(account_ids=[conn.plaid_account_id]),
+            options=AccountsGetRequestOptions(account_ids=[conn.plaid_account_id]),
         )
-        response = client.accounts_balance_get(request)
+        response = client.accounts_get(request)
     except ApiException as exc:
         info = _plaid_error_info(exc)
         logger.warning(
-            "Plaid accounts_balance_get failed for user %s "
+            "Plaid accounts_get failed for user %s "
             "(request_id=%s, error_type=%s, error_code=%s, error_message=%s)",
             user.id,
             info.get("request_id"),
@@ -636,7 +638,7 @@ def update_plaid_balance_for_user(user) -> dict:
             cache[user.id] = result
         return result
     except Exception:
-        logger.exception("Unexpected error calling Plaid balance API for user %s", user.id)
+        logger.exception("Unexpected error calling Plaid accounts API for user %s", user.id)
         _record_sync_status(conn, "unexpected_error", "Unexpected Plaid error.")
         try:
             db.session.commit()

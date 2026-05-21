@@ -741,7 +741,7 @@ class TestUpdateBalance:
             _add_connection(plaid_user)
             user = User.query.get(plaid_user)
             with patch.object(plaid_service, "_plaid_client") as mock_client:
-                mock_client.return_value.accounts_balance_get.return_value = (
+                mock_client.return_value.accounts_get.return_value = (
                     _make_balances_response("acct-1", available=500.25, current=600.00)
                 )
                 result = plaid_service.update_plaid_balance_for_user(user)
@@ -760,7 +760,7 @@ class TestUpdateBalance:
             _add_connection(plaid_user)
             user = User.query.get(plaid_user)
             with patch.object(plaid_service, "_plaid_client") as mock_client:
-                mock_client.return_value.accounts_balance_get.return_value = (
+                mock_client.return_value.accounts_get.return_value = (
                     _make_balances_response("acct-1", available=None, current=800.10)
                 )
                 result = plaid_service.update_plaid_balance_for_user(user)
@@ -781,7 +781,7 @@ class TestUpdateBalance:
 
             user = User.query.get(plaid_user)
             with patch.object(plaid_service, "_plaid_client") as mock_client:
-                mock_client.return_value.accounts_balance_get.return_value = (
+                mock_client.return_value.accounts_get.return_value = (
                     _make_balances_response("acct-1", available=None, current=None)
                 )
                 result = plaid_service.update_plaid_balance_for_user(user)
@@ -809,7 +809,7 @@ class TestUpdateBalance:
 
             user = User.query.get(plaid_user)
             with patch.object(plaid_service, "_plaid_client") as mock_client:
-                mock_client.return_value.accounts_balance_get.return_value = (
+                mock_client.return_value.accounts_get.return_value = (
                     _make_balances_response("acct-1", available=250.0, current=300.0)
                 )
                 plaid_service.update_plaid_balance_for_user(user)
@@ -825,7 +825,7 @@ class TestUpdateBalance:
             _add_connection(plaid_user)
             user = User.query.get(plaid_user)
             with patch.object(plaid_service, "_plaid_client") as mock_client:
-                mock_client.return_value.accounts_balance_get.return_value = (
+                mock_client.return_value.accounts_get.return_value = (
                     _make_balances_response("acct-1", available=42.0, current=None)
                 )
                 plaid_service.update_plaid_balance_for_user(user)
@@ -843,7 +843,7 @@ class TestUpdateBalance:
             _add_connection(plaid_user)
             user = User.query.get(plaid_user)
             with patch.object(plaid_service, "_plaid_client") as mock_client:
-                mock_client.return_value.accounts_balance_get.side_effect = RuntimeError(
+                mock_client.return_value.accounts_get.side_effect = RuntimeError(
                     "boom"
                 )
                 # Must not raise.
