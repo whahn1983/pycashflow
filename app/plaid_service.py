@@ -498,42 +498,79 @@ def exchange_public_token_for_user(user, public_token: str, metadata: dict) -> P
 # ── Remove connection ────────────────────────────────────────────────────────
 
 
+def _detach_plaid_item(conn: PlaidConnection) -> None:
+    """Best-effort call to Plaid's /item/remove for ``conn``. Never raises.
+
+    Calling /item/remove ends the Plaid Transactions subscription for the
+    underlying Item; skipping this step means Plaid keeps billing us for the
+    Item even after the local record is gone.
+    """
+    if not plaid_is_configured():
+        return
+
+    from plaid.exceptions import ApiException
+    from plaid.model.item_remove_request import ItemRemoveRequest
+
+    try:
+        access_token = decrypt_password(conn.encrypted_access_token)
+        client = _plaid_client()
+        client.item_remove(ItemRemoveRequest(access_token=access_token))
+    except ApiException as exc:
+        info = _plaid_error_info(exc)
+        logger.warning(
+            "Plaid item_remove failed for user %s connection %s "
+            "(request_id=%s, error_type=%s, error_code=%s, error_message=%s); "
+            "deleting local record anyway",
+            conn.user_id,
+            conn.id,
+            info.get("request_id"),
+            info.get("error_type"),
+            info.get("error_code"),
+            info.get("error_message"),
+        )
+    except Exception:
+        logger.exception(
+            "Unexpected error calling Plaid item_remove for user %s connection %s; "
+            "deleting local record anyway",
+            conn.user_id,
+            conn.id,
+        )
+
+
 def remove_plaid_connection_for_user(user) -> bool:
     """Remove the active Plaid connection for ``user``. Returns True if removed."""
     conn = get_active_connection(user)
     if conn is None:
         return False
 
-    # Best-effort call to /item/remove; never propagate raw errors to caller.
-    if plaid_is_configured():
-        from plaid.exceptions import ApiException
-        from plaid.model.item_remove_request import ItemRemoveRequest
-
-        try:
-            access_token = decrypt_password(conn.encrypted_access_token)
-            client = _plaid_client()
-            client.item_remove(ItemRemoveRequest(access_token=access_token))
-        except ApiException as exc:
-            info = _plaid_error_info(exc)
-            logger.warning(
-                "Plaid item_remove failed for user %s "
-                "(request_id=%s, error_type=%s, error_code=%s, error_message=%s); "
-                "deleting local record anyway",
-                user.id,
-                info.get("request_id"),
-                info.get("error_type"),
-                info.get("error_code"),
-                info.get("error_message"),
-            )
-        except Exception:
-            logger.exception(
-                "Unexpected error calling Plaid item_remove for user %s; deleting local record anyway",
-                user.id,
-            )
-
+    _detach_plaid_item(conn)
     db.session.delete(conn)
     db.session.commit()
     return True
+
+
+def remove_plaid_connections_for_user_ids(user_ids, *, commit: bool = False) -> int:
+    """Remove every PlaidConnection owned by the given user IDs.
+
+    For each row, best-effort calls Plaid's /item/remove (so we stop being
+    billed for the Item's Transactions subscription) and then deletes the
+    local record. Returns the number of rows removed. Caller is responsible
+    for committing the session unless ``commit=True``.
+    """
+    if not user_ids:
+        return 0
+
+    connections = (
+        PlaidConnection.query.filter(PlaidConnection.user_id.in_(list(user_ids))).all()
+    )
+    for conn in connections:
+        _detach_plaid_item(conn)
+        db.session.delete(conn)
+
+    if commit and connections:
+        db.session.commit()
+
+    return len(connections)
 
 
 # ── Balance update ───────────────────────────────────────────────────────────

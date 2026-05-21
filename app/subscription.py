@@ -13,6 +13,7 @@ from flask import current_app
 
 from app import db
 from app.models import Subscription, User
+from app.plaid_service import remove_plaid_connections_for_user_ids
 
 
 logger = logging.getLogger(__name__)
@@ -196,6 +197,12 @@ def apply_subscription_status(
         user.is_active = False
 
     db.session.add(user)
+
+    # If the user just lost active status, detach their Plaid Items so we
+    # stop being billed for the Plaid Transactions subscription.
+    if old_active and not user.is_active:
+        remove_plaid_connections_for_user_ids([user.id])
+
     if commit:
         db.session.commit()
     logger.info(
@@ -266,7 +273,9 @@ def enforce_user_access(user: User | None) -> bool:
             db.session.commit()
         return True
 
-    changed = _expire_user(owner)
+    deactivated_ids: list[int] = []
+    if _expire_user(owner):
+        deactivated_ids.append(owner.id)
 
     # Guests inherit owner status; mark inactive for consistency in admin UIs.
     guests = User.query.filter(
@@ -275,7 +284,14 @@ def enforce_user_access(user: User | None) -> bool:
     for guest in guests:
         if guest.is_active:
             guest.is_active = False
-            changed = True
+            deactivated_ids.append(guest.id)
+
+    changed = bool(deactivated_ids)
+
+    # Detach Plaid Items for any user that just lost access so Plaid stops
+    # billing us for the Transactions subscription on their Item.
+    if deactivated_ids:
+        remove_plaid_connections_for_user_ids(deactivated_ids)
 
     if changed:
         db.session.commit()

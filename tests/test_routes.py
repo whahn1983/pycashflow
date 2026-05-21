@@ -18,7 +18,10 @@ import pytest
 import importlib
 import json
 from datetime import datetime, timezone
+from unittest.mock import patch
 from werkzeug.security import generate_password_hash
+
+from app.crypto_utils import encrypt_password
 
 
 
@@ -520,6 +523,191 @@ def test_delete_my_account_blocks_global_admin(
     assert "/settings" in resp.headers.get("Location", "")
     # The admin account must still exist after the blocked self-delete attempt.
     assert user_model.query.filter_by(id=admin_id).first() is not None
+
+
+def _enable_plaid(flask_app):
+    flask_app.config.update(
+        PLAID_CLIENT_ID="client-id",
+        PLAID_SECRET="secret",
+        PLAID_ENV="sandbox",
+        PLAID_PRODUCTS="auth",
+        PLAID_COUNTRY_CODES="US",
+        PLAID_REDIRECT_URI="",
+    )
+
+
+def _disable_plaid(flask_app):
+    for k in (
+        "PLAID_CLIENT_ID",
+        "PLAID_SECRET",
+        "PLAID_ENV",
+        "PLAID_PRODUCTS",
+        "PLAID_REDIRECT_URI",
+    ):
+        flask_app.config[k] = ""
+
+
+def test_delete_user_calls_plaid_item_remove(
+    auth_client, flask_app, app_ctx, user_model, plaid_connection_model, plaid_service_module
+):
+    """Removing a user must tell Plaid so we stop paying for the Item."""
+    db = app_ctx
+    acting_admin = user_model.query.filter_by(email="admin@test.local").first()
+    acting_admin.is_global_admin = True
+    db.session.flush()
+
+    owner = user_model(
+        email="owner-plaid-delete@test.local",
+        password=generate_password_hash("testpass123", method="scrypt"),
+        name="Owner With Plaid",
+        admin=True,
+        is_active=True,
+        account_owner_id=None,
+        is_global_admin=False,
+    )
+    db.session.add(owner)
+    db.session.flush()
+
+    guest = user_model(
+        email="guest-plaid-delete@test.local",
+        password=generate_password_hash("testpass123", method="scrypt"),
+        name="Guest With Plaid",
+        admin=False,
+        is_active=True,
+        account_owner_id=owner.id,
+        is_global_admin=False,
+    )
+    db.session.add(guest)
+    db.session.flush()
+
+    db.session.add(plaid_connection_model(
+        user_id=owner.id,
+        encrypted_access_token=encrypt_password("access-owner"),
+        plaid_item_id="item-owner",
+        plaid_account_id="acct-owner",
+        is_active=True,
+    ))
+    db.session.add(plaid_connection_model(
+        user_id=guest.id,
+        encrypted_access_token=encrypt_password("access-guest"),
+        plaid_item_id="item-guest",
+        plaid_account_id="acct-guest",
+        is_active=True,
+    ))
+    db.session.commit()
+
+    owner_id = owner.id
+    guest_id = guest.id
+
+    _enable_plaid(flask_app)
+    try:
+        with patch.object(plaid_service_module, "_plaid_client") as mock_client:
+            resp = auth_client.post(f"/delete_user/{owner_id}", follow_redirects=False)
+            assert resp.status_code in (301, 302)
+            assert mock_client.return_value.item_remove.call_count == 2
+    finally:
+        _disable_plaid(flask_app)
+
+    assert user_model.query.filter_by(id=owner_id).first() is None
+    assert user_model.query.filter_by(id=guest_id).first() is None
+    assert plaid_connection_model.query.filter_by(user_id=owner_id).count() == 0
+    assert plaid_connection_model.query.filter_by(user_id=guest_id).count() == 0
+
+
+def test_subscription_expired_removes_plaid_connection(
+    flask_app, app_ctx, user_model, plaid_connection_model, plaid_service_module
+):
+    """When apply_subscription_status flips a user to inactive due to an
+    expired subscription, their Plaid Item must be detached so Plaid stops
+    charging us."""
+    from app.subscription import apply_subscription_status, SUB_EXPIRED
+
+    db = app_ctx
+    owner = user_model(
+        email="owner-sub-lapse@test.local",
+        password=generate_password_hash("testpass123", method="scrypt"),
+        name="Lapsed Owner",
+        admin=True,
+        is_active=True,
+        account_owner_id=None,
+        is_global_admin=False,
+    )
+    db.session.add(owner)
+    db.session.flush()
+    db.session.add(plaid_connection_model(
+        user_id=owner.id,
+        encrypted_access_token=encrypt_password("access-lapse"),
+        plaid_item_id="item-lapse",
+        plaid_account_id="acct-lapse",
+        is_active=True,
+    ))
+    db.session.commit()
+    owner_id = owner.id
+
+    _enable_plaid(flask_app)
+    try:
+        with patch.object(plaid_service_module, "_plaid_client") as mock_client:
+            apply_subscription_status(
+                owner,
+                status=SUB_EXPIRED,
+                source="apple",
+                subscription_id="txn-1",
+                activate=False,
+            )
+            assert mock_client.return_value.item_remove.call_count == 1
+    finally:
+        _disable_plaid(flask_app)
+
+    refreshed = user_model.query.filter_by(id=owner_id).first()
+    assert refreshed is not None
+    assert refreshed.is_active is False
+    assert plaid_connection_model.query.filter_by(user_id=owner_id).count() == 0
+
+
+def test_enforce_user_access_removes_plaid_on_expiry(
+    flask_app, app_ctx, user_model, plaid_connection_model, plaid_service_module
+):
+    """enforce_user_access flips owners + guests to inactive when the owner's
+    subscription is no longer current; Plaid Items must be detached for any
+    user that just lost access."""
+    from app.subscription import enforce_user_access
+
+    db = app_ctx
+    flask_app.config["PAYMENTS_ENABLED"] = True
+    try:
+        owner = user_model(
+            email="owner-enforce-lapse@test.local",
+            password=generate_password_hash("testpass123", method="scrypt"),
+            name="Enforce Lapse Owner",
+            admin=True,
+            is_active=True,
+            account_owner_id=None,
+            is_global_admin=False,
+        )
+        db.session.add(owner)
+        db.session.flush()
+        db.session.add(plaid_connection_model(
+            user_id=owner.id,
+            encrypted_access_token=encrypt_password("access-enforce"),
+            plaid_item_id="item-enforce",
+            plaid_account_id="acct-enforce",
+            is_active=True,
+        ))
+        db.session.commit()
+        owner_id = owner.id
+
+        _enable_plaid(flask_app)
+        try:
+            with patch.object(plaid_service_module, "_plaid_client") as mock_client:
+                assert enforce_user_access(owner) is False
+                assert mock_client.return_value.item_remove.call_count == 1
+        finally:
+            _disable_plaid(flask_app)
+
+        assert user_model.query.filter_by(id=owner_id).first().is_active is False
+        assert plaid_connection_model.query.filter_by(user_id=owner_id).count() == 0
+    finally:
+        flask_app.config["PAYMENTS_ENABLED"] = False
 
 
 class TestGuestOnboarding:

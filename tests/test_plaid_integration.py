@@ -714,6 +714,66 @@ class TestRemoveConnection:
             _deconfigure_plaid(flask_app)
 
 
+class TestRemoveConnectionsBulk:
+    def test_calls_item_remove_for_every_user(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            other = User(
+                email=f"plaid-bulk-{datetime.utcnow().timestamp()}@test.local",
+                password=generate_password_hash("pw", method="scrypt"),
+                name="Other",
+                admin=True,
+                is_active=True,
+            )
+            db.session.add(other)
+            db.session.commit()
+            other_id = other.id
+            _add_connection(plaid_user)
+            _add_connection(
+                other_id,
+                encrypted_access_token=encrypt_password("access-sandbox-other"),
+                plaid_item_id="item-other",
+            )
+
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                removed = plaid_service.remove_plaid_connections_for_user_ids(
+                    [plaid_user, other_id], commit=True
+                )
+                assert removed == 2
+                assert mock_client.return_value.item_remove.call_count == 2
+
+            assert PlaidConnection.query.filter_by(user_id=plaid_user).count() == 0
+            assert PlaidConnection.query.filter_by(user_id=other_id).count() == 0
+
+            User.query.filter_by(id=other_id).delete()
+            db.session.commit()
+            _deconfigure_plaid(flask_app)
+
+    def test_noop_when_no_user_ids(self, flask_app):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                removed = plaid_service.remove_plaid_connections_for_user_ids([])
+                assert removed == 0
+                assert not mock_client.return_value.item_remove.called
+            _deconfigure_plaid(flask_app)
+
+    def test_swallows_item_remove_failures(self, flask_app, plaid_user):
+        from plaid.exceptions import ApiException
+
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.item_remove.side_effect = ApiException()
+                removed = plaid_service.remove_plaid_connections_for_user_ids(
+                    [plaid_user], commit=True
+                )
+            assert removed == 1
+            assert PlaidConnection.query.filter_by(user_id=plaid_user).count() == 0
+            _deconfigure_plaid(flask_app)
+
+
 # ── Balance update ──────────────────────────────────────────────────────────
 
 
