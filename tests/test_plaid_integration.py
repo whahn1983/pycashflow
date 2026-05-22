@@ -8,7 +8,7 @@ storage paths exist.
 All Plaid SDK interactions are mocked; tests never hit the network.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -82,8 +82,12 @@ def _deconfigure_plaid(flask_app):
         flask_app.config[k] = ""
 
 
-def _make_balances_response(account_id, *, available, current):
-    balances = SimpleNamespace(available=available, current=current)
+def _make_balances_response(account_id, *, available, current, last_updated_datetime=None):
+    balances = SimpleNamespace(
+        available=available,
+        current=current,
+        last_updated_datetime=last_updated_datetime,
+    )
     account = SimpleNamespace(account_id=account_id, balances=balances)
     return SimpleNamespace(accounts=[account])
 
@@ -909,6 +913,86 @@ class TestUpdateBalance:
                 )
                 # Must not raise.
                 plaid_service.safe_update_plaid_balance_for_user(user)
+            _deconfigure_plaid(flask_app)
+
+    def test_skips_when_cache_older_than_last_realtime(self, flask_app, plaid_user):
+        """Plaid's cached balance is stale relative to our live one — don't overwrite.
+
+        Belt-and-suspenders alongside the 5-minute time guard: when Plaid
+        explicitly tells us ``balances.last_updated_datetime`` is older than
+        our last real-time refresh, we know /accounts/get is returning
+        stale data and the live row must stay put — even if the time guard
+        has already elapsed.
+        """
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            conn = PlaidConnection.query.filter_by(
+                user_id=plaid_user, is_active=True
+            ).first()
+            # Pretend the real-time refresh ran ~10 minutes ago — past the
+            # 5-minute time guard, so we rely on the cache-timestamp check.
+            conn.last_realtime_balance_at = datetime.utcnow() - timedelta(minutes=10)
+            db.session.commit()
+            db.session.add(
+                Balance(user_id=plaid_user, amount=1234.56, date=date.today())
+            )
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                # Plaid's cache was last refreshed BEFORE our real-time call.
+                stale_cache_ts = (
+                    datetime.utcnow() - timedelta(hours=2)
+                ).replace(tzinfo=timezone.utc).isoformat()
+                mock_client.return_value.accounts_get.return_value = (
+                    _make_balances_response(
+                        "acct-1",
+                        available=100.0,
+                        current=100.0,
+                        last_updated_datetime=stale_cache_ts,
+                    )
+                )
+                result = plaid_service.update_plaid_balance_for_user(user)
+            assert result["status"] == "skipped"
+            assert result["reason"] == "cache_older_than_realtime"
+            # Live value is untouched.
+            row = Balance.query.filter_by(
+                user_id=plaid_user, date=date.today()
+            ).first()
+            assert float(row.amount) == pytest.approx(1234.56)
+            _deconfigure_plaid(flask_app)
+
+    def test_proceeds_when_cache_newer_than_last_realtime(self, flask_app, plaid_user):
+        """If Plaid's cache caught up after our real-time refresh, sync as normal."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            conn = PlaidConnection.query.filter_by(
+                user_id=plaid_user, is_active=True
+            ).first()
+            conn.last_realtime_balance_at = datetime.utcnow() - timedelta(hours=2)
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                fresh_cache_ts = (
+                    datetime.utcnow() - timedelta(minutes=5)
+                ).replace(tzinfo=timezone.utc).isoformat()
+                mock_client.return_value.accounts_get.return_value = (
+                    _make_balances_response(
+                        "acct-1",
+                        available=200.0,
+                        current=250.0,
+                        last_updated_datetime=fresh_cache_ts,
+                    )
+                )
+                result = plaid_service.update_plaid_balance_for_user(user)
+            assert result["status"] == "ok"
+            row = Balance.query.filter_by(
+                user_id=plaid_user, date=date.today()
+            ).first()
+            assert float(row.amount) == pytest.approx(200.0)
             _deconfigure_plaid(flask_app)
 
     def test_skips_after_recent_realtime_refresh(self, flask_app, plaid_user):

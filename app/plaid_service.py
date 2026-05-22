@@ -598,6 +598,28 @@ def _today_date() -> date:
     return datetime.today().date()
 
 
+def _normalize_naive_utc(value):
+    """Coerce an ISO datetime string or aware/naive datetime to naive UTC.
+
+    Plaid returns ``balances.last_updated_datetime`` as an ISO 8601 string
+    (per SDK version, sometimes as a parsed ``datetime``). Internal
+    timestamps like ``last_realtime_balance_at`` are naive UTC, so cast
+    both sides to the same form before comparing.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if not isinstance(value, datetime):
+        return None
+    if value.tzinfo is not None:
+        value = value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
 def _upsert_today_balance(user_id: int, amount: float) -> Balance:
     today = _today_date()
     existing = (
@@ -745,6 +767,26 @@ def update_plaid_balance_for_user(user) -> dict:
     balances = getattr(target, "balances", None)
     available = getattr(balances, "available", None) if balances is not None else None
     current = getattr(balances, "current", None) if balances is not None else None
+    cache_updated_at = (
+        getattr(balances, "last_updated_datetime", None)
+        if balances is not None
+        else None
+    )
+
+    # Defense in depth: if Plaid tells us when its cached balance was last
+    # refreshed and that timestamp is older than our most recent real-time
+    # refresh, the cached value is stale relative to the live one we already
+    # wrote. Don't overwrite. (The 5-minute brute-force protection above
+    # covers institutions that don't populate last_updated_datetime.)
+    if (
+        conn.last_realtime_balance_at is not None
+        and cache_updated_at is not None
+        and _normalize_naive_utc(cache_updated_at) < conn.last_realtime_balance_at
+    ):
+        result = {"status": "skipped", "reason": "cache_older_than_realtime"}
+        if cache is not None:
+            cache[user.id] = result
+        return result
 
     if available is not None:
         balance_value = float(available)
