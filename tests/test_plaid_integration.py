@@ -8,7 +8,7 @@ storage paths exist.
 All Plaid SDK interactions are mocked; tests never hit the network.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -82,8 +82,12 @@ def _deconfigure_plaid(flask_app):
         flask_app.config[k] = ""
 
 
-def _make_balances_response(account_id, *, available, current):
-    balances = SimpleNamespace(available=available, current=current)
+def _make_balances_response(account_id, *, available, current, last_updated_datetime=None):
+    balances = SimpleNamespace(
+        available=available,
+        current=current,
+        last_updated_datetime=last_updated_datetime,
+    )
     account = SimpleNamespace(account_id=account_id, balances=balances)
     return SimpleNamespace(accounts=[account])
 
@@ -911,6 +915,122 @@ class TestUpdateBalance:
                 plaid_service.safe_update_plaid_balance_for_user(user)
             _deconfigure_plaid(flask_app)
 
+    def test_skips_when_cache_older_than_last_realtime(self, flask_app, plaid_user):
+        """Plaid's cached balance is stale relative to our live one — don't overwrite.
+
+        Belt-and-suspenders alongside the 5-minute time guard: when Plaid
+        explicitly tells us ``balances.last_updated_datetime`` is older than
+        our last real-time refresh, we know /accounts/get is returning
+        stale data and the live row must stay put — even if the time guard
+        has already elapsed.
+        """
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            conn = PlaidConnection.query.filter_by(
+                user_id=plaid_user, is_active=True
+            ).first()
+            # Pretend the real-time refresh ran ~10 minutes ago — past the
+            # 5-minute time guard, so we rely on the cache-timestamp check.
+            conn.last_realtime_balance_at = datetime.utcnow() - timedelta(minutes=10)
+            db.session.commit()
+            db.session.add(
+                Balance(user_id=plaid_user, amount=1234.56, date=date.today())
+            )
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                # Plaid's cache was last refreshed BEFORE our real-time call.
+                stale_cache_ts = (
+                    datetime.utcnow() - timedelta(hours=2)
+                ).replace(tzinfo=timezone.utc).isoformat()
+                mock_client.return_value.accounts_get.return_value = (
+                    _make_balances_response(
+                        "acct-1",
+                        available=100.0,
+                        current=100.0,
+                        last_updated_datetime=stale_cache_ts,
+                    )
+                )
+                result = plaid_service.update_plaid_balance_for_user(user)
+            assert result["status"] == "skipped"
+            assert result["reason"] == "cache_older_than_realtime"
+            # Live value is untouched.
+            row = Balance.query.filter_by(
+                user_id=plaid_user, date=date.today()
+            ).first()
+            assert float(row.amount) == pytest.approx(1234.56)
+            _deconfigure_plaid(flask_app)
+
+    def test_proceeds_when_cache_newer_than_last_realtime(self, flask_app, plaid_user):
+        """If Plaid's cache caught up after our real-time refresh, sync as normal."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            conn = PlaidConnection.query.filter_by(
+                user_id=plaid_user, is_active=True
+            ).first()
+            conn.last_realtime_balance_at = datetime.utcnow() - timedelta(hours=2)
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                fresh_cache_ts = (
+                    datetime.utcnow() - timedelta(minutes=5)
+                ).replace(tzinfo=timezone.utc).isoformat()
+                mock_client.return_value.accounts_get.return_value = (
+                    _make_balances_response(
+                        "acct-1",
+                        available=200.0,
+                        current=250.0,
+                        last_updated_datetime=fresh_cache_ts,
+                    )
+                )
+                result = plaid_service.update_plaid_balance_for_user(user)
+            assert result["status"] == "ok"
+            row = Balance.query.filter_by(
+                user_id=plaid_user, date=date.today()
+            ).first()
+            assert float(row.amount) == pytest.approx(200.0)
+            _deconfigure_plaid(flask_app)
+
+    def test_skips_after_recent_realtime_refresh(self, flask_app, plaid_user):
+        """A just-written real-time balance must not be clobbered by the cached sync.
+
+        Plaid does not guarantee /accounts/get reflects a fresh
+        /accounts/balance/get immediately, so the dashboard auto-sync must
+        skip while the realtime value is still within the protection window.
+        """
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            conn = PlaidConnection.query.filter_by(
+                user_id=plaid_user, is_active=True
+            ).first()
+            conn.last_realtime_balance_at = datetime.utcnow()
+            db.session.commit()
+            db.session.add(
+                Balance(user_id=plaid_user, amount=1234.56, date=date.today())
+            )
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                # Simulate a stale cached value that would clobber the live one.
+                mock_client.return_value.accounts_get.return_value = (
+                    _make_balances_response("acct-1", available=100.0, current=100.0)
+                )
+                result = plaid_service.update_plaid_balance_for_user(user)
+            assert result["status"] == "skipped"
+            assert result["reason"] == "realtime_recent"
+            # Live value is untouched.
+            row = Balance.query.filter_by(
+                user_id=plaid_user, date=date.today()
+            ).first()
+            assert float(row.amount) == pytest.approx(1234.56)
+            _deconfigure_plaid(flask_app)
+
 
 # ── Dashboard integration ───────────────────────────────────────────────────
 
@@ -1110,3 +1230,455 @@ class TestModelInvariants:
             with pytest.raises(IntegrityError):
                 db.session.commit()
             db.session.rollback()
+
+
+# ── Real-time balance refresh (/accounts/balance/get) ────────────────────────
+
+
+class TestRealtimeBalanceRefresh:
+    """Service-layer tests for ``realtime_update_plaid_balance_for_user``.
+
+    Covers the 24-hour cooldown, the available/current fallback, today-row
+    upsert, and the requirement that no /accounts/get behavior is changed.
+    """
+
+    def test_noop_when_not_configured(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _deconfigure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            result = plaid_service.realtime_update_plaid_balance_for_user(user)
+            assert result["status"] == "skipped"
+            assert result["reason"] == "not_configured"
+
+    def test_noop_when_no_active_connection(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            user = User.query.get(plaid_user)
+            result = plaid_service.realtime_update_plaid_balance_for_user(user)
+            assert result["status"] == "skipped"
+            assert result["reason"] == "no_connection"
+            _deconfigure_plaid(flask_app)
+
+    def test_calls_accounts_balance_get_with_account_id_option(
+        self, flask_app, plaid_user
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.accounts_balance_get.return_value = (
+                    _make_balances_response("acct-1", available=123.45, current=200.00)
+                )
+                # The legacy /accounts/get path must not be invoked.
+                mock_client.return_value.accounts_get.side_effect = AssertionError(
+                    "realtime refresh must not call /accounts/get"
+                )
+                result = plaid_service.realtime_update_plaid_balance_for_user(user)
+                assert result["status"] == "ok"
+                assert result["source"] == "plaid_realtime_available_balance"
+                assert result["amount"] == pytest.approx(123.45)
+                # Plaid SDK was called with the stored plaid_account_id filter.
+                args, kwargs = mock_client.return_value.accounts_balance_get.call_args
+                req = args[0] if args else kwargs.get("request")
+                options = getattr(req, "options", None)
+                account_ids = getattr(options, "account_ids", None)
+                assert list(account_ids) == ["acct-1"]
+            _deconfigure_plaid(flask_app)
+
+    def test_prefers_available_over_current(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.accounts_balance_get.return_value = (
+                    _make_balances_response("acct-1", available=500.25, current=600.00)
+                )
+                result = plaid_service.realtime_update_plaid_balance_for_user(user)
+            assert result["source"] == "plaid_realtime_available_balance"
+            row = Balance.query.filter_by(user_id=plaid_user, date=date.today()).first()
+            assert float(row.amount) == pytest.approx(500.25)
+            _deconfigure_plaid(flask_app)
+
+    def test_falls_back_to_current_when_available_is_none(
+        self, flask_app, plaid_user
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.accounts_balance_get.return_value = (
+                    _make_balances_response("acct-1", available=None, current=800.10)
+                )
+                result = plaid_service.realtime_update_plaid_balance_for_user(user)
+            assert result["source"] == "plaid_realtime_current_balance_fallback"
+            row = Balance.query.filter_by(user_id=plaid_user, date=date.today()).first()
+            assert float(row.amount) == pytest.approx(800.10)
+            _deconfigure_plaid(flask_app)
+
+    def test_does_not_overwrite_when_both_balances_are_none(
+        self, flask_app, plaid_user
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            db.session.add(
+                Balance(user_id=plaid_user, amount=999.99, date=date.today())
+            )
+            db.session.commit()
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.accounts_balance_get.return_value = (
+                    _make_balances_response("acct-1", available=None, current=None)
+                )
+                result = plaid_service.realtime_update_plaid_balance_for_user(user)
+            assert result["status"] == "skipped"
+            row = Balance.query.filter_by(user_id=plaid_user, date=date.today()).first()
+            assert float(row.amount) == pytest.approx(999.99)
+            conn = PlaidConnection.query.filter_by(
+                user_id=plaid_user, is_active=True
+            ).first()
+            # Cooldown still consumed because Plaid was called and billed.
+            assert conn.last_realtime_balance_at is not None
+            assert conn.last_realtime_refresh_status == "no_balance_value"
+            _deconfigure_plaid(flask_app)
+
+    def test_updates_existing_today_row_instead_of_creating_duplicate(
+        self, flask_app, plaid_user
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            db.session.add(
+                Balance(user_id=plaid_user, amount=100.0, date=date.today())
+            )
+            db.session.commit()
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.accounts_balance_get.return_value = (
+                    _make_balances_response("acct-1", available=250.0, current=300.0)
+                )
+                plaid_service.realtime_update_plaid_balance_for_user(user)
+            rows = Balance.query.filter_by(
+                user_id=plaid_user, date=date.today()
+            ).all()
+            assert len(rows) == 1
+            assert float(rows[0].amount) == pytest.approx(250.0)
+            _deconfigure_plaid(flask_app)
+
+    def test_creates_today_row_when_missing(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.accounts_balance_get.return_value = (
+                    _make_balances_response("acct-1", available=42.0, current=None)
+                )
+                plaid_service.realtime_update_plaid_balance_for_user(user)
+            row = Balance.query.filter_by(
+                user_id=plaid_user, date=date.today()
+            ).first()
+            assert row is not None
+            assert float(row.amount) == pytest.approx(42.0)
+            _deconfigure_plaid(flask_app)
+
+    def test_24h_cooldown_blocks_second_call(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.accounts_balance_get.return_value = (
+                    _make_balances_response("acct-1", available=10.0, current=20.0)
+                )
+                first = plaid_service.realtime_update_plaid_balance_for_user(user)
+                second = plaid_service.realtime_update_plaid_balance_for_user(user)
+            assert first["status"] == "ok"
+            assert second["status"] == "rate_limited"
+            assert second["reason"] == "cooldown_active"
+            assert second["retry_after_seconds"] > 0
+            # Only one paid Plaid call should have been made.
+            assert mock_client.return_value.accounts_balance_get.call_count == 1
+            _deconfigure_plaid(flask_app)
+
+    def test_cooldown_expires_after_24_hours(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            conn = PlaidConnection.query.filter_by(
+                user_id=plaid_user, is_active=True
+            ).first()
+            # Pretend the last refresh was just over 24h ago.
+            conn.last_realtime_balance_at = datetime.utcnow() - timedelta(
+                hours=24, minutes=1
+            )
+            db.session.commit()
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.accounts_balance_get.return_value = (
+                    _make_balances_response("acct-1", available=77.0, current=None)
+                )
+                result = plaid_service.realtime_update_plaid_balance_for_user(user)
+            assert result["status"] == "ok"
+            assert mock_client.return_value.accounts_balance_get.call_count == 1
+            _deconfigure_plaid(flask_app)
+
+    def test_failed_call_still_consumes_cooldown(self, flask_app, plaid_user):
+        """Plaid charges per attempt — failures must consume the 24h window."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.accounts_balance_get.side_effect = (
+                    RuntimeError("boom")
+                )
+                first = plaid_service.realtime_update_plaid_balance_for_user(user)
+            assert first["status"] == "error"
+            assert first["reason"] == "unexpected_error"
+            # Second call within the window must NOT trigger another Plaid call.
+            with patch.object(plaid_service, "_plaid_client") as mock_client2:
+                second = plaid_service.realtime_update_plaid_balance_for_user(user)
+            assert second["status"] == "rate_limited"
+            assert mock_client2.return_value.accounts_balance_get.call_count == 0
+            _deconfigure_plaid(flask_app)
+
+    def test_does_not_overwrite_regular_sync_status(self, flask_app, plaid_user):
+        """A realtime failure must not clobber last_sync_status from /accounts/get."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            conn = PlaidConnection.query.filter_by(
+                user_id=plaid_user, is_active=True
+            ).first()
+            conn.last_sync_status = "plaid_available_balance"
+            conn.last_sync_error = None
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.accounts_balance_get.side_effect = (
+                    RuntimeError("boom")
+                )
+                plaid_service.realtime_update_plaid_balance_for_user(user)
+
+            conn = PlaidConnection.query.filter_by(
+                user_id=plaid_user, is_active=True
+            ).first()
+            # Automatic sync status is untouched.
+            assert conn.last_sync_status == "plaid_available_balance"
+            assert conn.last_sync_error is None
+            # Dedicated realtime status reflects the failure.
+            assert conn.last_realtime_refresh_status == "plaid_realtime_unexpected_error"
+            assert conn.last_realtime_refresh_error
+            _deconfigure_plaid(flask_app)
+
+    def test_does_not_run_on_dashboard_load(self, auth_client, flask_app):
+        """The dashboard load must continue to use /accounts/get only, never the paid endpoint."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        with patch.object(
+            plaid_service, "realtime_update_plaid_balance_for_user"
+        ) as mock_realtime:
+            resp = auth_client.get("/")
+            assert resp.status_code == 200
+            assert not mock_realtime.called
+        with patch("app.api.routes.data.safe_update_plaid_balance_for_user"):
+            with patch.object(
+                plaid_service, "realtime_update_plaid_balance_for_user"
+            ) as mock_realtime:
+                resp = auth_client.get("/api/v1/dashboard")
+                assert resp.status_code == 200
+                assert not mock_realtime.called
+        with flask_app.app_context():
+            _deconfigure_plaid(flask_app)
+
+
+def _csrf_headers_for(client):
+    """Fetch a CSRF token via the settings page so cookie-auth API writes work.
+
+    The realtime-balance route uses ``require_bearer=True``; tests using
+    Flask-Login cookie auth must therefore also send a valid X-CSRFToken.
+    """
+    html = client.get("/settings").get_data(as_text=True)
+    marker = 'meta name="csrf-token" content="'
+    idx = html.find(marker)
+    assert idx != -1, "CSRF token meta tag not found in /settings"
+    start = idx + len(marker)
+    end = html.find('"', start)
+    return {"X-CSRFToken": html[start:end]}
+
+
+class TestRealtimeBalanceAPIRoute:
+    def test_requires_authentication(self, flask_app):
+        client = flask_app.test_client()
+        resp = client.post("/api/v1/plaid/realtime-balance")
+        # Unauthenticated requests should be rejected (401 or 403, not 200).
+        assert resp.status_code in (401, 403)
+
+    def test_does_not_accept_user_id_from_client(
+        self, auth_client, flask_app, plaid_user
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        headers = _csrf_headers_for(auth_client)
+        with patch.object(plaid_service, "_plaid_client") as mock_client:
+            mock_client.return_value.accounts_balance_get.return_value = (
+                _make_balances_response("acct-1", available=1.0, current=2.0)
+            )
+            # Spoofing a different user_id in the body must be ignored —
+            # the route operates only on the authenticated user.
+            resp = auth_client.post(
+                "/api/v1/plaid/realtime-balance",
+                headers=headers,
+                json={"user_id": plaid_user},
+            )
+        # The seeded admin user has no Plaid connection, so the call returns
+        # plaid_no_connection — NOT a successful refresh of the spoofed user.
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["code"] == "plaid_no_connection"
+        with flask_app.app_context():
+            _deconfigure_plaid(flask_app)
+
+    def test_returns_429_with_retry_after_on_cooldown(
+        self, auth_client, flask_app
+    ):
+        from conftest import _ADMIN_USER_ID
+
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(_ADMIN_USER_ID)
+        try:
+            headers = _csrf_headers_for(auth_client)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.accounts_balance_get.return_value = (
+                    _make_balances_response("acct-1", available=5.0, current=6.0)
+                )
+                first = auth_client.post(
+                    "/api/v1/plaid/realtime-balance", headers=headers
+                )
+                second = auth_client.post(
+                    "/api/v1/plaid/realtime-balance", headers=headers
+                )
+            assert first.status_code == 200
+            assert first.get_json()["data"]["success"] is True
+            assert second.status_code == 429
+            body = second.get_json()
+            assert body["code"] == "plaid_realtime_cooldown"
+            assert body["retry_after_seconds"] > 0
+            assert body["next_available_refresh_at"]
+            assert "Retry-After" in second.headers
+        finally:
+            with flask_app.app_context():
+                PlaidConnection.query.filter_by(user_id=_ADMIN_USER_ID).delete()
+                Balance.query.filter_by(user_id=_ADMIN_USER_ID).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+    def test_response_never_includes_access_token(
+        self, auth_client, flask_app
+    ):
+        from conftest import _ADMIN_USER_ID
+
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(_ADMIN_USER_ID)
+        try:
+            headers = _csrf_headers_for(auth_client)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.accounts_balance_get.return_value = (
+                    _make_balances_response("acct-1", available=11.0, current=12.0)
+                )
+                resp = auth_client.post(
+                    "/api/v1/plaid/realtime-balance", headers=headers
+                )
+            assert resp.status_code == 200
+            raw = resp.get_data(as_text=True)
+            for forbidden_substr in (
+                "access_token",
+                "encrypted_access_token",
+                "access-sandbox-test",
+            ):
+                assert forbidden_substr not in raw
+        finally:
+            with flask_app.app_context():
+                PlaidConnection.query.filter_by(user_id=_ADMIN_USER_ID).delete()
+                Balance.query.filter_by(user_id=_ADMIN_USER_ID).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+
+class TestRealtimeBalanceGuestRestrictions:
+    """Guest (admin=False) users must not be able to trigger a paid refresh."""
+
+    @pytest.fixture()
+    def guest_client(self, flask_app):
+        with flask_app.app_context():
+            owner = User(
+                email=f"plaid-rt-owner-{datetime.utcnow().timestamp()}@test.local",
+                password=generate_password_hash("pw", method="scrypt"),
+                name="Owner",
+                admin=True,
+                is_account_owner=True,
+                is_active=True,
+            )
+            db.session.add(owner)
+            db.session.commit()
+            guest = User(
+                email=f"plaid-rt-guest-{datetime.utcnow().timestamp()}@test.local",
+                password=generate_password_hash("pw", method="scrypt"),
+                name="Guest",
+                admin=False,
+                is_active=True,
+                is_account_owner=False,
+                owner_user_id=owner.id,
+                account_owner_id=owner.id,
+            )
+            db.session.add(guest)
+            db.session.commit()
+            guest_id = guest.id
+            owner_id = owner.id
+
+        c = flask_app.test_client()
+        with c.session_transaction() as sess:
+            sess["_user_id"] = str(guest_id)
+            sess["_fresh"] = True
+
+        yield c
+
+        with flask_app.app_context():
+            PlaidConnection.query.filter(
+                PlaidConnection.user_id.in_([guest_id, owner_id])
+            ).delete(synchronize_session=False)
+            User.query.filter(User.id.in_([guest_id, owner_id])).delete(
+                synchronize_session=False
+            )
+            db.session.commit()
+
+    def _csrf_headers(self, client):
+        html = client.get("/settings").get_data(as_text=True)
+        marker = 'meta name="csrf-token" content="'
+        idx = html.find(marker)
+        assert idx != -1
+        start = idx + len(marker)
+        end = html.find('"', start)
+        return {"X-CSRFToken": html[start:end]}
+
+    def test_guest_forbidden(self, flask_app, guest_client):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+        with patch.object(plaid_service, "realtime_update_plaid_balance_for_user") as mock_upd:
+            resp = guest_client.post(
+                "/api/v1/plaid/realtime-balance",
+                headers=self._csrf_headers(guest_client),
+            )
+        assert resp.status_code == 403
+        assert resp.get_json()["code"] == "forbidden"
+        assert not mock_upd.called
+        with flask_app.app_context():
+            _deconfigure_plaid(flask_app)

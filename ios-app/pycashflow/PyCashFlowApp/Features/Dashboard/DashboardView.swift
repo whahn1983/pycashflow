@@ -66,6 +66,11 @@ struct DashboardView: View {
         }
         .task { await loadAll() }
         .refreshable { await loadAll() }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .pycashflowDashboardShouldReload)
+        ) { _ in
+            Task { await loadAll() }
+        }
         .appBackground()
         .navigationTitle("Dashboard")
     }

@@ -36,6 +36,7 @@ from .ai_insights import (
 from .password_setup import create_password_setup_link
 from .plaid_service import (
     safe_update_plaid_balance_for_user,
+    realtime_update_plaid_balance_for_user,
     remove_plaid_connections_for_user_ids,
 )
 from .totp_utils import (
@@ -581,6 +582,59 @@ def healthz():
     # redirect-free, and side-effect-free so it doesn't pollute access logs
     # or trigger the dashboard Plaid balance refresh.
     return Response('ok', status=200, mimetype='text/plain')
+
+
+@main.route('/refresh_realtime_balance', methods=['POST'])
+@login_required
+@admin_required
+@limiter.limit("60 per hour")
+def refresh_realtime_balance():
+    """Trigger a paid Plaid /accounts/balance/get refresh from the dashboard.
+
+    Rate-limited server-side to once every 24 hours per connection. The
+    dashboard route re-runs after the redirect, so any new balance is
+    reflected immediately.
+    """
+    owner = _get_balance_owner_user()
+    try:
+        result = realtime_update_plaid_balance_for_user(owner)
+    except Exception:
+        logger.exception(
+            "Real-time Plaid balance refresh failed for user %s",
+            getattr(owner, "id", None),
+        )
+        flash("Could not refresh balance from Plaid. Please try again later.")
+        return redirect(url_for('main.index'))
+
+    status = result.get("status")
+    reason = result.get("reason")
+    if status == "ok":
+        flash("Live balance refreshed.")
+    elif status == "rate_limited":
+        retry_after = int(result.get("retry_after_seconds") or 0)
+        hours = max(1, (retry_after + 1800) // 3600)
+        flash(
+            "Live refresh is available once every 24 hours. "
+            f"Try again in about {hours} hour(s)."
+        )
+    elif status == "skipped" and reason == "no_connection":
+        flash("Connect a Plaid account in Settings > More Settings.")
+    elif status == "skipped" and reason == "not_configured":
+        flash(
+            "Live refresh is unavailable right now. Your cached Plaid balance "
+            "will still update automatically."
+        )
+    elif status == "skipped" and reason == "no_balance_value":
+        flash("Plaid did not return a balance for this account.")
+    else:
+        flash(
+            "Live refresh is unavailable right now. Your cached Plaid balance "
+            "will still update automatically."
+        )
+
+    # The dashboard route re-runs after this redirect, so any new balance row
+    # is picked up immediately via the existing dashboard calculation helper.
+    return redirect(url_for('main.index'))
 
 
 @main.route('/balance', methods=('GET', 'POST'))

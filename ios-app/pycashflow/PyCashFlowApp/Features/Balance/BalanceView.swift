@@ -6,15 +6,37 @@ struct BalanceView: View {
     @State private var history: [BalanceDTO] = []
     @State private var newAmount = ""
     @State private var errorText: String?
+    @State private var statusText: String?
+    @State private var isRefreshing: Bool = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let balance {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Current Balance")
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.textMuted)
+                        HStack(spacing: 8) {
+                            Text("Current Balance")
+                                .font(.caption)
+                                .foregroundStyle(AppTheme.textMuted)
+                            Spacer()
+                            Button {
+                                Task { await refreshRealtimeBalance() }
+                            } label: {
+                                Image(systemName: "arrow.clockwise.circle")
+                                    .font(.title3)
+                                    .foregroundStyle(AppTheme.textSecondary)
+                                    .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                                    .animation(
+                                        isRefreshing
+                                            ? .linear(duration: 1).repeatForever(autoreverses: false)
+                                            : .default,
+                                        value: isRefreshing
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isRefreshing)
+                            .accessibilityLabel("Refresh balance from your bank")
+                        }
                         HStack(spacing: 8) {
                             Text("$\(balance.amount)")
                                 .font(.headline)
@@ -29,6 +51,14 @@ struct BalanceView: View {
                         }
                     }
                     .cardRow()
+                }
+
+                if let statusText {
+                    Text(statusText)
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 VStack(spacing: 8) {
@@ -111,4 +141,54 @@ struct BalanceView: View {
             errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to save balance"
         }
     }
+
+    private func refreshRealtimeBalance() async {
+        guard let token = session.token else { return }
+        await MainActor.run {
+            // Prevent double-taps while the request is in flight.
+            guard !isRefreshing else { return }
+            isRefreshing = true
+            errorText = nil
+            statusText = nil
+        }
+        defer {
+            Task { @MainActor in isRefreshing = false }
+        }
+        do {
+            let response: APIEnvelope<PlaidRealtimeBalanceDTO> = try await APIClient.shared.request(
+                "plaid/realtime-balance",
+                method: "POST",
+                token: token,
+                as: APIEnvelope<PlaidRealtimeBalanceDTO>.self
+            )
+            // Reload the local balance card from the existing balance API so
+            // the new amount/date show immediately, and trigger a dashboard
+            // reload notification so the Dashboard view picks up the change.
+            await load()
+            NotificationCenter.default.post(name: .pycashflowDashboardShouldReload, object: nil)
+            await MainActor.run {
+                statusText = response.data.message ?? "Live balance refreshed."
+            }
+        } catch let envelope as APIErrorEnvelope {
+            await MainActor.run {
+                if envelope.code == "plaid_realtime_cooldown" {
+                    statusText = envelope.error
+                } else if envelope.code == "plaid_no_connection" {
+                    errorText = envelope.error
+                } else {
+                    errorText = envelope.error
+                }
+            }
+        } catch {
+            await MainActor.run { errorText = "Failed to refresh balance" }
+        }
+    }
+}
+
+extension Notification.Name {
+    /// Posted by features that mutate the user's balance so the Dashboard
+    /// view can re-fetch its data without a full app refresh.
+    static let pycashflowDashboardShouldReload = Notification.Name(
+        "PyCashFlowDashboardShouldReload"
+    )
 }

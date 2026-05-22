@@ -275,6 +275,17 @@ class PlaidConnection(db.Model):
     last_balance_sync_at = db.Column(db.DateTime, nullable=True)
     last_sync_status = db.Column(db.String(64), nullable=True)
     last_sync_error = db.Column(db.String(255), nullable=True)
+    # Last attempted /accounts/balance/get call. Used to rate-limit the
+    # paid real-time refresh to once every 24 hours per user/connection.
+    # Set BEFORE calling Plaid so a failed-but-billed call still consumes
+    # the cooldown window and rapid double-clicks cannot duplicate paid
+    # calls.
+    last_realtime_balance_at = db.Column(db.DateTime, nullable=True)
+    # Dedicated status/error columns for the real-time refresh so a Plaid
+    # /accounts/balance/get failure does not overwrite the unrelated status
+    # of the automatic /accounts/get sync (last_sync_status/last_sync_error).
+    last_realtime_refresh_status = db.Column(db.String(64), nullable=True)
+    last_realtime_refresh_error = db.Column(db.String(255), nullable=True)
     created_at = db.Column(
         db.DateTime,
         nullable=False,
