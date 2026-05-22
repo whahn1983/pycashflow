@@ -603,7 +603,10 @@ def refresh_realtime_balance():
             "Real-time Plaid balance refresh failed for user %s",
             getattr(owner, "id", None),
         )
-        flash("Could not refresh balance from Plaid. Please try again later.")
+        flash(
+            "Could not refresh balance from Plaid. Please try again later.",
+            "error",
+        )
         return redirect(url_for('main.index'))
 
     status = result.get("status")
@@ -615,21 +618,27 @@ def refresh_realtime_balance():
         hours = max(1, (retry_after + 1800) // 3600)
         flash(
             "Live refresh is available once every 24 hours. "
-            f"Try again in about {hours} hour(s)."
+            f"Try again in about {hours} hour(s).",
+            "error",
         )
     elif status == "skipped" and reason == "no_connection":
-        flash("Connect a Plaid account in Settings > More Settings.")
+        flash(
+            "Connect a Plaid account in Settings > More Settings.",
+            "error",
+        )
     elif status == "skipped" and reason == "not_configured":
         flash(
             "Live refresh is unavailable right now. Your cached Plaid balance "
-            "will still update automatically."
+            "will still update automatically.",
+            "error",
         )
     elif status == "skipped" and reason == "no_balance_value":
-        flash("Plaid did not return a balance for this account.")
+        flash("Plaid did not return a balance for this account.", "error")
     else:
         flash(
             "Live refresh is unavailable right now. Your cached Plaid balance "
-            "will still update automatically."
+            "will still update automatically.",
+            "error",
         )
 
     # The dashboard route re-runs after this redirect, so any new balance row
