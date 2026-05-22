@@ -144,13 +144,17 @@ struct BalanceView: View {
 
     private func refreshRealtimeBalance() async {
         guard let token = session.token else { return }
-        await MainActor.run {
-            // Prevent double-taps while the request is in flight.
-            guard !isRefreshing else { return }
+        // Prevent double-taps while the request is in flight. The guard
+        // must exit the function, not just the MainActor closure, or a
+        // second tap can still fire a duplicate network request.
+        let shouldProceed = await MainActor.run { () -> Bool in
+            guard !isRefreshing else { return false }
             isRefreshing = true
             errorText = nil
             statusText = nil
+            return true
         }
+        guard shouldProceed else { return }
         defer {
             Task { @MainActor in isRefreshing = false }
         }
