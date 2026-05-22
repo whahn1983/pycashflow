@@ -51,6 +51,13 @@ _BALANCE_SOURCE_REALTIME_CURRENT_FALLBACK = "plaid_realtime_current_balance_fall
 # refresh is rate-limited to once every 24 hours per connection.
 REALTIME_BALANCE_COOLDOWN_SECONDS = 24 * 60 * 60
 
+# How long after a real-time /accounts/balance/get refresh the cached
+# /accounts/get auto-sync is skipped. Plaid does not guarantee that the
+# cached path immediately reflects the freshly-refreshed value, so the
+# auto-sync triggered by the next dashboard load could otherwise overwrite
+# the live balance with stale data.
+REALTIME_BALANCE_PROTECTION_SECONDS = 5 * 60
+
 
 class PlaidServiceError(Exception):
     """Raised for any Plaid-related failure surfaced to a route.
@@ -641,6 +648,21 @@ def update_plaid_balance_for_user(user) -> dict:
         if cache is not None:
             cache[user.id] = result
         return result
+
+    # Don't clobber a freshly-written real-time balance with a possibly-stale
+    # /accounts/get cached value. Plaid does not guarantee that calling
+    # /accounts/get immediately after /accounts/balance/get returns the new
+    # value, so skip the auto-sync briefly after a real-time refresh.
+    if conn.last_realtime_balance_at is not None:
+        age = (
+            datetime.now(timezone.utc).replace(tzinfo=None)
+            - conn.last_realtime_balance_at
+        ).total_seconds()
+        if age < REALTIME_BALANCE_PROTECTION_SECONDS:
+            result = {"status": "skipped", "reason": "realtime_recent"}
+            if cache is not None:
+                cache[user.id] = result
+            return result
 
     from plaid.exceptions import ApiException
     from plaid.model.accounts_get_request import AccountsGetRequest

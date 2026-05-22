@@ -911,6 +911,42 @@ class TestUpdateBalance:
                 plaid_service.safe_update_plaid_balance_for_user(user)
             _deconfigure_plaid(flask_app)
 
+    def test_skips_after_recent_realtime_refresh(self, flask_app, plaid_user):
+        """A just-written real-time balance must not be clobbered by the cached sync.
+
+        Plaid does not guarantee /accounts/get reflects a fresh
+        /accounts/balance/get immediately, so the dashboard auto-sync must
+        skip while the realtime value is still within the protection window.
+        """
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            conn = PlaidConnection.query.filter_by(
+                user_id=plaid_user, is_active=True
+            ).first()
+            conn.last_realtime_balance_at = datetime.utcnow()
+            db.session.commit()
+            db.session.add(
+                Balance(user_id=plaid_user, amount=1234.56, date=date.today())
+            )
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                # Simulate a stale cached value that would clobber the live one.
+                mock_client.return_value.accounts_get.return_value = (
+                    _make_balances_response("acct-1", available=100.0, current=100.0)
+                )
+                result = plaid_service.update_plaid_balance_for_user(user)
+            assert result["status"] == "skipped"
+            assert result["reason"] == "realtime_recent"
+            # Live value is untouched.
+            row = Balance.query.filter_by(
+                user_id=plaid_user, date=date.today()
+            ).first()
+            assert float(row.amount) == pytest.approx(1234.56)
+            _deconfigure_plaid(flask_app)
+
 
 # ── Dashboard integration ───────────────────────────────────────────────────
 
