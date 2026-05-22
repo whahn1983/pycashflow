@@ -400,6 +400,10 @@ body::before {
   cursor: not-allowed;
 }
 
+.balance-refresh-icon--spinning {
+  animation: rotate 1s linear infinite;
+}
+
 .metric-card.warning {
   border: 2px solid var(--warning);
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, var(--primary-dark) 100%);

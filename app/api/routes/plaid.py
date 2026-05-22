@@ -136,19 +136,49 @@ def api_plaid_update_balance():
     return api_ok(result)
 
 
+def _cooldown_error_response(result: dict):
+    """Build the 429 envelope for a cooldown-blocked realtime refresh.
+
+    Uses the standard ``{error, code, status}`` envelope so existing clients
+    can decode it, plus extra top-level fields (``retry_after_seconds``,
+    ``next_available_refresh_at``) and a ``Retry-After`` header so the UI
+    can disable the button until the window opens.
+    """
+    retry_after = int(result.get("retry_after_seconds") or 0)
+    body = {
+        "error": "Live balance refresh is available once every 24 hours.",
+        "code": "plaid_realtime_cooldown",
+        "status": 429,
+        "retry_after_seconds": retry_after,
+        "last_realtime_balance_at": result.get("last_realtime_balance_at"),
+        "next_available_refresh_at": result.get("next_available_refresh_at"),
+    }
+    response = jsonify(body)
+    response.status_code = 429
+    if retry_after > 0:
+        response.headers["Retry-After"] = str(retry_after)
+    return response
+
+
 @api.route("/plaid/realtime-balance", methods=["POST"])
 @api_login_required(require_bearer=True)
 @limiter.limit("60 per hour")
 def api_plaid_realtime_balance():
     """Force-refresh today's balance via Plaid's billed /accounts/balance/get.
 
-    Server-enforced: at most one successful refresh per connection every 24
-    hours. Callers that hit the cooldown receive HTTP 429 with a
-    ``retry_after_seconds`` field so the UI can disable the button.
+    Server-enforced: at most one attempted refresh per connection every 24
+    hours. The cooldown timestamp is claimed before the Plaid call so a
+    failed-but-billed call still consumes the window and rapid double-clicks
+    cannot trigger duplicate paid calls.
+
+    Callers that hit the cooldown receive HTTP 429 with ``retry_after_seconds``
+    plus ``next_available_refresh_at`` so the UI can disable the button.
     """
     if (resp := _forbid_guest_writes()) is not None:
         return resp
+
     owner = _balance_owner_user()
+
     try:
         result = realtime_update_plaid_balance_for_user(owner)
     except Exception:
@@ -158,24 +188,57 @@ def api_plaid_realtime_balance():
             502,
         )
 
-    if result.get("status") == "rate_limited":
-        retry_after = int(result.get("retry_after_seconds") or 0)
-        body = {
-            "error": "Balance refresh is available once every 24 hours.",
-            "code": "plaid_realtime_cooldown",
-            "status": 429,
-            "retry_after_seconds": retry_after,
-            "last_realtime_balance_at": result.get("last_realtime_balance_at"),
-        }
-        response = jsonify(body)
-        response.status_code = 429
-        if retry_after > 0:
-            response.headers["Retry-After"] = str(retry_after)
-        return response
-    if result.get("status") == "error":
+    status = result.get("status")
+    reason = result.get("reason")
+
+    if status == "skipped" and reason == "no_connection":
+        return api_error(
+            "Connect a Plaid account before using live balance refresh.",
+            "plaid_no_connection",
+            400,
+        )
+
+    if status == "skipped" and reason == "not_configured":
+        return api_error(
+            "Live balance refresh is unavailable right now.",
+            "plaid_not_configured",
+            400,
+        )
+
+    if status == "rate_limited":
+        return _cooldown_error_response(result)
+
+    if status == "skipped" and reason == "no_balance_value":
+        # Plaid was called and billed, but returned no usable balance value.
+        # Surface a successful 200 response so the client can show a friendly
+        # message; the cooldown is already recorded so the next call is
+        # blocked for 24 hours.
+        return api_ok(
+            {
+                "success": False,
+                "message": "Plaid did not return a balance for this account.",
+                "balance": None,
+                "balance_source": None,
+                "refreshed_at": result.get("refreshed_at"),
+                "next_available_refresh_at": result.get("next_available_refresh_at"),
+            }
+        )
+
+    if status == "error":
         return api_error(
             "Could not refresh balance from Plaid.",
             "plaid_error",
             502,
         )
-    return api_ok(result)
+
+    # status == "ok"
+    return api_ok(
+        {
+            "success": True,
+            "message": "Live balance refreshed.",
+            "balance": result.get("amount"),
+            "balance_source": result.get("source"),
+            "refreshed_at": result.get("refreshed_at"),
+            "next_available_refresh_at": result.get("next_available_refresh_at"),
+        }
+    )

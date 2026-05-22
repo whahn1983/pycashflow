@@ -15,10 +15,10 @@
 <div class="metrics-grid">
     <!-- Current Balance Card -->
     <div class="metric-card highlight balance-card">
-        <form action="{{ url_for('main.refresh_realtime_balance') }}" method="POST" class="balance-refresh-form">
+        <form action="{{ url_for('main.refresh_realtime_balance') }}" method="POST" class="balance-refresh-form" onsubmit="onRealtimeRefreshSubmit(this);">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="balance-refresh-btn" title="Refresh balance from your bank" aria-label="Refresh balance from your bank">
-                <i class="fa-solid fa-arrows-rotate"></i>
+            <button type="submit" class="balance-refresh-btn" title="Refresh live balance — available once every 24 hours" aria-label="Refresh live balance">
+                <i class="fa-solid fa-arrows-rotate balance-refresh-icon"></i>
             </button>
         </form>
         <div class="metric-label">
@@ -603,6 +603,16 @@
         const localStr = new Date(utc).toLocaleString([], {year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
         el.innerHTML = '<i class="fa-solid fa-clock"></i> Last updated: ' + localStr;
     })();
+
+    // Prevent rapid double-clicks on the live balance refresh button while
+    // the POST is in flight; the dashboard reload after the redirect will
+    // re-render the (re-enabled) button automatically.
+    function onRealtimeRefreshSubmit(form) {
+        const btn = form.querySelector('.balance-refresh-btn');
+        const icon = form.querySelector('.balance-refresh-icon');
+        if (btn) btn.disabled = true;
+        if (icon) icon.classList.add('balance-refresh-icon--spinning');
+    }
 </script>
 
 {% endblock %}

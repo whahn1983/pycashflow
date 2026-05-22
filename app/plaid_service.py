@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlsplit, urlunsplit
 
 from flask import current_app, g
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 
 from app import db
 from app.crypto_utils import encrypt_password, decrypt_password
@@ -200,12 +200,11 @@ def get_plaid_connection_status(user) -> dict:
         ),
         "last_sync_status": conn.last_sync_status,
         "last_sync_error": conn.last_sync_error,
-        "last_realtime_balance_at": (
-            conn.last_realtime_balance_at.replace(microsecond=0).isoformat() + "Z"
-            if conn.last_realtime_balance_at
-            else None
-        ),
+        "last_realtime_balance_at": _iso_utc(conn.last_realtime_balance_at),
+        "last_realtime_refresh_status": conn.last_realtime_refresh_status,
+        "last_realtime_refresh_error": conn.last_realtime_refresh_error,
         "realtime_refresh_retry_after_seconds": _seconds_until_realtime_refresh(conn),
+        "next_available_refresh_at": _iso_utc(_next_available_refresh_at(conn)),
     }
     return payload
 
@@ -767,6 +766,12 @@ def safe_update_plaid_balance_for_user(user) -> None:
 # ── Real-time balance refresh (/accounts/balance/get) ────────────────────────
 
 
+def _iso_utc(value: Optional[datetime]) -> Optional[str]:
+    if value is None:
+        return None
+    return value.replace(microsecond=0).isoformat() + "Z"
+
+
 def _seconds_until_realtime_refresh(conn: PlaidConnection) -> int:
     """Return seconds remaining before the next real-time refresh is allowed.
 
@@ -781,13 +786,66 @@ def _seconds_until_realtime_refresh(conn: PlaidConnection) -> int:
     return max(remaining, 0)
 
 
+def _next_available_refresh_at(conn: PlaidConnection) -> Optional[datetime]:
+    if conn.last_realtime_balance_at is None:
+        return None
+    return conn.last_realtime_balance_at + timedelta(
+        seconds=REALTIME_BALANCE_COOLDOWN_SECONDS
+    )
+
+
+def _record_realtime_status(
+    conn: PlaidConnection, status: str, error: Optional[str]
+) -> None:
+    """Write the dedicated real-time refresh status/error columns.
+
+    Kept separate from ``_record_sync_status`` so a failed paid call cannot
+    overwrite the unrelated status of the automatic /accounts/get sync.
+    """
+    conn.last_realtime_refresh_status = status[:64] if status else None
+    conn.last_realtime_refresh_error = error[:255] if error else None
+
+
+def _claim_realtime_refresh_slot(conn_id: int) -> bool:
+    """Atomically reserve the next 24-hour real-time refresh window.
+
+    Updates ``last_realtime_balance_at`` to *now* only when the previous
+    value is null or older than the cooldown. Returns True if this caller
+    won the race and may now call Plaid; False if another caller is already
+    inside (or has just consumed) the window. The pre-call write ensures
+    that even a failed-but-billed Plaid call consumes the cooldown.
+    """
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    cutoff = now - timedelta(seconds=REALTIME_BALANCE_COOLDOWN_SECONDS)
+    updated = (
+        db.session.query(PlaidConnection)
+        .filter(
+            PlaidConnection.id == conn_id,
+            or_(
+                PlaidConnection.last_realtime_balance_at.is_(None),
+                PlaidConnection.last_realtime_balance_at <= cutoff,
+            ),
+        )
+        .update(
+            {PlaidConnection.last_realtime_balance_at: now},
+            synchronize_session=False,
+        )
+    )
+    db.session.commit()
+    return updated == 1
+
+
 def realtime_update_plaid_balance_for_user(user) -> dict:
     """Force-refresh today's balance from Plaid's /accounts/balance/get endpoint.
 
-    Plaid charges per call for this product, so callers are rate-limited to one
-    successful refresh every ``REALTIME_BALANCE_COOLDOWN_SECONDS`` per
-    connection. Returns a status dict; never returns Plaid secrets or raw
-    payloads.
+    Plaid charges per call for this product, so callers are rate-limited to
+    one *attempted* refresh every ``REALTIME_BALANCE_COOLDOWN_SECONDS`` per
+    connection. The cooldown timestamp is reserved with an atomic conditional
+    UPDATE before the Plaid call is made — that way a failed-but-billed call
+    still consumes the window, and rapid double-clicks cannot trigger
+    duplicate paid calls.
+
+    Returns a status dict; never returns Plaid secrets or raw payloads.
     """
     if user is None or not getattr(user, "id", None):
         return {"status": "skipped", "reason": "no_user"}
@@ -799,18 +857,22 @@ def realtime_update_plaid_balance_for_user(user) -> dict:
     if conn is None:
         return {"status": "skipped", "reason": "no_connection"}
 
-    retry_after = _seconds_until_realtime_refresh(conn)
-    if retry_after > 0:
+    # Atomic pre-call cooldown claim: succeeds only when the previous
+    # refresh was >= 24 hours ago (or never).
+    if not _claim_realtime_refresh_slot(conn.id):
+        # Reload to see the existing timestamp written by whoever owns the slot.
+        db.session.refresh(conn)
         return {
             "status": "rate_limited",
             "reason": "cooldown_active",
-            "retry_after_seconds": retry_after,
-            "last_realtime_balance_at": (
-                conn.last_realtime_balance_at.replace(microsecond=0).isoformat() + "Z"
-                if conn.last_realtime_balance_at
-                else None
-            ),
+            "retry_after_seconds": _seconds_until_realtime_refresh(conn),
+            "last_realtime_balance_at": _iso_utc(conn.last_realtime_balance_at),
+            "next_available_refresh_at": _iso_utc(_next_available_refresh_at(conn)),
         }
+
+    # Slot reserved — refresh local state so we see the new timestamp.
+    db.session.refresh(conn)
+    refreshed_at = conn.last_realtime_balance_at
 
     from plaid.exceptions import ApiException
     from plaid.model.accounts_balance_get_request import AccountsBalanceGetRequest
@@ -825,9 +887,16 @@ def realtime_update_plaid_balance_for_user(user) -> dict:
             "Could not decrypt Plaid access token for user %s (realtime refresh)",
             user.id,
         )
-        _record_sync_status(conn, "decrypt_failed", "Stored Plaid token could not be read.")
+        _record_realtime_status(
+            conn, "decrypt_failed", "Stored Plaid token could not be read."
+        )
         db.session.commit()
-        return {"status": "error", "reason": "decrypt_failed"}
+        return {
+            "status": "error",
+            "reason": "decrypt_failed",
+            "refreshed_at": _iso_utc(refreshed_at),
+            "next_available_refresh_at": _iso_utc(_next_available_refresh_at(conn)),
+        }
 
     try:
         client = _plaid_client()
@@ -849,23 +918,33 @@ def realtime_update_plaid_balance_for_user(user) -> dict:
             info.get("error_code"),
             info.get("error_message"),
         )
-        _record_sync_status(
+        _record_realtime_status(
             conn, "plaid_realtime_api_error", "Plaid real-time balance request failed."
         )
         db.session.commit()
-        return {"status": "error", "reason": "plaid_api_error"}
+        return {
+            "status": "error",
+            "reason": "plaid_api_error",
+            "refreshed_at": _iso_utc(refreshed_at),
+            "next_available_refresh_at": _iso_utc(_next_available_refresh_at(conn)),
+        }
     except Exception:
         logger.exception(
             "Unexpected error calling Plaid /accounts/balance/get for user %s", user.id
         )
-        _record_sync_status(
+        _record_realtime_status(
             conn, "plaid_realtime_unexpected_error", "Unexpected Plaid error."
         )
         try:
             db.session.commit()
         except Exception:
             db.session.rollback()
-        return {"status": "error", "reason": "unexpected_error"}
+        return {
+            "status": "error",
+            "reason": "unexpected_error",
+            "refreshed_at": _iso_utc(refreshed_at),
+            "next_available_refresh_at": _iso_utc(_next_available_refresh_at(conn)),
+        }
 
     target = None
     try:
@@ -878,13 +957,18 @@ def realtime_update_plaid_balance_for_user(user) -> dict:
             break
 
     if target is None:
-        _record_sync_status(
+        _record_realtime_status(
             conn,
             "account_not_found",
             "Connected Plaid account was not in the balance response.",
         )
         db.session.commit()
-        return {"status": "error", "reason": "account_not_found"}
+        return {
+            "status": "error",
+            "reason": "account_not_found",
+            "refreshed_at": _iso_utc(refreshed_at),
+            "next_available_refresh_at": _iso_utc(_next_available_refresh_at(conn)),
+        }
 
     balances = getattr(target, "balances", None)
     available = getattr(balances, "available", None) if balances is not None else None
@@ -897,26 +981,26 @@ def realtime_update_plaid_balance_for_user(user) -> dict:
         balance_value = float(current)
         source = _BALANCE_SOURCE_REALTIME_CURRENT_FALLBACK
     else:
-        # The call still counts against Plaid billing, so record the cooldown
-        # to prevent rapid retries even when no usable balance was returned.
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
-        conn.last_realtime_balance_at = now
-        _record_sync_status(
+        _record_realtime_status(
             conn,
             "no_balance_value",
             "Plaid did not return available or current balance.",
         )
         db.session.commit()
-        return {"status": "skipped", "reason": "no_balance_value"}
+        return {
+            "status": "skipped",
+            "reason": "no_balance_value",
+            "refreshed_at": _iso_utc(refreshed_at),
+            "next_available_refresh_at": _iso_utc(_next_available_refresh_at(conn)),
+        }
 
     _upsert_today_balance(user.id, balance_value)
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    conn.last_realtime_balance_at = now
-    _record_sync_status(conn, source, None)
+    _record_realtime_status(conn, source, None)
     db.session.commit()
     return {
         "status": "ok",
         "source": source,
         "amount": balance_value,
-        "last_realtime_balance_at": now.replace(microsecond=0).isoformat() + "Z",
+        "refreshed_at": _iso_utc(refreshed_at),
+        "next_available_refresh_at": _iso_utc(_next_available_refresh_at(conn)),
     }

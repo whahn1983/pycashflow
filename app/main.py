@@ -607,24 +607,33 @@ def refresh_realtime_balance():
         return redirect(url_for('main.index'))
 
     status = result.get("status")
+    reason = result.get("reason")
     if status == "ok":
-        flash("Balance refreshed from your bank.")
+        flash("Live balance refreshed.")
     elif status == "rate_limited":
         retry_after = int(result.get("retry_after_seconds") or 0)
         hours = max(1, (retry_after + 1800) // 3600)
         flash(
-            f"Balance refresh is limited to once every 24 hours. "
+            "Live refresh is available once every 24 hours. "
             f"Try again in about {hours} hour(s)."
         )
-    elif status == "skipped" and result.get("reason") == "no_connection":
-        flash("Connect a Plaid account in Settings to refresh your balance.")
-    elif status == "skipped" and result.get("reason") == "not_configured":
-        flash("Plaid is not configured.")
-    elif status == "skipped" and result.get("reason") == "no_balance_value":
+    elif status == "skipped" and reason == "no_connection":
+        flash("Connect a Plaid account in Settings > More Settings.")
+    elif status == "skipped" and reason == "not_configured":
+        flash(
+            "Live refresh is unavailable right now. Your cached Plaid balance "
+            "will still update automatically."
+        )
+    elif status == "skipped" and reason == "no_balance_value":
         flash("Plaid did not return a balance for this account.")
     else:
-        flash("Could not refresh balance from Plaid. Please try again later.")
+        flash(
+            "Live refresh is unavailable right now. Your cached Plaid balance "
+            "will still update automatically."
+        )
 
+    # The dashboard route re-runs after this redirect, so any new balance row
+    # is picked up immediately via the existing dashboard calculation helper.
     return redirect(url_for('main.index'))
 
 

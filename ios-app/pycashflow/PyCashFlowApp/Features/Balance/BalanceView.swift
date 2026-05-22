@@ -145,6 +145,8 @@ struct BalanceView: View {
     private func refreshRealtimeBalance() async {
         guard let token = session.token else { return }
         await MainActor.run {
+            // Prevent double-taps while the request is in flight.
+            guard !isRefreshing else { return }
             isRefreshing = true
             errorText = nil
             statusText = nil
@@ -153,18 +155,26 @@ struct BalanceView: View {
             Task { @MainActor in isRefreshing = false }
         }
         do {
-            _ = try await APIClient.shared.request(
+            let response: APIEnvelope<PlaidRealtimeBalanceDTO> = try await APIClient.shared.request(
                 "plaid/realtime-balance",
                 method: "POST",
                 token: token,
                 as: APIEnvelope<PlaidRealtimeBalanceDTO>.self
             )
+            // Reload the local balance card from the existing balance API so
+            // the new amount/date show immediately, and trigger a dashboard
+            // reload notification so the Dashboard view picks up the change.
             await load()
-            await MainActor.run { statusText = "Balance refreshed from your bank." }
+            NotificationCenter.default.post(name: .pycashflowDashboardShouldReload, object: nil)
+            await MainActor.run {
+                statusText = response.data.message ?? "Live balance refreshed."
+            }
         } catch let envelope as APIErrorEnvelope {
             await MainActor.run {
                 if envelope.code == "plaid_realtime_cooldown" {
                     statusText = envelope.error
+                } else if envelope.code == "plaid_no_connection" {
+                    errorText = envelope.error
                 } else {
                     errorText = envelope.error
                 }
@@ -173,4 +183,12 @@ struct BalanceView: View {
             await MainActor.run { errorText = "Failed to refresh balance" }
         }
     }
+}
+
+extension Notification.Name {
+    /// Posted by features that mutate the user's balance so the Dashboard
+    /// view can re-fetch its data without a full app refresh.
+    static let pycashflowDashboardShouldReload = Notification.Name(
+        "PyCashFlowDashboardShouldReload"
+    )
 }
