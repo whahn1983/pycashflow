@@ -362,6 +362,44 @@ body::before {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, var(--primary-dark) 100%);
 }
 
+/* Plaid real-time balance refresh icon button (top-right of Balance card). */
+.balance-card {
+  position: relative;
+}
+
+.balance-refresh-form {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  margin: 0;
+}
+
+.balance-refresh-btn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.balance-refresh-btn:hover:not(:disabled) {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.balance-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .metric-card.warning {
   border: 2px solid var(--warning);
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, var(--primary-dark) 100%);

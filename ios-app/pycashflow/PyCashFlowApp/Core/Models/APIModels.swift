@@ -124,6 +124,15 @@ struct BalanceDTO: Decodable, Identifiable {
     let date: String
 }
 
+struct PlaidRealtimeBalanceDTO: Decodable {
+    let status: String?
+    let source: String?
+    let amount: Double?
+    let reason: String?
+    let last_realtime_balance_at: String?
+    let retry_after_seconds: Int?
+}
+
 struct ScheduleDTO: Decodable, Identifiable {
     let id: Int
     let name: String

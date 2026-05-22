@@ -275,6 +275,9 @@ class PlaidConnection(db.Model):
     last_balance_sync_at = db.Column(db.DateTime, nullable=True)
     last_sync_status = db.Column(db.String(64), nullable=True)
     last_sync_error = db.Column(db.String(255), nullable=True)
+    # Last successful /accounts/balance/get call. Used to rate-limit the
+    # paid real-time refresh to once every 24 hours per user/connection.
+    last_realtime_balance_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(
         db.DateTime,
         nullable=False,

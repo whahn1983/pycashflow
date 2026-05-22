@@ -14,7 +14,13 @@
 <!-- Metrics Grid -->
 <div class="metrics-grid">
     <!-- Current Balance Card -->
-    <div class="metric-card highlight">
+    <div class="metric-card highlight balance-card">
+        <form action="{{ url_for('main.refresh_realtime_balance') }}" method="POST" class="balance-refresh-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="balance-refresh-btn" title="Refresh balance from your bank" aria-label="Refresh balance from your bank">
+                <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+        </form>
         <div class="metric-label">
             <i class="fa-solid fa-wallet"></i> Current Balance
         </div>

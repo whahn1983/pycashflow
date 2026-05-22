@@ -36,6 +36,7 @@ from .ai_insights import (
 from .password_setup import create_password_setup_link
 from .plaid_service import (
     safe_update_plaid_balance_for_user,
+    realtime_update_plaid_balance_for_user,
     remove_plaid_connections_for_user_ids,
 )
 from .totp_utils import (
@@ -581,6 +582,50 @@ def healthz():
     # redirect-free, and side-effect-free so it doesn't pollute access logs
     # or trigger the dashboard Plaid balance refresh.
     return Response('ok', status=200, mimetype='text/plain')
+
+
+@main.route('/refresh_realtime_balance', methods=['POST'])
+@login_required
+@admin_required
+@limiter.limit("60 per hour")
+def refresh_realtime_balance():
+    """Trigger a paid Plaid /accounts/balance/get refresh from the dashboard.
+
+    Rate-limited server-side to once every 24 hours per connection. The
+    dashboard route re-runs after the redirect, so any new balance is
+    reflected immediately.
+    """
+    owner = _get_balance_owner_user()
+    try:
+        result = realtime_update_plaid_balance_for_user(owner)
+    except Exception:
+        logger.exception(
+            "Real-time Plaid balance refresh failed for user %s",
+            getattr(owner, "id", None),
+        )
+        flash("Could not refresh balance from Plaid. Please try again later.")
+        return redirect(url_for('main.index'))
+
+    status = result.get("status")
+    if status == "ok":
+        flash("Balance refreshed from your bank.")
+    elif status == "rate_limited":
+        retry_after = int(result.get("retry_after_seconds") or 0)
+        hours = max(1, (retry_after + 1800) // 3600)
+        flash(
+            f"Balance refresh is limited to once every 24 hours. "
+            f"Try again in about {hours} hour(s)."
+        )
+    elif status == "skipped" and result.get("reason") == "no_connection":
+        flash("Connect a Plaid account in Settings to refresh your balance.")
+    elif status == "skipped" and result.get("reason") == "not_configured":
+        flash("Plaid is not configured.")
+    elif status == "skipped" and result.get("reason") == "no_balance_value":
+        flash("Plaid did not return a balance for this account.")
+    else:
+        flash("Could not refresh balance from Plaid. Please try again later.")
+
+    return redirect(url_for('main.index'))
 
 
 @main.route('/balance', methods=('GET', 'POST'))

@@ -6,15 +6,37 @@ struct BalanceView: View {
     @State private var history: [BalanceDTO] = []
     @State private var newAmount = ""
     @State private var errorText: String?
+    @State private var statusText: String?
+    @State private var isRefreshing: Bool = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let balance {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Current Balance")
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.textMuted)
+                        HStack(spacing: 8) {
+                            Text("Current Balance")
+                                .font(.caption)
+                                .foregroundStyle(AppTheme.textMuted)
+                            Spacer()
+                            Button {
+                                Task { await refreshRealtimeBalance() }
+                            } label: {
+                                Image(systemName: "arrow.clockwise.circle")
+                                    .font(.title3)
+                                    .foregroundStyle(AppTheme.textSecondary)
+                                    .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                                    .animation(
+                                        isRefreshing
+                                            ? .linear(duration: 1).repeatForever(autoreverses: false)
+                                            : .default,
+                                        value: isRefreshing
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isRefreshing)
+                            .accessibilityLabel("Refresh balance from your bank")
+                        }
                         HStack(spacing: 8) {
                             Text("$\(balance.amount)")
                                 .font(.headline)
@@ -29,6 +51,14 @@ struct BalanceView: View {
                         }
                     }
                     .cardRow()
+                }
+
+                if let statusText {
+                    Text(statusText)
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 VStack(spacing: 8) {
@@ -109,6 +139,38 @@ struct BalanceView: View {
             newAmount = ""
         } catch {
             errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to save balance"
+        }
+    }
+
+    private func refreshRealtimeBalance() async {
+        guard let token = session.token else { return }
+        await MainActor.run {
+            isRefreshing = true
+            errorText = nil
+            statusText = nil
+        }
+        defer {
+            Task { @MainActor in isRefreshing = false }
+        }
+        do {
+            _ = try await APIClient.shared.request(
+                "plaid/realtime-balance",
+                method: "POST",
+                token: token,
+                as: APIEnvelope<PlaidRealtimeBalanceDTO>.self
+            )
+            await load()
+            await MainActor.run { statusText = "Balance refreshed from your bank." }
+        } catch let envelope as APIErrorEnvelope {
+            await MainActor.run {
+                if envelope.code == "plaid_realtime_cooldown" {
+                    statusText = envelope.error
+                } else {
+                    errorText = envelope.error
+                }
+            }
+        } catch {
+            await MainActor.run { errorText = "Failed to refresh balance" }
         }
     }
 }
