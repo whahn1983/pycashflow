@@ -778,6 +778,90 @@ class TestRemoveConnectionsBulk:
             _deconfigure_plaid(flask_app)
 
 
+class TestRealtimeCooldownSurvivesReconnect:
+    """Deleting and re-adding a Plaid account must not reset the 24-hour
+    /accounts/balance/get rate limit."""
+
+    def _mock_exchange(self, item_id="item-x", access_token="access-x"):
+        return SimpleNamespace(item_id=item_id, access_token=access_token)
+
+    def test_remove_preserves_cooldown_on_user(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            cooldown_at = datetime.utcnow() - timedelta(hours=1)
+            _add_connection(plaid_user, last_realtime_balance_at=cooldown_at)
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client"):
+                plaid_service.remove_plaid_connection_for_user(user)
+            db.session.refresh(user)
+            assert user.last_plaid_realtime_balance_at == cooldown_at
+            _deconfigure_plaid(flask_app)
+
+    def test_remove_bulk_preserves_cooldown_on_user(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            cooldown_at = datetime.utcnow() - timedelta(hours=2)
+            _add_connection(plaid_user, last_realtime_balance_at=cooldown_at)
+            with patch.object(plaid_service, "_plaid_client"):
+                plaid_service.remove_plaid_connections_for_user_ids(
+                    [plaid_user], commit=True
+                )
+            user = User.query.get(plaid_user)
+            assert user.last_plaid_realtime_balance_at == cooldown_at
+            _deconfigure_plaid(flask_app)
+
+    def test_remove_without_prior_realtime_call_leaves_user_null(
+        self, flask_app, plaid_user
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            with patch.object(plaid_service, "_plaid_client"):
+                plaid_service.remove_plaid_connection_for_user(user)
+            db.session.refresh(user)
+            assert user.last_plaid_realtime_balance_at is None
+            _deconfigure_plaid(flask_app)
+
+    def test_reconnect_restores_cooldown_on_new_connection(
+        self, flask_app, plaid_user
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            cooldown_at = datetime.utcnow() - timedelta(hours=1)
+            _add_connection(plaid_user, last_realtime_balance_at=cooldown_at)
+            user = User.query.get(plaid_user)
+
+            with patch.object(plaid_service, "_plaid_client"):
+                plaid_service.remove_plaid_connection_for_user(user)
+
+            metadata = {
+                "institution": {"institution_id": "ins_9", "name": "Re-Add Bank"},
+                "accounts": [
+                    {
+                        "id": "acct-reconnect-1",
+                        "name": "Checking",
+                        "mask": "9999",
+                        "type": "depository",
+                        "subtype": "checking",
+                        "iso_currency_code": "USD",
+                    }
+                ],
+            }
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                mock_client.return_value.item_public_token_exchange.return_value = (
+                    self._mock_exchange(
+                        item_id="item-reconnect", access_token="access-reconnect"
+                    )
+                )
+                new_conn = plaid_service.exchange_public_token_for_user(
+                    user, "public-token-reconnect", metadata
+                )
+
+            assert new_conn.last_realtime_balance_at == cooldown_at
+            _deconfigure_plaid(flask_app)
+
+
 # ── Balance update ──────────────────────────────────────────────────────────
 
 

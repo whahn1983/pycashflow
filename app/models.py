@@ -24,6 +24,10 @@ class User(UserMixin, db.Model):
     is_review_user = db.Column(
         db.Boolean, default=False, server_default=db.false(), nullable=False
     )
+    # Last consumed Plaid /accounts/balance/get cooldown slot for this user.
+    # Persisted on the user (not just the PlaidConnection) so deleting and
+    # re-adding the Plaid account does not reset the 24-hour rate limit.
+    last_plaid_realtime_balance_at = db.Column(db.DateTime, nullable=True)
 
     # Relationships
     guests = db.relationship(
