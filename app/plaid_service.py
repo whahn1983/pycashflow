@@ -21,7 +21,7 @@ from sqlalchemy import desc, or_
 
 from app import db
 from app.crypto_utils import encrypt_password, decrypt_password
-from app.models import Balance, PlaidConnection
+from app.models import Balance, PlaidConnection, User
 
 logger = logging.getLogger(__name__)
 
@@ -507,6 +507,9 @@ def exchange_public_token_for_user(user, public_token: str, metadata: dict) -> P
         account_subtype=(selected.get("subtype") or None),
         iso_currency_code=(selected.get("iso_currency_code") or None),
         is_active=True,
+        # Carry the user-level cooldown timestamp into the new connection so
+        # delete-and-re-add cannot bypass the 24-hour real-time refresh limit.
+        last_realtime_balance_at=getattr(user, "last_plaid_realtime_balance_at", None),
     )
     db.session.add(conn)
     db.session.commit()
@@ -555,6 +558,23 @@ def _detach_plaid_item(conn: PlaidConnection) -> None:
         )
 
 
+def _preserve_realtime_cooldown(conn: PlaidConnection) -> None:
+    """Copy the connection's real-time refresh cooldown timestamp onto its user.
+
+    The PlaidConnection row is about to be deleted; persisting
+    ``last_realtime_balance_at`` on the user prevents a delete-and-re-add
+    cycle from resetting the 24-hour /accounts/balance/get rate limit.
+    """
+    if conn.last_realtime_balance_at is None:
+        return
+    user = getattr(conn, "user", None)
+    if user is None:
+        user = User.query.get(conn.user_id)
+    if user is None:
+        return
+    user.last_plaid_realtime_balance_at = conn.last_realtime_balance_at
+
+
 def remove_plaid_connection_for_user(user) -> bool:
     """Remove the active Plaid connection for ``user``. Returns True if removed."""
     conn = get_active_connection(user)
@@ -562,6 +582,7 @@ def remove_plaid_connection_for_user(user) -> bool:
         return False
 
     _detach_plaid_item(conn)
+    _preserve_realtime_cooldown(conn)
     db.session.delete(conn)
     db.session.commit()
     return True
@@ -583,6 +604,7 @@ def remove_plaid_connections_for_user_ids(user_ids, *, commit: bool = False) -> 
     )
     for conn in connections:
         _detach_plaid_item(conn)
+        _preserve_realtime_cooldown(conn)
         db.session.delete(conn)
 
     if commit and connections:
