@@ -778,10 +778,11 @@ def update_plaid_balance_for_user(user) -> dict:
     # refresh, the cached value is stale relative to the live one we already
     # wrote. Don't overwrite. (The 5-minute brute-force protection above
     # covers institutions that don't populate last_updated_datetime.)
+    normalized_cache_updated_at = _normalize_naive_utc(cache_updated_at)
     if (
         conn.last_realtime_balance_at is not None
-        and cache_updated_at is not None
-        and _normalize_naive_utc(cache_updated_at) < conn.last_realtime_balance_at
+        and normalized_cache_updated_at is not None
+        and normalized_cache_updated_at < conn.last_realtime_balance_at
     ):
         result = {"status": "skipped", "reason": "cache_older_than_realtime"}
         if cache is not None:
