@@ -296,6 +296,25 @@ class TestBalanceUpdate:
         # Should redirect back to the dashboard
         assert resp.status_code in (301, 302)
 
+    def test_balance_update_upserts_same_date(self, auth_client, flask_app):
+        from conftest import _Balance as Balance
+
+        target_date = "2099-02-02"
+        auth_client.post(
+            "/balance",
+            data={"amount": "100.00", "date": target_date},
+            follow_redirects=False,
+        )
+        auth_client.post(
+            "/balance",
+            data={"amount": "250.00", "date": target_date},
+            follow_redirects=False,
+        )
+        with flask_app.app_context():
+            rows = Balance.query.filter_by(date=datetime.strptime(target_date, "%Y-%m-%d").date()).all()
+            assert len(rows) == 1
+            assert str(rows[0].amount) == "250.00"
+
 
 # ── Tests: scenario creation (POST /create_scenario) ─────────────────────────
 

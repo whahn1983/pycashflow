@@ -676,6 +676,15 @@ def api_set_balance():
         return validation_error(errors)
 
     balance_date = datetime.strptime(body.get("date") or datetime.today().date().isoformat(), "%Y-%m-%d").date()
+    existing = (
+        Balance.query.filter_by(user_id=user_id, date=balance_date)
+        .order_by(desc(Balance.id))
+        .first()
+    )
+    if existing is not None:
+        existing.amount = body["amount"]
+        db.session.commit()
+        return api_ok(serialize_balance(existing))
     balance = Balance(user_id=user_id, amount=body["amount"], date=balance_date)
     db.session.add(balance)
     db.session.commit()

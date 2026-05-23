@@ -788,13 +788,26 @@ class TestWriteEndpoints:
 
     def test_balance_post_and_history(self, client):
         token = _login(client)
+        # Seeded user already has a balance row for today, so POSTing for the
+        # same date updates the existing row (200) rather than creating one (201).
         resp = client.post(
             "/api/v1/balance",
             headers=_bearer(token),
             json={"amount": "999.00", "date": date.today().isoformat()},
             content_type="application/json",
         )
-        assert resp.status_code == 201
+        assert resp.status_code == 200
+        assert _json(resp)["data"]["amount"] == "999.00"
+
+        # Posting for a new date should create a new row.
+        new_date = (date.today() - timedelta(days=1)).isoformat()
+        resp_new = client.post(
+            "/api/v1/balance",
+            headers=_bearer(token),
+            json={"amount": "1234.00", "date": new_date},
+            content_type="application/json",
+        )
+        assert resp_new.status_code == 201
 
         history = client.get("/api/v1/balance/history?limit=1&offset=0", headers=_bearer(token))
         assert history.status_code == 200
