@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import json
 
 from sqlalchemy import desc
+from sqlalchemy.exc import IntegrityError
 
 from flask import request, g
 
@@ -687,7 +688,18 @@ def api_set_balance():
         return api_ok(serialize_balance(existing))
     balance = Balance(user_id=user_id, amount=body["amount"], date=balance_date)
     db.session.add(balance)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        # A concurrent request inserted a row for the same (user_id, date)
+        # between our SELECT and INSERT. Roll back, refetch, and update.
+        db.session.rollback()
+        existing = Balance.query.filter_by(user_id=user_id, date=balance_date).first()
+        if existing is None:
+            raise
+        existing.amount = body["amount"]
+        db.session.commit()
+        return api_ok(serialize_balance(existing))
     return api_created(serialize_balance(balance))
 
 

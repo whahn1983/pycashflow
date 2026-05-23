@@ -16,6 +16,7 @@ import json
 import logging
 from urllib.parse import urlparse
 from sqlalchemy import desc, extract, asc
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 from .cashflow import update_cash, plot_cash, calculate_cash_risk_score
 from .auth import admin_required, global_admin_required, account_owner_required
@@ -98,7 +99,13 @@ def index():
     if balance is None:
         balance = Balance(amount='0', date=datetime.today(), user_id=user_id)
         db.session.add(balance)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            balance = Balance.query.filter_by(user_id=user_id).order_by(
+                desc(Balance.date), desc(Balance.id)
+            ).first()
     else:
         try:
             float(balance.amount)
@@ -664,9 +671,18 @@ def balance():
         )
         if existing is not None:
             existing.amount = amount
+            db.session.commit()
         else:
             db.session.add(Balance(amount=amount, date=balance_date, user_id=user_id))
-        db.session.commit()
+            try:
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                existing = Balance.query.filter_by(user_id=user_id, date=balance_date).first()
+                if existing is None:
+                    raise
+                existing.amount = amount
+                db.session.commit()
 
         return redirect(url_for('main.index'))
 

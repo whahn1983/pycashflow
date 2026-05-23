@@ -18,6 +18,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from flask import current_app, g
 from sqlalchemy import desc, or_
+from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.crypto_utils import encrypt_password, decrypt_password
@@ -659,9 +660,23 @@ def _upsert_today_balance(user_id: int, amount: float) -> Balance:
     if existing is not None:
         existing.amount = amount
         return existing
+    # Flush inside a SAVEPOINT so a concurrent insert for the same
+    # (user_id, date) surfaces as IntegrityError here without discarding
+    # any other dirty state on the outer transaction.
     row = Balance(user_id=user_id, amount=amount, date=today)
     db.session.add(row)
-    return row
+    savepoint = db.session.begin_nested()
+    try:
+        db.session.flush()
+        savepoint.commit()
+        return row
+    except IntegrityError:
+        savepoint.rollback()
+        existing = Balance.query.filter_by(user_id=user_id, date=today).first()
+        if existing is None:
+            raise
+        existing.amount = amount
+        return existing
 
 
 def _record_sync_status(conn: PlaidConnection, status: str, error: Optional[str]) -> None:
