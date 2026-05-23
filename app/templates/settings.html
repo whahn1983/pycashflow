@@ -830,9 +830,10 @@
                     background-color: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger);
                     border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.875rem;"></div>
                 <p style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 1rem;">
-                    Only one Plaid account sync is supported. PyCashFlow stores only minimal
-                    connection metadata, never your bank credentials or queried balances. Plaid
-                    Link handles all credential entry inside Plaid's secure flow.
+                    Only one Plaid account sync is supported. PyCashFlow never sees your bank
+                    credentials &mdash; Plaid Link handles credential entry inside Plaid's secure
+                    flow &mdash; and we store only an encrypted access token plus the queried
+                    balance as today's balance entry.
                 </p>
             </div>
         </div>
