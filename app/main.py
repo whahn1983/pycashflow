@@ -656,10 +656,16 @@ def balance():
     if request.method == 'POST':
         amount = request.form['amount']
         dateentry = request.form['date']
-        balance = Balance(amount=amount,
-                          date=datetime.strptime(dateentry, format).date(),
-                          user_id=user_id)
-        db.session.add(balance)
+        balance_date = datetime.strptime(dateentry, format).date()
+        existing = (
+            Balance.query.filter_by(user_id=user_id, date=balance_date)
+            .order_by(desc(Balance.id))
+            .first()
+        )
+        if existing is not None:
+            existing.amount = amount
+        else:
+            db.session.add(Balance(amount=amount, date=balance_date, user_id=user_id))
         db.session.commit()
 
         return redirect(url_for('main.index'))
