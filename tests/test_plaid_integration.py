@@ -810,6 +810,38 @@ class TestRealtimeCooldownSurvivesReconnect:
             assert user.last_plaid_realtime_balance_at == cooldown_at
             _deconfigure_plaid(flask_app)
 
+    def test_remove_bulk_keeps_newest_cooldown_across_multiple_connections(
+        self, flask_app, plaid_user
+    ):
+        """Multiple PlaidConnection rows for one user (e.g. an inactive
+        leftover + an active one) must not let bulk delete move the user's
+        cooldown backward — keep the newest timestamp regardless of row
+        iteration order."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            older = datetime.utcnow() - timedelta(hours=20)
+            newer = datetime.utcnow() - timedelta(hours=1)
+            _add_connection(
+                plaid_user,
+                plaid_item_id="item-old",
+                plaid_account_id="acct-old",
+                is_active=False,
+                last_realtime_balance_at=older,
+            )
+            _add_connection(
+                plaid_user,
+                plaid_item_id="item-new",
+                plaid_account_id="acct-new",
+                last_realtime_balance_at=newer,
+            )
+            with patch.object(plaid_service, "_plaid_client"):
+                plaid_service.remove_plaid_connections_for_user_ids(
+                    [plaid_user], commit=True
+                )
+            user = User.query.get(plaid_user)
+            assert user.last_plaid_realtime_balance_at == newer
+            _deconfigure_plaid(flask_app)
+
     def test_remove_without_prior_realtime_call_leaves_user_null(
         self, flask_app, plaid_user
     ):

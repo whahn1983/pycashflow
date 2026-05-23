@@ -564,6 +564,11 @@ def _preserve_realtime_cooldown(conn: PlaidConnection) -> None:
     The PlaidConnection row is about to be deleted; persisting
     ``last_realtime_balance_at`` on the user prevents a delete-and-re-add
     cycle from resetting the 24-hour /accounts/balance/get rate limit.
+
+    Keeps the newest of the user-level and connection-level timestamps:
+    bulk deletes may iterate multiple connections per user (and SQL row
+    order is not guaranteed), so a blind overwrite could move the
+    cooldown backward and let a reconnect bypass the rate limit.
     """
     if conn.last_realtime_balance_at is None:
         return
@@ -572,7 +577,9 @@ def _preserve_realtime_cooldown(conn: PlaidConnection) -> None:
         user = User.query.get(conn.user_id)
     if user is None:
         return
-    user.last_plaid_realtime_balance_at = conn.last_realtime_balance_at
+    existing = user.last_plaid_realtime_balance_at
+    if existing is None or conn.last_realtime_balance_at > existing:
+        user.last_plaid_realtime_balance_at = conn.last_realtime_balance_at
 
 
 def remove_plaid_connection_for_user(user) -> bool:
