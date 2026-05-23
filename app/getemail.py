@@ -256,14 +256,20 @@ def process_email_balances():
                 existing_balance = Balance.query.filter_by(
                     user_id=user_id,
                     date=balance_date,
-                    amount=new_balance,
                 ).first()
 
-                if existing_balance:
+                if existing_balance is not None and float(existing_balance.amount) == new_balance:
                     logger.info(
                         "Duplicate balance ignored for user %s",
                         user_id,
                     )
+                elif existing_balance is not None:
+                    # Upsert: same-day row already exists with a different
+                    # amount — update it instead of inserting a duplicate.
+                    existing_balance.amount = new_balance
+                    db.session.commit()
+                    balance_updated = True
+                    logger.info("Balance updated successfully for user %s", user_id)
                 else:
                     # Insert balance WITH user_id using SQLAlchemy ORM
                     balance = Balance(

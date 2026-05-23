@@ -106,6 +106,7 @@ class Balance(db.Model):
 
     __table_args__ = (
         db.Index('ix_balance_user_id_date_id', 'user_id', 'date', 'id'),
+        db.UniqueConstraint('user_id', 'date', name='uq_balance_user_id_date'),
     )
 
 
