@@ -544,14 +544,18 @@ cached freshness timestamp against the most recent email balance timestamp
 recorded on the user's `email` configuration (`balance_email_datetime`,
 captured from the message's `Date` header):
 
-- If today's email balance timestamp is **newer** than Plaid's cached
-  freshness timestamp, the cached sync is skipped
+- If the email balance timestamp is **newer** than Plaid's cached freshness
+  timestamp, the cached sync is skipped
   (`skipped_cached_plaid_update_email_newer`) and the email value remains
   in the balance row.
-- If Plaid's cached freshness timestamp is missing/unknown and a same-date
-  email balance timestamp exists, the cached sync is skipped.
-- Otherwise (cached value is newer than email, or no same-date email
-  exists) the normal `/accounts/get` upsert runs.
+- If Plaid's cached freshness timestamp is missing/unknown and any email
+  balance timestamp exists, the cached sync is skipped.
+- Otherwise (Plaid's cached value is newer than the email, or no email
+  balance timestamp exists) the normal `/accounts/get` upsert runs.
+
+The comparison is purely timestamp-vs-timestamp — it does not consider the
+calendar day of either side or the date of the balance row. The balance
+row's date is used only as the insert/update key for today's row.
 
 No balance source/source-timestamp columns are added — the balance table
 keeps storing balance values as before. The comparison reuses the existing
