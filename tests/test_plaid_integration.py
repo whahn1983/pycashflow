@@ -1283,21 +1283,31 @@ class TestEmailBalanceVsPlaidCachedSync:
                 db.session.commit()
                 _deconfigure_plaid(flask_app)
 
-    def test_updates_when_no_same_date_email_timestamp(self, flask_app, plaid_user):
-        """An old email balance from a previous day must not block today's sync."""
+    def test_updates_when_old_email_predates_fresh_plaid_cache(
+        self, flask_app, plaid_user
+    ):
+        """An old email balance must not block a Plaid cached value whose
+        freshness is newer than the email — the comparison is purely
+        timestamp-vs-timestamp.
+        """
         with flask_app.app_context():
             _configure_plaid(flask_app)
             _add_connection(plaid_user)
-            # Email datetime from several days ago — different local date.
             email_ts = datetime.utcnow() - timedelta(days=3)
             _add_email_config(plaid_user, balance_email_datetime=email_ts)
 
             user = User.query.get(plaid_user)
             try:
                 with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    fresh_cache_ts = (
+                        datetime.utcnow() - timedelta(minutes=5)
+                    ).replace(tzinfo=timezone.utc).isoformat()
                     mock_client.return_value.accounts_get.return_value = (
                         _make_balances_response(
-                            "acct-1", available=321.0, current=400.0
+                            "acct-1",
+                            available=321.0,
+                            current=400.0,
+                            last_updated_datetime=fresh_cache_ts,
                         )
                     )
                     result = plaid_service.update_plaid_balance_for_user(user)
@@ -1344,7 +1354,7 @@ class TestEmailBalanceVsPlaidCachedSync:
         self, flask_app, plaid_user
     ):
         """If a user has more than one Email row, the newest balance timestamp
-        wins — a stale one must not be picked over a fresh same-date one.
+        wins — a stale one must not be picked over a fresher one.
         """
         with flask_app.app_context():
             _configure_plaid(flask_app)
