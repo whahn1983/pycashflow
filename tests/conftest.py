@@ -40,8 +40,10 @@ from app.models import (
     PasskeyCredential as _PasskeyCredential,
     PasswordSetupToken as _PasswordSetupToken,
     PlaidConnection as _PlaidConnection,
+    Email as _Email,
 )  # noqa: E402
 from app import plaid_service as _plaid_service  # noqa: E402
+from app import getemail as _getemail  # noqa: E402
 from app.password_setup import (  # noqa: E402
     build_password_setup_url as _build_password_setup_url,
     create_password_setup_token as _create_password_setup_token,

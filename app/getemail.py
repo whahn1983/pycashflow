@@ -21,10 +21,10 @@ import email
 import smtplib
 from flask import current_app
 from email.header import decode_header
-from email.utils import parseaddr
+from email.utils import parseaddr, parsedate_to_datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app import db
 from app.models import User, Email, Balance, GlobalEmailSettings
 from app.crypto_utils import decrypt_password
@@ -61,6 +61,27 @@ def _sender_is_allowed(sender_address: str, allowed_sender: str) -> bool:
     if allowed.startswith("@"):
         return sender.endswith(allowed)
     return sender == allowed
+
+
+def _email_message_datetime_utc(msg) -> datetime:
+    """Return the best-available send timestamp for *msg*, as naive UTC.
+
+    Prefers the message ``Date`` header (RFC 5322); falls back to the
+    current processing time if the header is missing or unparseable.
+    Naive datetimes parsed from the header are assumed to be UTC, matching
+    the app's stored-datetime convention.
+    """
+    raw = msg.get("Date") if msg is not None else None
+    if raw:
+        try:
+            parsed = parsedate_to_datetime(raw)
+        except (TypeError, ValueError, IndexError):
+            parsed = None
+        if isinstance(parsed, datetime):
+            if parsed.tzinfo is not None:
+                parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+            return parsed
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _parse_auth_results(msg) -> dict:
@@ -133,6 +154,10 @@ def process_email_balances():
             logger.info("Found %d email(s) from the past day for user %s", emails_scanned, user_id)
 
             email_content = {}
+            # Best-available send timestamp (naive UTC) for the message that
+            # populated email_content[subject]. The newest timestamp wins so
+            # the recorded balance datetime tracks the most recent email.
+            email_datetimes: dict = {}
 
             # INNER LOOP: Process only emails from the past day
             for email_id in email_ids:
@@ -208,6 +233,14 @@ def process_email_balances():
                                         user_id, mech.upper(),
                                     )
 
+                            msg_datetime = _email_message_datetime_utc(msg)
+
+                            def _record_body(subj, body_text):
+                                existing_ts = email_datetimes.get(subj)
+                                if existing_ts is None or msg_datetime >= existing_ts:
+                                    email_content[subj] = body_text
+                                    email_datetimes[subj] = msg_datetime
+
                             # Extract email body
                             if msg.is_multipart():
                                 for part in msg.walk():
@@ -226,12 +259,12 @@ def process_email_balances():
                                         and "attachment" not in content_disposition
                                         and body is not None
                                     ):
-                                        email_content[subject] = body
+                                        _record_body(subject, body)
                             else:
                                 content_type = msg.get_content_type()
                                 body = msg.get_payload(decode=True).decode()
                                 if content_type == "text/plain":
-                                    email_content[subject] = body
+                                    _record_body(subject, body)
                 except Exception as exc:
                     logger.debug(
                         "Skipping an email for user %s due to error: %s",
@@ -252,13 +285,24 @@ def process_email_balances():
                 new_balance = new_balance.replace('$', '')
                 new_balance = float(new_balance)
                 balance_date = datetime.today().date()
+                email_message_datetime = email_datetimes.get(subjectstr) or (
+                    datetime.now(timezone.utc).replace(tzinfo=None)
+                )
 
                 existing_balance = Balance.query.filter_by(
                     user_id=user_id,
                     date=balance_date,
                 ).first()
 
+                # Record the email balance timestamp on the Email config row
+                # regardless of duplicate detection — the Plaid cached sync
+                # uses this to detect that today's balance was email-sourced.
+                existing_ts = email_config.balance_email_datetime
+                if existing_ts is None or email_message_datetime > existing_ts:
+                    email_config.balance_email_datetime = email_message_datetime
+
                 if existing_balance is not None and float(existing_balance.amount) == new_balance:
+                    db.session.commit()
                     logger.info(
                         "Duplicate balance ignored for user %s",
                         user_id,

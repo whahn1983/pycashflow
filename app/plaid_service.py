@@ -22,7 +22,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.crypto_utils import encrypt_password, decrypt_password
-from app.models import Balance, PlaidConnection, User
+from app.models import Balance, Email, PlaidConnection, User
 
 logger = logging.getLogger(__name__)
 
@@ -650,6 +650,39 @@ def _normalize_naive_utc(value):
     return value
 
 
+def _newest_email_balance_datetime(user_id: int) -> Optional[datetime]:
+    """Return the most recent email balance timestamp for *user_id*, or None.
+
+    Multiple Email configs per user are allowed by the schema; the newest
+    ``balance_email_datetime`` across them wins so a same-date email balance
+    is reliably detected.
+    """
+    row = (
+        db.session.query(Email.balance_email_datetime)
+        .filter(
+            Email.user_id == user_id,
+            Email.balance_email_datetime.isnot(None),
+        )
+        .order_by(desc(Email.balance_email_datetime))
+        .first()
+    )
+    return row[0] if row else None
+
+
+def _email_balance_local_date(email_dt: datetime) -> Optional[date]:
+    """Convert a naive-UTC email balance timestamp to a local date.
+
+    Balance rows are keyed by local date (``datetime.today().date()``), so
+    the email datetime must be projected into local time before matching.
+    """
+    if email_dt is None:
+        return None
+    try:
+        return email_dt.replace(tzinfo=timezone.utc).astimezone().date()
+    except (ValueError, OverflowError):
+        return None
+
+
 def _upsert_today_balance(user_id: int, amount: float) -> Balance:
     today = _today_date()
     existing = (
@@ -832,6 +865,30 @@ def update_plaid_balance_for_user(user) -> dict:
         if cache is not None:
             cache[user.id] = result
         return result
+
+    # Don't overwrite a same-date email-derived balance with a possibly-stale
+    # Plaid cached value. Plaid's /accounts/get returns cached data whose
+    # freshness is exposed via ``balances.last_updated_datetime``; if that is
+    # older than (or unknown relative to) the latest balance email we processed
+    # for today, the email value is authoritative.
+    email_balance_dt = _newest_email_balance_datetime(user.id)
+    if email_balance_dt is not None:
+        if _email_balance_local_date(email_balance_dt) == _today_date() and (
+            normalized_cache_updated_at is None
+            or normalized_cache_updated_at < email_balance_dt
+        ):
+            logger.info(
+                "Plaid cached /accounts/get sync skipped for user %s: "
+                "email balance is newer than Plaid cached freshness",
+                user.id,
+            )
+            result = {
+                "status": "skipped",
+                "reason": "skipped_cached_plaid_update_email_newer",
+            }
+            if cache is not None:
+                cache[user.id] = result
+            return result
 
     if available is not None:
         balance_value = float(available)
