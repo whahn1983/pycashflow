@@ -168,6 +168,11 @@ class Email(db.Model):
     # Exact match: 'alerts@bank.com'  Domain match: '@bank.com'
     # NULL means no restriction is configured (ingestion proceeds with a warning).
     allowed_sender = db.Column(db.String(200), nullable=True)
+    # Timestamp of the most recent balance email this config produced. Stored
+    # as naive UTC (Date header → UTC; processing time fallback). The Plaid
+    # cached /accounts/get sync compares this against Plaid's cached freshness
+    # so a stale cached balance cannot overwrite a newer email-derived one.
+    balance_email_datetime = db.Column(db.DateTime, nullable=True)
 
     # Relationships
     user = db.relationship('User', backref='email_configs')

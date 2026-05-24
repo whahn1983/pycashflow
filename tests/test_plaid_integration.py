@@ -25,6 +25,7 @@ from conftest import (  # noqa: E402
     _Balance as Balance,
     _User as User,
     _PlaidConnection as PlaidConnection,
+    _Email as Email,
     _plaid_service as plaid_service,
 )
 from app.crypto_utils import encrypt_password  # crypto_utils is never stubbed
@@ -1146,6 +1147,342 @@ class TestUpdateBalance:
             ).first()
             assert float(row.amount) == pytest.approx(1234.56)
             _deconfigure_plaid(flask_app)
+
+
+# ── Email balance vs Plaid cached sync precedence ───────────────────────────
+
+
+def _add_email_config(user_id: int, balance_email_datetime=None, **overrides):
+    """Insert an Email config row for *user_id* with optional timestamp."""
+    defaults = dict(
+        user_id=user_id,
+        email="bank-alerts@example.com",
+        password=encrypt_password("imap-pw"),
+        server="imap.example.com",
+        subjectstr="Daily balance",
+        startstr="$",
+        endstr=" USD",
+        balance_email_datetime=balance_email_datetime,
+    )
+    defaults.update(overrides)
+    cfg = Email(**defaults)
+    db.session.add(cfg)
+    db.session.commit()
+    return cfg
+
+
+class TestEmailBalanceVsPlaidCachedSync:
+    """The dashboard /accounts/get sync must not overwrite a newer email-derived
+    balance with stale Plaid cached data.
+    """
+
+    def test_skips_when_email_newer_than_plaid_cache(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            email_ts = datetime.utcnow() - timedelta(minutes=5)
+            _add_email_config(plaid_user, balance_email_datetime=email_ts)
+            db.session.add(
+                Balance(user_id=plaid_user, amount=1234.56, date=date.today())
+            )
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    stale_cache_ts = (
+                        datetime.utcnow() - timedelta(hours=2)
+                    ).replace(tzinfo=timezone.utc).isoformat()
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1",
+                            available=10.0,
+                            current=10.0,
+                            last_updated_datetime=stale_cache_ts,
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "skipped"
+                assert result["reason"] == "skipped_cached_plaid_update_email_newer"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(1234.56)
+            finally:
+                Email.query.filter_by(user_id=plaid_user).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+    def test_skips_when_plaid_cache_freshness_missing(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            email_ts = datetime.utcnow() - timedelta(minutes=10)
+            _add_email_config(plaid_user, balance_email_datetime=email_ts)
+            db.session.add(
+                Balance(user_id=plaid_user, amount=2222.22, date=date.today())
+            )
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1",
+                            available=50.0,
+                            current=50.0,
+                            last_updated_datetime=None,
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "skipped"
+                assert result["reason"] == "skipped_cached_plaid_update_email_newer"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(2222.22)
+            finally:
+                Email.query.filter_by(user_id=plaid_user).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+    def test_updates_when_plaid_cache_newer_than_email(self, flask_app, plaid_user):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            email_ts = datetime.utcnow() - timedelta(hours=3)
+            _add_email_config(plaid_user, balance_email_datetime=email_ts)
+            db.session.add(
+                Balance(user_id=plaid_user, amount=100.0, date=date.today())
+            )
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    fresh_cache_ts = (
+                        datetime.utcnow() - timedelta(minutes=5)
+                    ).replace(tzinfo=timezone.utc).isoformat()
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1",
+                            available=777.0,
+                            current=800.0,
+                            last_updated_datetime=fresh_cache_ts,
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "ok"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(777.0)
+            finally:
+                Email.query.filter_by(user_id=plaid_user).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+    def test_updates_when_no_same_date_email_timestamp(self, flask_app, plaid_user):
+        """An old email balance from a previous day must not block today's sync."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            # Email datetime from several days ago — different local date.
+            email_ts = datetime.utcnow() - timedelta(days=3)
+            _add_email_config(plaid_user, balance_email_datetime=email_ts)
+
+            user = User.query.get(plaid_user)
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1", available=321.0, current=400.0
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "ok"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(321.0)
+            finally:
+                Email.query.filter_by(user_id=plaid_user).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+    def test_updates_when_email_config_has_no_balance_timestamp(
+        self, flask_app, plaid_user
+    ):
+        """An Email config without a recorded balance timestamp is a no-op
+        for the skip rule — the normal Plaid sync still proceeds."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            _add_email_config(plaid_user, balance_email_datetime=None)
+
+            user = User.query.get(plaid_user)
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1", available=55.5, current=60.0
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "ok"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(55.5)
+            finally:
+                Email.query.filter_by(user_id=plaid_user).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+    def test_uses_newest_timestamp_across_multiple_email_configs(
+        self, flask_app, plaid_user
+    ):
+        """If a user has more than one Email row, the newest balance timestamp
+        wins — a stale one must not be picked over a fresh same-date one.
+        """
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            old_ts = datetime.utcnow() - timedelta(days=2)
+            fresh_ts = datetime.utcnow() - timedelta(minutes=2)
+            _add_email_config(plaid_user, balance_email_datetime=old_ts)
+            _add_email_config(
+                plaid_user,
+                balance_email_datetime=fresh_ts,
+                email="bank-alerts-2@example.com",
+            )
+            db.session.add(
+                Balance(user_id=plaid_user, amount=4242.42, date=date.today())
+            )
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    stale_cache_ts = (
+                        datetime.utcnow() - timedelta(hours=1)
+                    ).replace(tzinfo=timezone.utc).isoformat()
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1",
+                            available=1.0,
+                            current=1.0,
+                            last_updated_datetime=stale_cache_ts,
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "skipped"
+                assert result["reason"] == "skipped_cached_plaid_update_email_newer"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(4242.42)
+            finally:
+                Email.query.filter_by(user_id=plaid_user).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+    def test_realtime_refresh_not_blocked_by_email_skip_rule(
+        self, flask_app, plaid_user
+    ):
+        """Manual /accounts/balance/get is user-triggered and must remain
+        free to update today's balance even when an email balance is newer.
+        """
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            email_ts = datetime.utcnow() - timedelta(minutes=1)
+            _add_email_config(plaid_user, balance_email_datetime=email_ts)
+            db.session.add(
+                Balance(user_id=plaid_user, amount=10.0, date=date.today())
+            )
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    mock_client.return_value.accounts_balance_get.return_value = (
+                        _make_balances_response(
+                            "acct-1", available=999.0, current=1000.0
+                        )
+                    )
+                    result = plaid_service.realtime_update_plaid_balance_for_user(
+                        user
+                    )
+                assert result["status"] == "ok"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(999.0)
+            finally:
+                Email.query.filter_by(user_id=plaid_user).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+    def test_dashboard_still_loads_when_email_skip_fires(
+        self, auth_client, flask_app
+    ):
+        """The dashboard must continue to render and use the existing balance
+        row when the Plaid cached sync is skipped because the email balance
+        is newer.
+        """
+        from conftest import _ADMIN_USER_ID
+
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(_ADMIN_USER_ID)
+            email_ts = datetime.utcnow() - timedelta(minutes=3)
+            _add_email_config(_ADMIN_USER_ID, balance_email_datetime=email_ts)
+            # Replace the seeded admin balance with a known email-derived value.
+            Balance.query.filter_by(
+                user_id=_ADMIN_USER_ID, date=date.today()
+            ).delete()
+            db.session.add(
+                Balance(user_id=_ADMIN_USER_ID, amount=8888.88, date=date.today())
+            )
+            db.session.commit()
+        try:
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                stale_cache_ts = (
+                    datetime.utcnow() - timedelta(hours=2)
+                ).replace(tzinfo=timezone.utc).isoformat()
+                mock_client.return_value.accounts_get.return_value = (
+                    _make_balances_response(
+                        "acct-1",
+                        available=1.0,
+                        current=1.0,
+                        last_updated_datetime=stale_cache_ts,
+                    )
+                )
+                resp = auth_client.get("/")
+            assert resp.status_code == 200
+            with flask_app.app_context():
+                row = Balance.query.filter_by(
+                    user_id=_ADMIN_USER_ID, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(8888.88)
+        finally:
+            with flask_app.app_context():
+                Email.query.filter_by(user_id=_ADMIN_USER_ID).delete()
+                PlaidConnection.query.filter_by(user_id=_ADMIN_USER_ID).delete()
+                Balance.query.filter_by(user_id=_ADMIN_USER_ID).delete()
+                # Re-seed the original admin balance so other tests using the
+                # same fixture see the expected starting state.
+                db.session.add(
+                    Balance(
+                        user_id=_ADMIN_USER_ID,
+                        amount="5000.00",
+                        date=date.today(),
+                    )
+                )
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
 
 
 # ── Dashboard integration ───────────────────────────────────────────────────
