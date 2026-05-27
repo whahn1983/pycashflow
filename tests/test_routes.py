@@ -315,6 +315,37 @@ class TestBalanceUpdate:
             assert len(rows) == 1
             assert str(rows[0].amount) == "250.00"
 
+    def test_manual_balance_entry_stamps_manual_timestamp(self, auth_client, flask_app):
+        """A successful web manual balance entry records the owner's
+        last_manual_balance_entry_at so the cached Plaid sync won't overwrite it."""
+        from conftest import _User as User, _Balance as Balance, _ADMIN_USER_ID, _db as db
+
+        entry_date = datetime.strptime("2099-03-03", "%Y-%m-%d").date()
+        with flask_app.app_context():
+            User.query.get(_ADMIN_USER_ID).last_manual_balance_entry_at = None
+            db.session.commit()
+
+        before = datetime.now(timezone.utc).replace(tzinfo=None)
+        resp = auth_client.post(
+            "/balance",
+            data={"amount": "4242.00", "date": "2099-03-03"},
+            follow_redirects=False,
+        )
+        assert resp.status_code in (301, 302)
+
+        try:
+            with flask_app.app_context():
+                ts = User.query.get(_ADMIN_USER_ID).last_manual_balance_entry_at
+                assert ts is not None
+                assert ts >= before
+        finally:
+            with flask_app.app_context():
+                User.query.get(_ADMIN_USER_ID).last_manual_balance_entry_at = None
+                Balance.query.filter_by(
+                    user_id=_ADMIN_USER_ID, date=entry_date
+                ).delete()
+                db.session.commit()
+
 
 # ── Tests: scenario creation (POST /create_scenario) ─────────────────────────
 

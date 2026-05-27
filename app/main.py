@@ -39,6 +39,7 @@ from .plaid_service import (
     safe_update_plaid_balance_for_user,
     realtime_update_plaid_balance_for_user,
     remove_plaid_connections_for_user_ids,
+    record_manual_balance_entry,
 )
 from .totp_utils import (
     generate_totp_secret, encrypt_totp_secret, decrypt_totp_secret,
@@ -664,6 +665,7 @@ def balance():
         amount = request.form['amount']
         dateentry = request.form['date']
         balance_date = datetime.strptime(dateentry, format).date()
+        owner = _get_balance_owner_user()
         existing = (
             Balance.query.filter_by(user_id=user_id, date=balance_date)
             .order_by(desc(Balance.id))
@@ -671,9 +673,11 @@ def balance():
         )
         if existing is not None:
             existing.amount = amount
+            record_manual_balance_entry(owner)
             db.session.commit()
         else:
             db.session.add(Balance(amount=amount, date=balance_date, user_id=user_id))
+            record_manual_balance_entry(owner)
             try:
                 db.session.commit()
             except IntegrityError:
@@ -682,6 +686,7 @@ def balance():
                 if existing is None:
                     raise
                 existing.amount = amount
+                record_manual_balance_entry(owner)
                 db.session.commit()
 
         return redirect(url_for('main.index'))

@@ -28,6 +28,11 @@ class User(UserMixin, db.Model):
     # Persisted on the user (not just the PlaidConnection) so deleting and
     # re-adding the Plaid account does not reset the 24-hour rate limit.
     last_plaid_realtime_balance_at = db.Column(db.DateTime, nullable=True)
+    # When PyCashFlow last accepted a manual balance entry for this user
+    # (web form or iOS API). Stored as naive UTC. The Plaid cached
+    # /accounts/get sync compares this against Plaid's cached freshness so a
+    # stale cached balance cannot overwrite a newer manually-entered value.
+    last_manual_balance_entry_at = db.Column(db.DateTime, nullable=True)
 
     # Relationships
     guests = db.relationship(

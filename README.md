@@ -532,39 +532,54 @@ appropriate for your account (typically `auth`); **do not** include
 - Errors are swallowed by the dashboard call site — Plaid problems never
   break dashboard load.
 
-### Email balance vs cached Plaid balance
+### Protecting newer balances from stale cached Plaid data
 
 `/accounts/get` returns **cached** balance data — Plaid exposes its own
 freshness for that cached value via `balances.last_updated_datetime`. A
-newer email-derived balance must not be silently overwritten by an older
-cached Plaid value the next time the dashboard loads.
+balance that PyCashFlow already obtained more recently must not be silently
+overwritten by an older cached Plaid value the next time the dashboard
+loads. On every cached `/accounts/get` sync, PyCashFlow compares Plaid's
+stored cached freshness timestamp against three protected freshness
+timestamps and skips the cached update if any of them is newer:
 
-On every cached `/accounts/get` sync, PyCashFlow compares Plaid's stored
-cached freshness timestamp against the most recent email balance timestamp
-recorded on the user's `email` configuration (`balance_email_datetime`,
-captured from the message's `Date` header):
+1. **Manual balance entry** — `user.last_manual_balance_entry_at`, set
+   whenever a user successfully saves a balance through the web form
+   (`POST /balance`) or the iOS API (`POST /api/v1/balance`).
+2. **Email balance** — the most recent `balance_email_datetime` recorded on
+   the user's `email` configuration (captured from the message `Date`
+   header).
+3. **Real-time refresh** — the connection's `last_realtime_balance_at`,
+   written by the user-triggered `/accounts/balance/get` refresh.
 
-- If the email balance timestamp is **newer** than Plaid's cached freshness
-  timestamp, the cached sync is skipped
-  (`skipped_cached_plaid_update_email_newer`) and the email value remains
-  in the balance row.
-- If Plaid's cached freshness timestamp is missing/unknown and any email
-  balance timestamp exists, the cached sync is skipped.
-- Otherwise (Plaid's cached value is newer than the email, or no email
-  balance timestamp exists) the normal `/accounts/get` upsert runs.
+The skip rules for each protected timestamp are the same:
+
+- If the protected timestamp is **newer** than Plaid's cached freshness
+  timestamp, the cached sync is skipped and the existing balance row is
+  left untouched. The skip reasons are
+  `skipped_cached_plaid_update_manual_newer`,
+  `skipped_cached_plaid_update_email_newer`, and
+  `cache_older_than_realtime` respectively.
+- If Plaid's cached freshness timestamp is missing/unknown and a protected
+  manual/email/real-time timestamp exists, the cached sync is skipped.
+- The cached `/accounts/get` upsert proceeds only when Plaid's cached
+  freshness is newer than (or equal to) **every** protected timestamp, or
+  when no protected timestamp exists at all.
 
 The comparison is purely timestamp-vs-timestamp — it does not consider the
 calendar day of either side or the date of the balance row. The balance
 row's date is used only as the insert/update key for today's row.
 
-No balance source/source-timestamp columns are added — the balance table
-keeps storing balance values as before. The comparison reuses the existing
-Plaid freshness field (`balances.last_updated_datetime`) that already
-governs the cached-vs-real-time precedence rule.
+No balance source/source-timestamp columns or provenance tracking are added
+— the balance table keeps storing balance values as before.
+`last_manual_balance_entry_at` is a freshness timestamp on the `user` table
+only; it is **not** the balance row date or the user-selected balance date.
+The comparison reuses the existing Plaid freshness field
+(`balances.last_updated_datetime`) that already governs the
+cached-vs-email and cached-vs-real-time precedence rules.
 
 The manual real-time `/accounts/balance/get` refresh remains user-triggered
-and is **not** affected by the email-vs-cache skip rule — it may always
-update today's balance.
+and is **not** affected by these skip rules — it may always update today's
+balance.
 
 ### Scope and non-goals
 
@@ -608,13 +623,16 @@ After deploying changes, verify the Plaid flow end-to-end:
 
 The integration adds a single `plaid_connections` table. The follow-on
 email-balance freshness migration adds one nullable
-`balance_email_datetime` column on the existing `email` table — no other
-schema changes.
+`balance_email_datetime` column on the existing `email` table. The
+manual-balance freshness migration
+(`f8b1c2d3e4a5_add_last_manual_balance_entry_at_to_user`) adds one nullable
+`last_manual_balance_entry_at` column on the existing `user` table — no
+other schema changes.
 
 ```bash
 flask db current
 flask db heads
-flask db migrate -m "track email balance datetime"   # only during development
+flask db migrate -m "track manual balance entry freshness"   # only during development
 flask db upgrade
 ```
 
