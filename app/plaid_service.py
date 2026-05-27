@@ -852,6 +852,32 @@ def update_plaid_balance_for_user(user) -> dict:
             cache[user.id] = result
         return result
 
+    # Don't overwrite a manually-entered balance with a possibly-stale Plaid
+    # cached value. If the user keyed in a balance more recently than Plaid's
+    # cached freshness (or Plaid did not report its freshness at all), the
+    # manual value is authoritative regardless of which calendar day either
+    # falls on. This sits alongside the email and real-time refresh checks;
+    # the cached update may only proceed when all of them allow it.
+    manual_balance_dt = _normalize_naive_utc(
+        getattr(user, "last_manual_balance_entry_at", None)
+    )
+    if manual_balance_dt is not None and (
+        normalized_cache_updated_at is None
+        or normalized_cache_updated_at < manual_balance_dt
+    ):
+        logger.info(
+            "Plaid cached /accounts/get sync skipped for user %s: "
+            "manual balance entry is newer than Plaid cached freshness",
+            user.id,
+        )
+        result = {
+            "status": "skipped",
+            "reason": "skipped_cached_plaid_update_manual_newer",
+        }
+        if cache is not None:
+            cache[user.id] = result
+        return result
+
     # Don't overwrite an email-derived balance with a possibly-stale Plaid
     # cached value. Plaid's /accounts/get returns cached data whose freshness
     # is exposed via ``balances.last_updated_datetime``; if that is older than
@@ -913,6 +939,20 @@ def safe_update_plaid_balance_for_user(user) -> None:
             db.session.rollback()
         except Exception:
             pass
+
+
+def record_manual_balance_entry(user) -> None:
+    """Stamp *user*'s last manual balance entry time (naive UTC).
+
+    Call from the web/API manual balance entry paths after validation
+    succeeds and the balance write is staged to commit. The cached
+    /accounts/get sync compares this against Plaid's cached freshness so a
+    stale cached balance cannot immediately overwrite a newer manual entry.
+    Does not commit — the caller commits it alongside the balance write.
+    """
+    if user is None or not getattr(user, "id", None):
+        return
+    user.last_manual_balance_entry_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 # ── Real-time balance refresh (/accounts/balance/get) ────────────────────────

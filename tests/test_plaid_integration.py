@@ -1495,6 +1495,406 @@ class TestEmailBalanceVsPlaidCachedSync:
                 _deconfigure_plaid(flask_app)
 
 
+# ── Manual balance entry vs Plaid cached sync precedence ────────────────────
+
+
+class TestManualBalanceVsPlaidCachedSync:
+    """The dashboard /accounts/get sync must not overwrite a newer manually
+    entered balance with stale Plaid cached data. This sits alongside the
+    existing email and real-time refresh staleness checks.
+    """
+
+    def test_skips_when_manual_entry_newer_than_plaid_cache(
+        self, flask_app, plaid_user
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            user.last_manual_balance_entry_at = (
+                datetime.utcnow() - timedelta(minutes=5)
+            )
+            db.session.add(
+                Balance(user_id=plaid_user, amount=1234.56, date=date.today())
+            )
+            db.session.commit()
+
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    stale_cache_ts = (
+                        datetime.utcnow() - timedelta(hours=2)
+                    ).replace(tzinfo=timezone.utc).isoformat()
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1",
+                            available=10.0,
+                            current=10.0,
+                            last_updated_datetime=stale_cache_ts,
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "skipped"
+                assert result["reason"] == "skipped_cached_plaid_update_manual_newer"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(1234.56)
+            finally:
+                _deconfigure_plaid(flask_app)
+
+    def test_skips_when_manual_exists_and_cache_freshness_missing(
+        self, flask_app, plaid_user
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            user.last_manual_balance_entry_at = (
+                datetime.utcnow() - timedelta(minutes=10)
+            )
+            db.session.add(
+                Balance(user_id=plaid_user, amount=2222.22, date=date.today())
+            )
+            db.session.commit()
+
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1",
+                            available=50.0,
+                            current=50.0,
+                            last_updated_datetime=None,
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "skipped"
+                assert result["reason"] == "skipped_cached_plaid_update_manual_newer"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(2222.22)
+            finally:
+                _deconfigure_plaid(flask_app)
+
+    def test_updates_when_plaid_cache_newer_than_manual_entry(
+        self, flask_app, plaid_user
+    ):
+        """Cache freshness newer than the manual entry must not be blocked by
+        the manual timestamp (email/real-time checks also pass here)."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            user.last_manual_balance_entry_at = (
+                datetime.utcnow() - timedelta(hours=3)
+            )
+            db.session.add(
+                Balance(user_id=plaid_user, amount=100.0, date=date.today())
+            )
+            db.session.commit()
+
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    fresh_cache_ts = (
+                        datetime.utcnow() - timedelta(minutes=5)
+                    ).replace(tzinfo=timezone.utc).isoformat()
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1",
+                            available=777.0,
+                            current=800.0,
+                            last_updated_datetime=fresh_cache_ts,
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "ok"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(777.0)
+            finally:
+                _deconfigure_plaid(flask_app)
+
+    def test_old_manual_entry_does_not_block_fresh_plaid_cache(
+        self, flask_app, plaid_user
+    ):
+        """An old manual entry must not block a Plaid cached value whose
+        freshness is newer — the comparison is purely timestamp-vs-timestamp,
+        never the balance row date or today's calendar day."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            user.last_manual_balance_entry_at = (
+                datetime.utcnow() - timedelta(days=3)
+            )
+            db.session.commit()
+
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    fresh_cache_ts = (
+                        datetime.utcnow() - timedelta(minutes=5)
+                    ).replace(tzinfo=timezone.utc).isoformat()
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1",
+                            available=321.0,
+                            current=400.0,
+                            last_updated_datetime=fresh_cache_ts,
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "ok"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(321.0)
+            finally:
+                _deconfigure_plaid(flask_app)
+
+    def test_proceeds_only_when_manual_email_and_realtime_all_allow(
+        self, flask_app, plaid_user
+    ):
+        """Cached update proceeds when the cache is fresher than every
+        protected timestamp (manual + email + real-time)."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            conn = PlaidConnection.query.filter_by(
+                user_id=plaid_user, is_active=True
+            ).first()
+            conn.last_realtime_balance_at = datetime.utcnow() - timedelta(hours=6)
+            user = User.query.get(plaid_user)
+            user.last_manual_balance_entry_at = (
+                datetime.utcnow() - timedelta(hours=4)
+            )
+            _add_email_config(
+                plaid_user,
+                balance_email_datetime=datetime.utcnow() - timedelta(hours=5),
+            )
+            db.session.commit()
+
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    fresh_cache_ts = (
+                        datetime.utcnow() - timedelta(minutes=1)
+                    ).replace(tzinfo=timezone.utc).isoformat()
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1",
+                            available=555.0,
+                            current=600.0,
+                            last_updated_datetime=fresh_cache_ts,
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "ok"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(555.0)
+            finally:
+                Email.query.filter_by(user_id=plaid_user).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+    def test_manual_blocks_even_when_email_and_realtime_would_allow(
+        self, flask_app, plaid_user
+    ):
+        """A newer manual entry alone is enough to skip, even if the email and
+        real-time checks would individually permit the update."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            conn = PlaidConnection.query.filter_by(
+                user_id=plaid_user, is_active=True
+            ).first()
+            # Real-time well in the past (past the 5-minute window and older
+            # than the cache), email old too — only the manual entry is fresh.
+            conn.last_realtime_balance_at = datetime.utcnow() - timedelta(hours=6)
+            user = User.query.get(plaid_user)
+            user.last_manual_balance_entry_at = (
+                datetime.utcnow() - timedelta(minutes=1)
+            )
+            _add_email_config(
+                plaid_user,
+                balance_email_datetime=datetime.utcnow() - timedelta(hours=5),
+            )
+            db.session.add(
+                Balance(user_id=plaid_user, amount=4321.0, date=date.today())
+            )
+            db.session.commit()
+
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    cache_ts = (
+                        datetime.utcnow() - timedelta(minutes=30)
+                    ).replace(tzinfo=timezone.utc).isoformat()
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1",
+                            available=9.0,
+                            current=9.0,
+                            last_updated_datetime=cache_ts,
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "skipped"
+                assert result["reason"] == "skipped_cached_plaid_update_manual_newer"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(4321.0)
+            finally:
+                Email.query.filter_by(user_id=plaid_user).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+    def test_realtime_refresh_not_blocked_by_manual_skip_rule(
+        self, flask_app, plaid_user
+    ):
+        """Manual /accounts/balance/get is user-triggered and must remain free
+        to update today's balance even when a manual entry is newer."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            user.last_manual_balance_entry_at = (
+                datetime.utcnow() - timedelta(minutes=1)
+            )
+            db.session.add(
+                Balance(user_id=plaid_user, amount=10.0, date=date.today())
+            )
+            db.session.commit()
+
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    mock_client.return_value.accounts_balance_get.return_value = (
+                        _make_balances_response(
+                            "acct-1", available=999.0, current=1000.0
+                        )
+                    )
+                    result = plaid_service.realtime_update_plaid_balance_for_user(
+                        user
+                    )
+                assert result["status"] == "ok"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(999.0)
+            finally:
+                _deconfigure_plaid(flask_app)
+
+    def test_cached_sync_does_not_set_manual_timestamp(
+        self, flask_app, plaid_user
+    ):
+        """A cached /accounts/get update must never stamp the manual entry
+        timestamp — only genuine manual entries do."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            assert user.last_manual_balance_entry_at is None
+
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1", available=42.0, current=42.0
+                        )
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+                assert result["status"] == "ok"
+                refreshed = User.query.get(plaid_user)
+                assert refreshed.last_manual_balance_entry_at is None
+            finally:
+                _deconfigure_plaid(flask_app)
+
+    def test_realtime_refresh_does_not_set_manual_timestamp(
+        self, flask_app, plaid_user
+    ):
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            user = User.query.get(plaid_user)
+            assert user.last_manual_balance_entry_at is None
+
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    mock_client.return_value.accounts_balance_get.return_value = (
+                        _make_balances_response(
+                            "acct-1", available=88.0, current=88.0
+                        )
+                    )
+                    result = plaid_service.realtime_update_plaid_balance_for_user(
+                        user
+                    )
+                assert result["status"] == "ok"
+                refreshed = User.query.get(plaid_user)
+                assert refreshed.last_manual_balance_entry_at is None
+            finally:
+                _deconfigure_plaid(flask_app)
+
+    def test_dashboard_still_loads_when_manual_skip_fires(
+        self, auth_client, flask_app
+    ):
+        """The dashboard must continue to render and use the existing balance
+        row when the Plaid cached sync is skipped because a manual entry is
+        newer than Plaid's cached freshness."""
+        from conftest import _ADMIN_USER_ID
+
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(_ADMIN_USER_ID)
+            user = User.query.get(_ADMIN_USER_ID)
+            user.last_manual_balance_entry_at = (
+                datetime.utcnow() - timedelta(minutes=3)
+            )
+            Balance.query.filter_by(
+                user_id=_ADMIN_USER_ID, date=date.today()
+            ).delete()
+            db.session.add(
+                Balance(user_id=_ADMIN_USER_ID, amount=8888.88, date=date.today())
+            )
+            db.session.commit()
+        try:
+            with patch.object(plaid_service, "_plaid_client") as mock_client:
+                stale_cache_ts = (
+                    datetime.utcnow() - timedelta(hours=2)
+                ).replace(tzinfo=timezone.utc).isoformat()
+                mock_client.return_value.accounts_get.return_value = (
+                    _make_balances_response(
+                        "acct-1",
+                        available=1.0,
+                        current=1.0,
+                        last_updated_datetime=stale_cache_ts,
+                    )
+                )
+                resp = auth_client.get("/")
+            assert resp.status_code == 200
+            with flask_app.app_context():
+                row = Balance.query.filter_by(
+                    user_id=_ADMIN_USER_ID, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(8888.88)
+        finally:
+            with flask_app.app_context():
+                PlaidConnection.query.filter_by(user_id=_ADMIN_USER_ID).delete()
+                Balance.query.filter_by(user_id=_ADMIN_USER_ID).delete()
+                admin = User.query.get(_ADMIN_USER_ID)
+                admin.last_manual_balance_entry_at = None
+                db.session.add(
+                    Balance(
+                        user_id=_ADMIN_USER_ID,
+                        amount="5000.00",
+                        date=date.today(),
+                    )
+                )
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+
 # ── Dashboard integration ───────────────────────────────────────────────────
 
 

@@ -14,7 +14,7 @@ Covers:
 """
 
 import pytest
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 
 from werkzeug.security import generate_password_hash
 
@@ -846,6 +846,62 @@ class TestWriteEndpoints:
         body = _json(resp)
         assert body["code"] == "validation_error"
         assert "date" in body["fields"]
+
+    def test_balance_post_stamps_manual_timestamp(self, client, flask_app):
+        """A successful iOS/API manual balance entry records the owner's
+        last_manual_balance_entry_at for the cached Plaid staleness gate."""
+        from conftest import _ADMIN_USER_ID
+
+        with flask_app.app_context():
+            User.query.get(_ADMIN_USER_ID).last_manual_balance_entry_at = None
+            _db.session.commit()
+
+        token = _login(client)
+        before = datetime.now(timezone.utc).replace(tzinfo=None)
+        resp = client.post(
+            "/api/v1/balance",
+            headers=_bearer(token),
+            json={"amount": "1500.00", "date": date.today().isoformat()},
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        try:
+            with flask_app.app_context():
+                ts = User.query.get(_ADMIN_USER_ID).last_manual_balance_entry_at
+                assert ts is not None
+                assert ts >= before
+        finally:
+            with flask_app.app_context():
+                User.query.get(_ADMIN_USER_ID).last_manual_balance_entry_at = None
+                # Restore the seeded today balance so other tests that assert
+                # the 5000.00 seed value are not affected by this write.
+                row = Balance.query.filter_by(
+                    user_id=_ADMIN_USER_ID, date=date.today()
+                ).first()
+                if row is not None:
+                    row.amount = "5000.00"
+                _db.session.commit()
+
+    def test_balance_post_validation_failure_does_not_stamp_manual_timestamp(
+        self, client, flask_app
+    ):
+        from conftest import _ADMIN_USER_ID
+
+        with flask_app.app_context():
+            User.query.get(_ADMIN_USER_ID).last_manual_balance_entry_at = None
+            _db.session.commit()
+
+        token = _login(client)
+        resp = client.post(
+            "/api/v1/balance",
+            headers=_bearer(token),
+            json={"amount": "not-a-number", "date": date.today().isoformat()},
+            content_type="application/json",
+        )
+        assert resp.status_code == 422
+        with flask_app.app_context():
+            ts = User.query.get(_ADMIN_USER_ID).last_manual_balance_entry_at
+            assert ts is None
 
     def test_settings_and_insights_read(self, client):
         token = _login(client)

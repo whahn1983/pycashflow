@@ -20,7 +20,10 @@ from app.ai_insights import (
     select_provider,
 )
 from app.files import version
-from app.plaid_service import safe_update_plaid_balance_for_user
+from app.plaid_service import (
+    safe_update_plaid_balance_for_user,
+    record_manual_balance_entry,
+)
 from app.models import User
 
 from app.api import api
@@ -677,6 +680,7 @@ def api_set_balance():
         return validation_error(errors)
 
     balance_date = datetime.strptime(body.get("date") or datetime.today().date().isoformat(), "%Y-%m-%d").date()
+    owner = _balance_owner_user()
     existing = (
         Balance.query.filter_by(user_id=user_id, date=balance_date)
         .order_by(desc(Balance.id))
@@ -684,10 +688,12 @@ def api_set_balance():
     )
     if existing is not None:
         existing.amount = body["amount"]
+        record_manual_balance_entry(owner)
         db.session.commit()
         return api_ok(serialize_balance(existing))
     balance = Balance(user_id=user_id, amount=body["amount"], date=balance_date)
     db.session.add(balance)
+    record_manual_balance_entry(owner)
     try:
         db.session.commit()
     except IntegrityError:
@@ -698,6 +704,7 @@ def api_set_balance():
         if existing is None:
             raise
         existing.amount = body["amount"]
+        record_manual_balance_entry(owner)
         db.session.commit()
         return api_ok(serialize_balance(existing))
     return api_created(serialize_balance(balance))

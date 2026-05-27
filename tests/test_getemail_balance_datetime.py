@@ -206,6 +206,22 @@ class TestProcessEmailBalancesPersistsDatetime:
             ).first()
             assert float(row.amount) == pytest.approx(200.00)
 
+    def test_email_ingestion_does_not_stamp_manual_balance_timestamp(
+        self, flask_app, email_user
+    ):
+        """Email-derived balances must not set the user's manual entry
+        timestamp — that field is reserved for genuine manual entries."""
+        raw = _build_balance_email_bytes(
+            date_header="Sun, 24 May 2026 09:30:00 +0000"
+        )
+        with flask_app.app_context():
+            assert User.query.get(email_user).last_manual_balance_entry_at is None
+            with patch("app.getemail.imaplib.IMAP4_SSL") as mock_ssl:
+                mock_ssl.return_value = self._mock_imap([raw])
+                getemail.process_email_balances()
+
+            assert User.query.get(email_user).last_manual_balance_entry_at is None
+
     def test_falls_back_to_processing_time_when_date_header_missing(
         self, flask_app, email_user
     ):
