@@ -963,7 +963,7 @@
             '<dt style="color: var(--text-secondary);">Account:</dt><dd style="margin:0;">' + escapeHtml(conn.account_name || '—') + '</dd>' +
             '<dt style="color: var(--text-secondary);">Mask:</dt><dd style="margin:0;">' + escapeHtml(conn.account_mask || '—') + '</dd>' +
             '<dt style="color: var(--text-secondary);">Type:</dt><dd style="margin:0;">' + escapeHtml(conn.account_type || '—') + (conn.account_subtype ? ' / ' + escapeHtml(conn.account_subtype) : '') + '</dd>' +
-            '<dt style="color: var(--text-secondary);">Last sync:</dt><dd style="margin:0;">' + escapeHtml(lastSync) + '</dd>' +
+            '<dt style="color: var(--text-secondary);">Last cached refresh:</dt><dd style="margin:0;">' + escapeHtml(lastSync) + '</dd>' +
             '<dt style="color: var(--text-secondary);">Last real-time refresh:</dt><dd style="margin:0;">' + escapeHtml(lastRealtime) + '</dd>' +
             '<dt style="color: var(--text-secondary);">Status:</dt><dd style="margin:0;">' + escapeHtml(conn.last_sync_status || '—') + '</dd>' +
             '</dl>' +
