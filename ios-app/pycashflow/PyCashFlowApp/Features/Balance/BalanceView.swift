@@ -8,6 +8,7 @@ struct BalanceView: View {
     @State private var errorText: String?
     @State private var statusText: String?
     @State private var isRefreshing: Bool = false
+    @State private var isEditingBalance: Bool = false
 
     var body: some View {
         ScrollView {
@@ -43,6 +44,15 @@ struct BalanceView: View {
                                 .foregroundStyle(AppTheme.textPrimary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.6)
+                            Button {
+                                withAnimation { isEditingBalance.toggle() }
+                            } label: {
+                                Image(systemName: "pencil.circle")
+                                    .font(.title3)
+                                    .foregroundStyle(AppTheme.textSecondary)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Edit balance")
                             Spacer(minLength: 8)
                             Text(balance.date)
                                 .font(.caption)
@@ -61,16 +71,19 @@ struct BalanceView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                VStack(spacing: 8) {
-                    TextField("New balance amount", text: $newAmount)
-                        .keyboardType(.decimalPad)
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
-                    Button("Save Balance") { Task { await saveBalance() } }
-                        .buttonStyle(PrimaryButtonStyle())
+                if isEditingBalance {
+                    VStack(spacing: 8) {
+                        TextField("New balance amount", text: $newAmount)
+                            .keyboardType(.decimalPad)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+                        Button("Save Balance") { Task { await saveBalance() } }
+                            .buttonStyle(PrimaryButtonStyle())
+                    }
+                    .surfaceCard()
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-                .surfaceCard()
 
                 if let errorText {
                     Text(errorText)
@@ -137,6 +150,7 @@ struct BalanceView: View {
             _ = try await APIClient.shared.request("balance", method: "POST", token: token, body: Payload(amount: newAmount), as: APIEnvelope<BalanceDTO>.self)
             await load()
             newAmount = ""
+            withAnimation { isEditingBalance = false }
         } catch {
             errorText = (error as? APIErrorEnvelope)?.error ?? "Failed to save balance"
         }
