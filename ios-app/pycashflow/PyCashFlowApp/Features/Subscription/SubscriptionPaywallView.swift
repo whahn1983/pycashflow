@@ -9,15 +9,7 @@ struct SubscriptionPaywallView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Subscription Required")
-                    .font(.title.bold())
-                    .foregroundStyle(AppTheme.textPrimary)
-
-                Text("App Store subscription is only for PyCashFlow Cloud account activation.")
-                    .foregroundStyle(AppTheme.textSecondary)
-                    .cardRow()
-
-                Text("Enter the email you want to use for your PyCashFlow Cloud account.")
+                Text("Enter the email address you would like to use for your PyCashFlow Cloud account.")
                     .font(.footnote)
                     .foregroundStyle(AppTheme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -49,9 +41,6 @@ struct SubscriptionPaywallView: View {
                     ForEach(manager.availableProducts, id: \.id) { product in
                         VStack(alignment: .leading, spacing: 8) {
                             SubscriptionDisclosure(product: product)
-                            Text(product.description)
-                                .foregroundStyle(AppTheme.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
                             Text("Your 7 day free trial begins when activated. The \(product.displayPrice) subscription begins after the 7 day trial if not cancelled.")
                                 .font(.footnote)
                                 .foregroundStyle(AppTheme.textSecondary)
