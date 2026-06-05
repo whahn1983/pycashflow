@@ -17,6 +17,11 @@ struct SubscriptionPaywallView: View {
                     .foregroundStyle(AppTheme.textSecondary)
                     .cardRow()
 
+                Text("Enter the email you want to use for your PyCashFlow Cloud account.")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 TextField("Cloud account email", text: $cloudEmail)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -45,6 +50,10 @@ struct SubscriptionPaywallView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             SubscriptionDisclosure(product: product)
                             Text(product.description)
+                                .foregroundStyle(AppTheme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text("Your 7 day free trial begins when activated. The \(product.displayPrice) subscription begins after the 7 day trial if not cancelled.")
+                                .font(.footnote)
                                 .foregroundStyle(AppTheme.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
                             Button("Subscribe • \(product.displayPrice)") {
