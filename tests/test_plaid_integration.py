@@ -96,8 +96,7 @@ def _make_balances_response(account_id, *, available, current, last_updated_date
 def _make_item_response(last_successful_update=None):
     transactions = SimpleNamespace(last_successful_update=last_successful_update)
     status = SimpleNamespace(transactions=transactions)
-    item = SimpleNamespace(status=status)
-    return SimpleNamespace(item=item)
+    return SimpleNamespace(status=status)
 
 
 def _add_connection(user_id, **overrides):
@@ -118,6 +117,49 @@ def _add_connection(user_id, **overrides):
     db.session.add(conn)
     db.session.commit()
     return conn
+
+
+# ── Freshness helpers ────────────────────────────────────────────────────────
+
+
+def test_transactions_freshness_reads_top_level_item_get_status():
+    stale_nested = SimpleNamespace(
+        status=SimpleNamespace(
+            transactions=SimpleNamespace(
+                last_successful_update="2026-01-01T00:00:00Z"
+            )
+        )
+    )
+    response = SimpleNamespace(
+        status=SimpleNamespace(
+            transactions=SimpleNamespace(
+                last_successful_update="2026-01-02T00:00:00Z"
+            )
+        ),
+        item=stale_nested,
+    )
+
+    assert (
+        plaid_service._transactions_last_successful_update(response)
+        == "2026-01-02T00:00:00Z"
+    )
+
+
+def test_transactions_freshness_keeps_legacy_nested_fallback():
+    response = {
+        "item": {
+            "status": {
+                "transactions": {
+                    "last_successful_update": "2026-01-03T00:00:00Z"
+                }
+            }
+        }
+    }
+
+    assert (
+        plaid_service._transactions_last_successful_update(response)
+        == "2026-01-03T00:00:00Z"
+    )
 
 
 # ── Configuration ────────────────────────────────────────────────────────────
