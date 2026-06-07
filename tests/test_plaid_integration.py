@@ -93,6 +93,13 @@ def _make_balances_response(account_id, *, available, current, last_updated_date
     return SimpleNamespace(accounts=[account])
 
 
+def _make_item_response(last_successful_update=None):
+    transactions = SimpleNamespace(last_successful_update=last_successful_update)
+    status = SimpleNamespace(transactions=transactions)
+    item = SimpleNamespace(status=status)
+    return SimpleNamespace(item=item)
+
+
 def _add_connection(user_id, **overrides):
     defaults = dict(
         user_id=user_id,
@@ -1278,6 +1285,99 @@ class TestEmailBalanceVsPlaidCachedSync:
                     user_id=plaid_user, date=date.today()
                 ).first()
                 assert float(row.amount) == pytest.approx(777.0)
+            finally:
+                Email.query.filter_by(user_id=plaid_user).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+    def test_transactions_freshness_can_allow_update_when_balance_timestamp_is_old(
+        self, flask_app, plaid_user
+    ):
+        """Prefer /item/get Transactions freshness over account balance freshness."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            email_ts = datetime.utcnow() - timedelta(hours=1)
+            _add_email_config(plaid_user, balance_email_datetime=email_ts)
+            db.session.add(
+                Balance(user_id=plaid_user, amount=100.0, date=date.today())
+            )
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    old_balance_ts = (
+                        datetime.utcnow() - timedelta(hours=3)
+                    ).replace(tzinfo=timezone.utc).isoformat()
+                    fresh_transactions_ts = (
+                        datetime.utcnow() - timedelta(minutes=5)
+                    ).replace(tzinfo=timezone.utc).isoformat()
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1",
+                            available=888.0,
+                            current=900.0,
+                            last_updated_datetime=old_balance_ts,
+                        )
+                    )
+                    mock_client.return_value.item_get.return_value = _make_item_response(
+                        last_successful_update=fresh_transactions_ts
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+
+                assert result["status"] == "ok"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(888.0)
+            finally:
+                Email.query.filter_by(user_id=plaid_user).delete()
+                db.session.commit()
+                _deconfigure_plaid(flask_app)
+
+    def test_transactions_freshness_wins_over_newer_balance_timestamp(
+        self, flask_app, plaid_user
+    ):
+        """A stale Transactions timestamp blocks even with fresher balance timestamp."""
+        with flask_app.app_context():
+            _configure_plaid(flask_app)
+            _add_connection(plaid_user)
+            email_ts = datetime.utcnow() - timedelta(hours=1)
+            _add_email_config(plaid_user, balance_email_datetime=email_ts)
+            db.session.add(
+                Balance(user_id=plaid_user, amount=1234.56, date=date.today())
+            )
+            db.session.commit()
+
+            user = User.query.get(plaid_user)
+            try:
+                with patch.object(plaid_service, "_plaid_client") as mock_client:
+                    fresh_balance_ts = (
+                        datetime.utcnow() - timedelta(minutes=5)
+                    ).replace(tzinfo=timezone.utc).isoformat()
+                    stale_transactions_ts = (
+                        datetime.utcnow() - timedelta(hours=3)
+                    ).replace(tzinfo=timezone.utc).isoformat()
+                    mock_client.return_value.accounts_get.return_value = (
+                        _make_balances_response(
+                            "acct-1",
+                            available=10.0,
+                            current=10.0,
+                            last_updated_datetime=fresh_balance_ts,
+                        )
+                    )
+                    mock_client.return_value.item_get.return_value = _make_item_response(
+                        last_successful_update=stale_transactions_ts
+                    )
+                    result = plaid_service.update_plaid_balance_for_user(user)
+
+                assert result["status"] == "skipped"
+                assert result["reason"] == "skipped_cached_plaid_update_email_newer"
+                row = Balance.query.filter_by(
+                    user_id=plaid_user, date=date.today()
+                ).first()
+                assert float(row.amount) == pytest.approx(1234.56)
             finally:
                 Email.query.filter_by(user_id=plaid_user).delete()
                 db.session.commit()

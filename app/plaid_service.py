@@ -631,8 +631,8 @@ def _today_date() -> date:
 def _normalize_naive_utc(value):
     """Coerce an ISO datetime string or aware/naive datetime to naive UTC.
 
-    Plaid returns ``balances.last_updated_datetime`` as an ISO 8601 string
-    (per SDK version, sometimes as a parsed ``datetime``). Internal
+    Plaid freshness fields are ISO 8601 strings (per SDK version, sometimes
+    parsed ``datetime`` objects). Internal
     timestamps like ``last_realtime_balance_at`` are naive UTC, so cast
     both sides to the same form before comparing.
     """
@@ -648,6 +648,39 @@ def _normalize_naive_utc(value):
     if value.tzinfo is not None:
         value = value.astimezone(timezone.utc).replace(tzinfo=None)
     return value
+
+
+def _nested_get(obj, *path):
+    """Return a nested value from SDK model objects or dictionaries.
+
+    Plaid SDK responses are model objects in production, while tests and some
+    SDK versions may expose dict-like shapes. Keep this helper intentionally
+    small so freshness resolution can support both without storing raw payloads.
+    """
+    current = obj
+    for key in path:
+        if current is None:
+            return None
+        if isinstance(current, dict):
+            current = current.get(key)
+        else:
+            current = getattr(current, key, None)
+    return current
+
+
+def _transactions_last_successful_update(item_response):
+    """Return Plaid Item Transactions freshness, when present.
+
+    Plaid exposes the Transactions product's cached-data freshness on
+    ``item.status.transactions.last_successful_update`` from /item/get.
+    """
+    return _nested_get(
+        item_response,
+        "item",
+        "status",
+        "transactions",
+        "last_successful_update",
+    )
 
 
 def _newest_email_balance_datetime(user_id: int) -> Optional[datetime]:
@@ -752,6 +785,7 @@ def update_plaid_balance_for_user(user) -> dict:
     from plaid.exceptions import ApiException
     from plaid.model.accounts_get_request import AccountsGetRequest
     from plaid.model.accounts_get_request_options import AccountsGetRequestOptions
+    from plaid.model.item_get_request import ItemGetRequest
 
     try:
         access_token = decrypt_password(conn.encrypted_access_token)
@@ -804,6 +838,28 @@ def update_plaid_balance_for_user(user) -> dict:
             cache[user.id] = result
         return result
 
+    item_response = None
+    try:
+        item_response = client.item_get(ItemGetRequest(access_token=access_token))
+    except ApiException as exc:
+        info = _plaid_error_info(exc)
+        logger.warning(
+            "Plaid item_get failed while resolving cached balance freshness for "
+            "user %s (request_id=%s, error_type=%s, error_code=%s, "
+            "error_message=%s); falling back to account balance freshness",
+            user.id,
+            info.get("request_id"),
+            info.get("error_type"),
+            info.get("error_code"),
+            info.get("error_message"),
+        )
+    except Exception:
+        logger.exception(
+            "Unexpected Plaid item_get error while resolving cached balance "
+            "freshness for user %s; falling back to account balance freshness",
+            user.id,
+        )
+
     # Pull the matching account from the response.
     target = None
     try:
@@ -830,18 +886,26 @@ def update_plaid_balance_for_user(user) -> dict:
     balances = getattr(target, "balances", None)
     available = getattr(balances, "available", None) if balances is not None else None
     current = getattr(balances, "current", None) if balances is not None else None
-    cache_updated_at = (
+    balance_cache_updated_at = (
         getattr(balances, "last_updated_datetime", None)
         if balances is not None
         else None
     )
+    transactions_cache_updated_at = _transactions_last_successful_update(item_response)
 
-    # Defense in depth: if Plaid tells us when its cached balance was last
-    # refreshed and that timestamp is older than our most recent real-time
-    # refresh, the cached value is stale relative to the live one we already
-    # wrote. Don't overwrite. (The 5-minute brute-force protection above
-    # covers institutions that don't populate last_updated_datetime.)
-    normalized_cache_updated_at = _normalize_naive_utc(cache_updated_at)
+    # Defense in depth: resolve Plaid cached freshness by preferring the
+    # Transactions product timestamp from /item/get
+    # (item.status.transactions.last_successful_update), then falling back to
+    # the account balance timestamp from /accounts/get
+    # (balances.last_updated_datetime). If neither is present, freshness stays
+    # unknown and the manual/email guards below preserve the local balance.
+    normalized_transactions_updated_at = _normalize_naive_utc(
+        transactions_cache_updated_at
+    )
+    normalized_balance_updated_at = _normalize_naive_utc(balance_cache_updated_at)
+    normalized_cache_updated_at = (
+        normalized_transactions_updated_at or normalized_balance_updated_at
+    )
     if (
         conn.last_realtime_balance_at is not None
         and normalized_cache_updated_at is not None
@@ -879,10 +943,9 @@ def update_plaid_balance_for_user(user) -> dict:
         return result
 
     # Don't overwrite an email-derived balance with a possibly-stale Plaid
-    # cached value. Plaid's /accounts/get returns cached data whose freshness
-    # is exposed via ``balances.last_updated_datetime``; if that is older than
-    # (or unknown relative to) the most recent balance email we've processed,
-    # the email value is authoritative regardless of which calendar day either
+    # cached value. If the resolved Plaid cached freshness is older than (or
+    # unknown relative to) the most recent balance email we've processed, the
+    # email value is authoritative regardless of which calendar day either
     # falls on.
     email_balance_dt = _newest_email_balance_datetime(user.id)
     if email_balance_dt is not None and (
