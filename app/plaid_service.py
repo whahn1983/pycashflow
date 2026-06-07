@@ -672,14 +672,25 @@ def _transactions_last_successful_update(item_response):
     """Return Plaid Item Transactions freshness, when present.
 
     Plaid exposes the Transactions product's cached-data freshness on
-    ``item.status.transactions.last_successful_update`` from /item/get.
+    ``status.transactions.last_successful_update`` from /item/get. Older
+    mocks and SDK-shaped fixtures may have placed ``status`` under ``item``,
+    so keep that as a compatibility fallback after checking the production
+    shape first.
     """
-    return _nested_get(
-        item_response,
-        "item",
-        "status",
-        "transactions",
-        "last_successful_update",
+    return (
+        _nested_get(
+            item_response,
+            "status",
+            "transactions",
+            "last_successful_update",
+        )
+        or _nested_get(
+            item_response,
+            "item",
+            "status",
+            "transactions",
+            "last_successful_update",
+        )
     )
 
 
@@ -895,7 +906,7 @@ def update_plaid_balance_for_user(user) -> dict:
 
     # Defense in depth: resolve Plaid cached freshness by preferring the
     # Transactions product timestamp from /item/get
-    # (item.status.transactions.last_successful_update), then falling back to
+    # (status.transactions.last_successful_update), then falling back to
     # the account balance timestamp from /accounts/get
     # (balances.last_updated_datetime). If neither is present, freshness stays
     # unknown and the manual/email guards below preserve the local balance.
