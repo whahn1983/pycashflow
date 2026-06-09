@@ -58,6 +58,16 @@ def create_app():
     app.config["EMAIL_REQUIRE_AUTH_RESULTS"] = (
         os.environ.get("EMAIL_REQUIRE_AUTH_RESULTS", "true").lower() == "true"
     )
+    # Some mailboxes (notably custom-domain / self-hosted mail hosts) never
+    # stamp an Authentication-Results header, so an otherwise legitimate,
+    # DKIM-signed bank alert would be rejected as unauthenticated. When this is
+    # enabled (default), such messages fall back to in-app DKIM verification:
+    # the message's DKIM-Signature is verified against DNS and the signing
+    # domain must align with the Allowed Sender. Set to "false" only in
+    # environments without outbound DNS access.
+    app.config["EMAIL_VERIFY_DKIM"] = (
+        os.environ.get("EMAIL_VERIFY_DKIM", "true").lower() == "true"
+    )
 
     # Plaid Balance integration config (optional feature).
     # Treated as "configured" only when CLIENT_ID, SECRET, ENV, and PRODUCTS

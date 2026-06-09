@@ -401,3 +401,200 @@ class TestProcessEmailBalancesEnforcesAuth:
                 assert float(row.amount) == pytest.approx(1234.56)
             finally:
                 flask_app.config["EMAIL_REQUIRE_AUTH_RESULTS"] = True
+
+
+# ── In-app DKIM verification fallback ────────────────────────────────────────
+
+
+def _build_dkim_signed_email_bytes(
+    subject: str = "balance alert",
+    sender: str = "alerts@bank.com",
+    body: str = "Your balance is $1234.56 USD today.",
+    signing_domain: str = "bank.com",
+) -> bytes:
+    """A message with a DKIM-Signature header but NO Authentication-Results,
+    mimicking a custom-domain/self-hosted mailbox that doesn't stamp auth
+    headers. The signature is not cryptographically valid here — tests patch
+    _verify_dkim_signatures to control the verified-domain outcome."""
+    lines = [
+        f"From: {sender}",
+        f"Subject: {subject}",
+        "Date: Sun, 24 May 2026 09:30:00 +0000",
+        (
+            f"DKIM-Signature: v=1; a=rsa-sha256; d={signing_domain}; s=sel; "
+            "h=from:subject:date; bh=abc; b=def"
+        ),
+        "Content-Type: text/plain",
+        "",
+        body,
+    ]
+    return ("\r\n".join(lines)).encode()
+
+
+class TestDkimDomainAligns:
+    def test_exact_domain_match(self):
+        assert getemail._dkim_domain_aligns({"bank.com"}, "alerts@bank.com")
+
+    def test_signing_org_domain_aligns_with_subdomain_sender(self):
+        # From on a subdomain, signed by the organisational domain.
+        assert getemail._dkim_domain_aligns(
+            {"bankofamerica.com"}, "alerts@ealerts.bankofamerica.com"
+        )
+
+    def test_signing_subdomain_aligns_with_org_sender(self):
+        assert getemail._dkim_domain_aligns(
+            {"ealerts.bank.com"}, "alerts@bank.com"
+        )
+
+    def test_unrelated_domain_does_not_align(self):
+        assert not getemail._dkim_domain_aligns({"phisher.com"}, "alerts@bank.com")
+
+    def test_empty_inputs_do_not_align(self):
+        assert not getemail._dkim_domain_aligns(set(), "alerts@bank.com")
+        assert not getemail._dkim_domain_aligns({"bank.com"}, "")
+
+
+class TestVerifyDkimSignatures:
+    def test_returns_verified_signing_domain(self):
+        fake_dkim = MagicMock()
+        verifier = MagicMock()
+        verifier.verify.return_value = True
+        verifier.domain = b"bank.com"
+        fake_dkim.DKIM.return_value = verifier
+        with patch.dict("sys.modules", {"dkim": fake_dkim}):
+            result = getemail._verify_dkim_signatures(b"raw", 1)
+        assert result == {"bank.com"}
+
+    def test_failed_verification_excluded(self):
+        fake_dkim = MagicMock()
+        verifier = MagicMock()
+        verifier.verify.return_value = False
+        fake_dkim.DKIM.return_value = verifier
+        with patch.dict("sys.modules", {"dkim": fake_dkim}):
+            result = getemail._verify_dkim_signatures(b"raw", 1)
+        assert result == set()
+
+    def test_exception_is_swallowed(self):
+        fake_dkim = MagicMock()
+        fake_dkim.DKIM.side_effect = RuntimeError("boom")
+        with patch.dict("sys.modules", {"dkim": fake_dkim}):
+            result = getemail._verify_dkim_signatures(b"raw", 1)
+        assert result == set()
+
+
+class TestProcessEmailBalancesDkimFallback:
+    """When the mailbox stamps no Authentication-Results header, ingestion
+    falls back to in-app DKIM verification (the custom-domain case)."""
+
+    @pytest.fixture()
+    def email_user(self, flask_app):
+        with flask_app.app_context():
+            user = User(
+                email=f"dkim-{datetime.utcnow().timestamp()}@test.local",
+                password=generate_password_hash("pw", method="scrypt"),
+                name="DKIM User",
+                admin=True,
+                is_active=True,
+            )
+            db.session.add(user)
+            db.session.commit()
+            cfg = Email(
+                user_id=user.id,
+                email="ingest@example.com",
+                password=encrypt_password("imap-pw"),
+                server="imap.example.com",
+                subjectstr="balance alert",
+                startstr="$",
+                endstr=" USD",
+                allowed_sender="alerts@bank.com",
+            )
+            db.session.add(cfg)
+            db.session.commit()
+            user_id = user.id
+        yield user_id
+        with flask_app.app_context():
+            Email.query.filter_by(user_id=user_id).delete()
+            Balance.query.filter_by(user_id=user_id).delete()
+            User.query.filter_by(id=user_id).delete()
+            db.session.commit()
+
+    def _run(self, flask_app, raw_emails):
+        with patch("app.getemail.imaplib.IMAP4_SSL") as mock_ssl:
+            imap = MagicMock()
+            imap.select.return_value = ("OK", [b"1"])
+            imap.search.return_value = (
+                "OK",
+                [b" ".join(str(i + 1).encode() for i in range(len(raw_emails)))],
+            )
+
+            def _fetch(eid, _spec):
+                return ("OK", [(b"1 (RFC822 {1})", raw_emails[int(eid) - 1])])
+
+            imap.fetch.side_effect = _fetch
+            mock_ssl.return_value = imap
+            getemail.process_email_balances()
+
+    def _today_balance(self, user_id):
+        return Balance.query.filter_by(
+            user_id=user_id, date=datetime.today().date()
+        ).first()
+
+    def test_accepts_when_dkim_verifies_and_aligns(self, flask_app, email_user):
+        raw = _build_dkim_signed_email_bytes(signing_domain="bank.com")
+        with flask_app.app_context():
+            with patch(
+                "app.getemail._verify_dkim_signatures",
+                return_value={"bank.com"},
+            ) as mock_verify:
+                self._run(flask_app, [raw])
+            mock_verify.assert_called_once()
+            row = self._today_balance(email_user)
+            assert row is not None
+            assert float(row.amount) == pytest.approx(1234.56)
+
+    def test_rejects_when_dkim_domain_does_not_align(self, flask_app, email_user):
+        raw = _build_dkim_signed_email_bytes(signing_domain="phisher.com")
+        with flask_app.app_context():
+            with patch(
+                "app.getemail._verify_dkim_signatures",
+                return_value={"phisher.com"},
+            ):
+                self._run(flask_app, [raw])
+            assert self._today_balance(email_user) is None
+
+    def test_rejects_when_dkim_does_not_verify(self, flask_app, email_user):
+        raw = _build_dkim_signed_email_bytes()
+        with flask_app.app_context():
+            with patch(
+                "app.getemail._verify_dkim_signatures", return_value=set()
+            ):
+                self._run(flask_app, [raw])
+            assert self._today_balance(email_user) is None
+
+    def test_dkim_fallback_disabled_rejects(self, flask_app, email_user):
+        raw = _build_dkim_signed_email_bytes(signing_domain="bank.com")
+        with flask_app.app_context():
+            flask_app.config["EMAIL_VERIFY_DKIM"] = False
+            try:
+                with patch(
+                    "app.getemail._verify_dkim_signatures",
+                    return_value={"bank.com"},
+                ) as mock_verify:
+                    self._run(flask_app, [raw])
+                # Fallback disabled: DKIM verification must not even run.
+                mock_verify.assert_not_called()
+                assert self._today_balance(email_user) is None
+            finally:
+                flask_app.config["EMAIL_VERIFY_DKIM"] = True
+
+    def test_provider_auth_header_skips_dkim_fallback(self, flask_app, email_user):
+        # When the provider DID stamp a passing Authentication-Results header,
+        # the DKIM fallback is unnecessary and must not run.
+        raw = _build_balance_email_bytes(
+            auth_results="mx.test.local; dkim=pass; spf=pass; dmarc=pass"
+        )
+        with flask_app.app_context():
+            with patch("app.getemail._verify_dkim_signatures") as mock_verify:
+                self._run(flask_app, [raw])
+            mock_verify.assert_not_called()
+            assert self._today_balance(email_user) is not None

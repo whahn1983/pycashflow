@@ -328,9 +328,15 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
    # per-user "Allowed Sender" AND the message passes DKIM/SPF/DMARC.
    # Authentication uses your mailbox provider's (Gmail/Outlook/Fastmail/etc.)
    # outermost Authentication-Results header automatically — no configuration
-   # needed. EMAIL_REQUIRE_AUTH_RESULTS defaults to true; set to false only when
-   # a separate trusted ingestion path makes the headers redundant.
+   # needed. If the mailbox does not stamp that header (common on custom-domain
+   # or self-hosted mail hosts), the message's DKIM signature is verified
+   # in-app against DNS instead, and its signing domain must align with the
+   # Allowed Sender. EMAIL_VERIFY_DKIM defaults to true; set to false only in
+   # environments without outbound DNS. EMAIL_REQUIRE_AUTH_RESULTS defaults to
+   # true; set to false only when a separate trusted ingestion path makes the
+   # checks redundant.
    # EMAIL_REQUIRE_AUTH_RESULTS=true
+   # EMAIL_VERIFY_DKIM=true
 
    # Optional: Database URL (defaults to SQLite)
    DATABASE_URL=sqlite:///data/db.sqlite
