@@ -9,6 +9,24 @@ final class StoreKitSubscriptionManager: ObservableObject {
     @Published var errorMessage: String?
     @Published var statusMessage: String?
 
+    /// Long-lived task that observes transactions arriving outside the direct
+    /// `purchase()` flow (Ask to Buy approvals, renewals, or purchases that were
+    /// interrupted by app termination).
+    private var updatesListenerTask: Task<Void, Never>?
+
+    /// Account context from the most recent purchase/restore, used to submit
+    /// out-of-band transaction updates to the backend.
+    private var lastKnownEmail: String?
+    private var lastKnownToken: String?
+
+    init() {
+        startObservingTransactionUpdates()
+    }
+
+    deinit {
+        updatesListenerTask?.cancel()
+    }
+
     func loadProducts() async {
         guard !AppEnvironment.appStoreProductIDs.isEmpty else {
             errorMessage = "Subscription products are not configured for this build."
@@ -37,6 +55,9 @@ final class StoreKitSubscriptionManager: ObservableObject {
             errorMessage = "Please enter a valid email address to activate your subscription."
             return
         }
+
+        lastKnownEmail = email
+        lastKnownToken = token
 
         isBusy = true
         errorMessage = nil
@@ -74,6 +95,9 @@ final class StoreKitSubscriptionManager: ObservableObject {
             return
         }
 
+        lastKnownEmail = email
+        lastKnownToken = token
+
         isBusy = true
         errorMessage = nil
         statusMessage = "Restoring App Store purchases..."
@@ -94,6 +118,37 @@ final class StoreKitSubscriptionManager: ObservableObject {
         }
 
         isBusy = false
+    }
+
+    /// Starts listening for transaction updates as soon as the manager is
+    /// created so successful purchases delivered outside `purchase()` are not
+    /// missed.
+    private func startObservingTransactionUpdates() {
+        guard updatesListenerTask == nil else { return }
+        updatesListenerTask = Task { [weak self] in
+            for await update in StoreKit.Transaction.updates {
+                await self?.handle(transactionUpdate: update)
+            }
+        }
+    }
+
+    private func handle(transactionUpdate result: VerificationResult<StoreKit.Transaction>) async {
+        guard let transaction = try? checkVerified(result) else { return }
+
+        guard let email = lastKnownEmail, !email.isEmpty else {
+            // No account context yet. Leave the transaction unfinished so StoreKit
+            // redelivers it once the user activates or restores a subscription.
+            return
+        }
+
+        do {
+            try await submit(transaction: transaction, email: email, token: lastKnownToken)
+            await transaction.finish()
+            errorMessage = nil
+            statusMessage = "Subscription updated from the App Store."
+        } catch {
+            errorMessage = "A subscription update could not be verified with backend."
+        }
     }
 
     private func submit(transaction: StoreKit.Transaction, email: String, token: String?) async throws {
