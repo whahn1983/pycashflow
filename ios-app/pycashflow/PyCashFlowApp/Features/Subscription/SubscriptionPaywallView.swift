@@ -4,23 +4,34 @@ import StoreKit
 struct SubscriptionPaywallView: View {
     @EnvironmentObject var session: SessionManager
     @StateObject private var manager = StoreKitSubscriptionManager()
-    @State private var cloudEmail = ""
+    @State private var cloudEmail: String
+    private let showsEmailField: Bool
+
+    init(prefilledEmail: String? = nil, showsEmailField: Bool = true) {
+        _cloudEmail = State(initialValue: prefilledEmail ?? "")
+        self.showsEmailField = showsEmailField
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Enter the email address you would like to use for your PyCashFlow Cloud account.")
-                    .font(.footnote)
-                    .foregroundStyle(AppTheme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if showsEmailField {
+                    Text("Enter the email address you would like to use for your PyCashFlow Cloud account.")
+                        .font(.footnote)
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                TextField("Cloud account email", text: $cloudEmail)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
-                    .foregroundStyle(AppTheme.textPrimary)
+                    TextField("Cloud account email", text: $cloudEmail)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(AppTheme.surfaceLight.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+                        .foregroundStyle(AppTheme.textPrimary)
+                } else if !resolvedEmail.isEmpty {
+                    statusLine(label: "Cloud account email", value: resolvedEmail)
+                        .cardRow()
+                }
 
                 if let status = session.billingStatus {
                     VStack(alignment: .leading, spacing: 8) {
@@ -45,7 +56,7 @@ struct SubscriptionPaywallView: View {
                                 .font(.footnote)
                                 .foregroundStyle(AppTheme.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Button("Subscribe • \(product.displayPrice)") {
+                            Button("Start 7-Day Free Trial") {
                                 Task {
                                     await manager.purchase(
                                         product,
@@ -94,7 +105,7 @@ struct SubscriptionPaywallView: View {
         .appBackground()
         .task {
             await manager.loadProducts()
-            if cloudEmail.isEmpty {
+            if showsEmailField && cloudEmail.isEmpty {
                 cloudEmail = session.user?.email ?? ""
             }
         }

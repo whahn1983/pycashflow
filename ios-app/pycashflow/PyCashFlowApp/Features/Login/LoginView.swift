@@ -70,6 +70,24 @@ struct LoginView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
+                if session.appMode == .cloud {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("New to PyCashFlow Cloud?")
+                            .foregroundStyle(AppTheme.textSecondary)
+                        NavigationLink {
+                            CloudActivationEmailView()
+                        } label: {
+                            Text("Start 7-Day Free Trial")
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text("Already have an account?")
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 VStack(spacing: 12) {
                     if challenge == nil && showPasswordLoginFields {
                         TextField("Email", text: $email)
@@ -186,11 +204,6 @@ struct LoginView: View {
                         }
                     }
                     .surfaceCard()
-                } else {
-                    NavigationLink("Sign up for PyCashFlow Cloud") {
-                        SubscriptionPaywallView()
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
                 }
 
             }
