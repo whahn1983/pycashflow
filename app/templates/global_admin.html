@@ -189,6 +189,7 @@
                     </div>
                     <div class="modal-body">
                         <form action="{{url_for('main.update_user')}}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="id" value="{{user.id}}">
                             <div class="form-group-modern">
                                 <label class="form-label-modern"><i class="fa-solid fa-user"></i> Name</label>
@@ -397,6 +398,7 @@
                     </div>
                     <div class="modal-body">
                         <form action="{{url_for('main.update_user')}}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="id" value="{{owner.id}}">
                             <div class="form-group-modern">
                                 <label class="form-label-modern"><i class="fa-solid fa-user"></i> Name</label>

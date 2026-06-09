@@ -31,7 +31,7 @@ os.environ.setdefault("PAYMENTS_ENABLED", "false")
 # ── Capture real app references BEFORE stubs are set up ──────────────────────
 # conftest.py is loaded before test_*.py files, so all imports here use the
 # real modules.  Stubs installed later do NOT affect already-bound names.
-from app import create_app as _create_app, db as _db               # noqa: E402
+from app import create_app as _create_app, db as _db, limiter as _limiter  # noqa: E402
 from app.models import (
     User as _User,
     Balance as _Balance,
@@ -56,11 +56,16 @@ from werkzeug.security import generate_password_hash                # noqa: E402
 # Calling create_app() here ensures internal blueprint/model imports happen
 # with the real modules, so route handlers work correctly in route tests.
 _test_app = _create_app()
+# Flask-Limiter reads RATELIMIT_ENABLED during init_app() (already run inside
+# create_app), so updating config afterwards is not enough; disable the live
+# singleton directly so rate limits don't interfere with the test suite.
+_limiter.enabled = False
 _test_app.config.update(
     {
         "TESTING": True,
         "WTF_CSRF_ENABLED": False,
         "WTF_CSRF_CHECK_DEFAULT": False,
+        "RATELIMIT_ENABLED": False,  # mirrored on the limiter singleton below
         "SESSION_COOKIE_SECURE": False,
         "SECRET_KEY": "pytest-secret-key-32chars-minimum!",
     }

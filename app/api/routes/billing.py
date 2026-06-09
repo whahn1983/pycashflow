@@ -14,7 +14,7 @@ from flask import current_app, request
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash
 
-from app import db
+from app import db, limiter
 from app.models import Subscription, User
 from app.getemail import send_password_setup_email
 from app.password_setup import (
@@ -462,6 +462,7 @@ def api_stripe_webhook():
 
 
 @api.route("/billing/verify-appstore", methods=["POST"])
+@limiter.limit("10 per hour")
 def api_verify_appstore():
     body = request.get_json(silent=True) or {}
 

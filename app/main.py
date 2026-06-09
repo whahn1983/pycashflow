@@ -934,16 +934,16 @@ def update_user():
             # Handle role assignment
             role = request.form.get('role', 'guest')
             if role == 'global_admin':
-                my_data.admin = True
-                my_data.is_global_admin = True
+                current.admin = True
+                current.is_global_admin = True
                 # IMPORTANT: Global admins must always be active
-                my_data.is_active = True
+                current.is_active = True
             elif role == 'admin':
-                my_data.admin = True
-                my_data.is_global_admin = False
+                current.admin = True
+                current.is_global_admin = False
             else:  # guest
-                my_data.admin = False
-                my_data.is_global_admin = False
+                current.admin = False
+                current.is_global_admin = False
 
         db.session.commit()
         flash("Updated Successfully")
