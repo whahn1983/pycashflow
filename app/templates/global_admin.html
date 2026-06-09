@@ -130,92 +130,9 @@
                     </form>
                 </div>
             </div>
-
-            <!-- Edit Modal for Guest User under Global Admin -->
-            <div class="modal fade modal-modern" id="modaleditadminguest{{guest.id}}" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">
-                                <i class="fa-solid fa-user-pen"></i> Update Guest User
-                            </h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <form action="{{url_for('main.update_user')}}" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="id" value="{{guest.id}}">
-                                <div class="form-group-modern">
-                                    <label class="form-label-modern"><i class="fa-solid fa-user"></i> Name</label>
-                                    <input type="text" class="form-control-modern" name="name" value="{{guest.name}}" required>
-                                </div>
-                                <div class="form-group-modern">
-                                    <label class="form-label-modern"><i class="fa-solid fa-envelope"></i> Email</label>
-                                    <input type="email" class="form-control-modern" name="email" value="{{guest.email}}" required>
-                                </div>
-                                <div class="form-group-modern">
-                                    <label class="form-label-modern"><i class="fa-solid fa-shield-halved"></i> User Role</label>
-                                    <input type="text" class="form-control-modern" value="Guest" disabled>
-                                </div>
-                                <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
-                                    <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
-                                        <i class="fa-solid fa-check"></i> Update User
-                                    </button>
-                                    <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
-                                        <i class="fa-solid fa-xmark"></i> Cancel
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
             {% endfor %}
         </div>
         {% endif %}
-
-        <!-- Edit Modal for Global Admin -->
-        <div class="modal fade modal-modern" id="modaledit{{user.id}}" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fa-solid fa-user-pen"></i> Update User
-                        </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form action="{{url_for('main.update_user')}}" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="id" value="{{user.id}}">
-                            <div class="form-group-modern">
-                                <label class="form-label-modern"><i class="fa-solid fa-user"></i> Name</label>
-                                <input type="text" class="form-control-modern" name="name" value="{{user.name}}" required>
-                            </div>
-                            <div class="form-group-modern">
-                                <label class="form-label-modern"><i class="fa-solid fa-envelope"></i> Email</label>
-                                <input type="email" class="form-control-modern" name="email" value="{{user.email}}" required>
-                            </div>
-                            <div class="form-group-modern">
-                                <label class="form-label-modern"><i class="fa-solid fa-shield-halved"></i> User Role</label>
-                                <select name="role" class="form-control-modern">
-                                    <option value="global_admin" {% if user.is_global_admin %}selected{% endif %}>Global Admin</option>
-                                    <option value="admin" {% if not user.is_global_admin %}selected{% endif %}>Account Owner</option>
-                                </select>
-                            </div>
-                            <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
-                                <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
-                                    <i class="fa-solid fa-check"></i> Update User
-                                </button>
-                                <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
-                                    <i class="fa-solid fa-xmark"></i> Cancel
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
         {% endfor %}
     </div>
 </div>
@@ -336,92 +253,9 @@
                     </form>
                 </div>
             </div>
-
-            <!-- Edit Modal for Guest User -->
-            <div class="modal fade modal-modern" id="modaleditguest{{guest.id}}" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">
-                                <i class="fa-solid fa-user-pen"></i> Update Guest User
-                            </h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <form action="{{url_for('main.update_user')}}" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="hidden" name="id" value="{{guest.id}}">
-                                <div class="form-group-modern">
-                                    <label class="form-label-modern"><i class="fa-solid fa-user"></i> Name</label>
-                                    <input type="text" class="form-control-modern" name="name" value="{{guest.name}}" required>
-                                </div>
-                                <div class="form-group-modern">
-                                    <label class="form-label-modern"><i class="fa-solid fa-envelope"></i> Email</label>
-                                    <input type="email" class="form-control-modern" name="email" value="{{guest.email}}" required>
-                                </div>
-                                <div class="form-group-modern">
-                                    <label class="form-label-modern"><i class="fa-solid fa-shield-halved"></i> User Role</label>
-                                    <input type="text" class="form-control-modern" value="Guest" disabled>
-                                </div>
-                                <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
-                                    <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
-                                        <i class="fa-solid fa-check"></i> Update User
-                                    </button>
-                                    <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
-                                        <i class="fa-solid fa-xmark"></i> Cancel
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
             {% endfor %}
         </div>
         {% endif %}
-
-        <!-- Edit Modal for Account Owner -->
-        <div class="modal fade modal-modern" id="modaleditowner{{owner.id}}" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fa-solid fa-user-pen"></i> Update User
-                        </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form action="{{url_for('main.update_user')}}" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="id" value="{{owner.id}}">
-                            <div class="form-group-modern">
-                                <label class="form-label-modern"><i class="fa-solid fa-user"></i> Name</label>
-                                <input type="text" class="form-control-modern" name="name" value="{{owner.name}}" required>
-                            </div>
-                            <div class="form-group-modern">
-                                <label class="form-label-modern"><i class="fa-solid fa-envelope"></i> Email</label>
-                                <input type="email" class="form-control-modern" name="email" value="{{owner.email}}" required>
-                            </div>
-                            <div class="form-group-modern">
-                                <label class="form-label-modern"><i class="fa-solid fa-shield-halved"></i> User Role</label>
-                                <select name="role" class="form-control-modern">
-                                    <option value="global_admin" {% if owner.is_global_admin %}selected{% endif %}>Global Admin</option>
-                                    <option value="admin" {% if not owner.is_global_admin %}selected{% endif %}>Account Owner</option>
-                                </select>
-                            </div>
-                            <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
-                                <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
-                                    <i class="fa-solid fa-check"></i> Update User
-                                </button>
-                                <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
-                                    <i class="fa-solid fa-xmark"></i> Cancel
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
         {% endfor %}
 
         {% if not account_owners %}
@@ -492,6 +326,186 @@
         </div>
     </div>
 </div>
+
+<!--
+    Edit Modals (rendered outside the scrollable table cards).
+    Bootstrap modals must live outside containers with overflow/max-height
+    (.table-card, .insight-card-list); otherwise the dialog is clipped while
+    the backdrop covers the page, graying out the screen with nothing clickable.
+-->
+{% for user in global_admins %}
+<!-- Edit Modal for Global Admin -->
+<div class="modal fade modal-modern" id="modaledit{{user.id}}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-user-pen"></i> Update User
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{url_for('main.update_user')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="id" value="{{user.id}}">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern"><i class="fa-solid fa-user"></i> Name</label>
+                        <input type="text" class="form-control-modern" name="name" value="{{user.name}}" required>
+                    </div>
+                    <div class="form-group-modern">
+                        <label class="form-label-modern"><i class="fa-solid fa-envelope"></i> Email</label>
+                        <input type="email" class="form-control-modern" name="email" value="{{user.email}}" required>
+                    </div>
+                    <div class="form-group-modern">
+                        <label class="form-label-modern"><i class="fa-solid fa-shield-halved"></i> User Role</label>
+                        <select name="role" class="form-control-modern">
+                            <option value="global_admin" {% if user.is_global_admin %}selected{% endif %}>Global Admin</option>
+                            <option value="admin" {% if not user.is_global_admin %}selected{% endif %}>Account Owner</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                            <i class="fa-solid fa-check"></i> Update User
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i> Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modals for this Global Admin's Guest Users -->
+{% for guest in all_users|selectattr('account_owner_id', 'equalto', user.id)|list %}
+<div class="modal fade modal-modern" id="modaleditadminguest{{guest.id}}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-user-pen"></i> Update Guest User
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{url_for('main.update_user')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="id" value="{{guest.id}}">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern"><i class="fa-solid fa-user"></i> Name</label>
+                        <input type="text" class="form-control-modern" name="name" value="{{guest.name}}" required>
+                    </div>
+                    <div class="form-group-modern">
+                        <label class="form-label-modern"><i class="fa-solid fa-envelope"></i> Email</label>
+                        <input type="email" class="form-control-modern" name="email" value="{{guest.email}}" required>
+                    </div>
+                    <div class="form-group-modern">
+                        <label class="form-label-modern"><i class="fa-solid fa-shield-halved"></i> User Role</label>
+                        <input type="text" class="form-control-modern" value="Guest" disabled>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                            <i class="fa-solid fa-check"></i> Update User
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i> Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endfor %}
+
+{% for owner in account_owners %}
+<!-- Edit Modal for Account Owner -->
+<div class="modal fade modal-modern" id="modaleditowner{{owner.id}}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-user-pen"></i> Update User
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{url_for('main.update_user')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="id" value="{{owner.id}}">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern"><i class="fa-solid fa-user"></i> Name</label>
+                        <input type="text" class="form-control-modern" name="name" value="{{owner.name}}" required>
+                    </div>
+                    <div class="form-group-modern">
+                        <label class="form-label-modern"><i class="fa-solid fa-envelope"></i> Email</label>
+                        <input type="email" class="form-control-modern" name="email" value="{{owner.email}}" required>
+                    </div>
+                    <div class="form-group-modern">
+                        <label class="form-label-modern"><i class="fa-solid fa-shield-halved"></i> User Role</label>
+                        <select name="role" class="form-control-modern">
+                            <option value="global_admin" {% if owner.is_global_admin %}selected{% endif %}>Global Admin</option>
+                            <option value="admin" {% if not owner.is_global_admin %}selected{% endif %}>Account Owner</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                            <i class="fa-solid fa-check"></i> Update User
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i> Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modals for this Account Owner's Guest Users -->
+{% for guest in all_users|selectattr('account_owner_id', 'equalto', owner.id)|list %}
+<div class="modal fade modal-modern" id="modaleditguest{{guest.id}}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-user-pen"></i> Update Guest User
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{url_for('main.update_user')}}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="id" value="{{guest.id}}">
+                    <div class="form-group-modern">
+                        <label class="form-label-modern"><i class="fa-solid fa-user"></i> Name</label>
+                        <input type="text" class="form-control-modern" name="name" value="{{guest.name}}" required>
+                    </div>
+                    <div class="form-group-modern">
+                        <label class="form-label-modern"><i class="fa-solid fa-envelope"></i> Email</label>
+                        <input type="email" class="form-control-modern" name="email" value="{{guest.email}}" required>
+                    </div>
+                    <div class="form-group-modern">
+                        <label class="form-label-modern"><i class="fa-solid fa-shield-halved"></i> User Role</label>
+                        <input type="text" class="form-control-modern" value="Guest" disabled>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                        <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
+                            <i class="fa-solid fa-check"></i> Update User
+                        </button>
+                        <button type="button" class="btn-outline-modern btn-modern" data-bs-dismiss="modal">
+                            <i class="fa-solid fa-xmark"></i> Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endfor %}
 
 <!-- Stat Card Styles (global admin only) -->
 <style>
