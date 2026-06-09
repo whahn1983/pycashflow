@@ -535,6 +535,99 @@ def test_delete_owner_with_guest_passkey_does_not_break_integrity(
     ).first() is None
 
 
+def test_update_user_cannot_change_guest_role(auth_client, app_ctx, user_model):
+    """Once a guest, always a guest: posted roles for guests are ignored."""
+    db = app_ctx
+    acting_admin = user_model.query.filter_by(email="admin@test.local").first()
+    acting_admin.is_global_admin = True
+    db.session.flush()
+
+    owner = user_model(
+        email="owner-guest-role@test.local",
+        password=generate_password_hash("testpass123", method="scrypt"),
+        name="Owner Of Guest",
+        admin=True,
+        is_active=True,
+        account_owner_id=None,
+        is_global_admin=False,
+    )
+    db.session.add(owner)
+    db.session.flush()
+
+    guest = user_model(
+        email="guest-role-locked@test.local",
+        password=generate_password_hash("testpass123", method="scrypt"),
+        name="Role Locked Guest",
+        admin=False,
+        is_active=True,
+        account_owner_id=owner.id,
+        owner_user_id=owner.id,
+        is_account_owner=False,
+        is_global_admin=False,
+    )
+    db.session.add(guest)
+    db.session.commit()
+    owner_id = owner.id
+    guest_id = guest.id
+
+    for role in ("admin", "global_admin"):
+        resp = auth_client.post(
+            "/update_user",
+            data={
+                "id": guest_id,
+                "name": "Role Locked Guest",
+                "email": "guest-role-locked@test.local",
+                "role": role,
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code in (301, 302)
+
+        refreshed = user_model.query.filter_by(id=guest_id).first()
+        assert refreshed.admin is False
+        assert refreshed.is_global_admin is False
+        assert refreshed.is_account_owner is False
+        assert refreshed.account_owner_id == owner_id
+        assert refreshed.owner_user_id == owner_id
+
+
+def test_update_user_cannot_demote_owner_to_guest(auth_client, app_ctx, user_model):
+    """The 'guest' role is never a valid target for an existing non-guest."""
+    db = app_ctx
+    acting_admin = user_model.query.filter_by(email="admin@test.local").first()
+    acting_admin.is_global_admin = True
+    db.session.flush()
+
+    owner = user_model(
+        email="owner-no-demotion@test.local",
+        password=generate_password_hash("testpass123", method="scrypt"),
+        name="Owner No Demotion",
+        admin=True,
+        is_active=True,
+        account_owner_id=None,
+        is_global_admin=False,
+    )
+    db.session.add(owner)
+    db.session.commit()
+    owner_id = owner.id
+
+    resp = auth_client.post(
+        "/update_user",
+        data={
+            "id": owner_id,
+            "name": "Owner No Demotion",
+            "email": "owner-no-demotion@test.local",
+            "role": "guest",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code in (301, 302)
+
+    refreshed = user_model.query.filter_by(id=owner_id).first()
+    assert refreshed.admin is True
+    assert refreshed.is_global_admin is False
+
+
 def test_delete_my_account_blocks_global_admin(
     flask_app, app_ctx, user_model
 ):

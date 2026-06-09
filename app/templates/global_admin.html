@@ -155,10 +155,7 @@
                                 </div>
                                 <div class="form-group-modern">
                                     <label class="form-label-modern"><i class="fa-solid fa-shield-halved"></i> User Role</label>
-                                    <select name="role" class="form-control-modern">
-                                        <option value="global_admin" {% if guest.is_global_admin %}selected{% endif %}>Global Admin</option>
-                                        <option value="admin" {% if not guest.is_global_admin %}selected{% endif %}>Account Owner</option>
-                                    </select>
+                                    <input type="text" class="form-control-modern" value="Guest" disabled>
                                 </div>
                                 <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
                                     <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">
@@ -364,10 +361,7 @@
                                 </div>
                                 <div class="form-group-modern">
                                     <label class="form-label-modern"><i class="fa-solid fa-shield-halved"></i> User Role</label>
-                                    <select name="role" class="form-control-modern">
-                                        <option value="global_admin" {% if guest.is_global_admin %}selected{% endif %}>Global Admin</option>
-                                        <option value="admin" {% if not guest.is_global_admin %}selected{% endif %}>Account Owner</option>
-                                    </select>
+                                    <input type="text" class="form-control-modern" value="Guest" disabled>
                                 </div>
                                 <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
                                     <button class="btn-primary-modern btn-modern" type="submit" style="flex: 1;">

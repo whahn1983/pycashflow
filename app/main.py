@@ -929,10 +929,14 @@ def update_user():
         current.name = new_name
         current.email = new_email
 
-        # Global admins can change roles, Account Owners cannot
-        if current_user.is_global_admin:
+        # Global admins can change roles, Account Owners cannot.
+        # Guest accounts are permanent: once a guest, always a guest. Any
+        # posted role for a guest is ignored so a guest can never be promoted
+        # (which would leave them with inconsistent ownership links).
+        is_guest = current.account_owner_id is not None or current.owner_user_id is not None
+        if current_user.is_global_admin and not is_guest:
             # Handle role assignment
-            role = request.form.get('role', 'guest')
+            role = request.form.get('role')
             if role == 'global_admin':
                 current.admin = True
                 current.is_global_admin = True
@@ -941,9 +945,9 @@ def update_user():
             elif role == 'admin':
                 current.admin = True
                 current.is_global_admin = False
-            else:  # guest
-                current.admin = False
-                current.is_global_admin = False
+            # Any other value is ignored: non-guests cannot be demoted to
+            # guests either, since real guests are created via add_guest and
+            # must be linked to an account owner.
 
         db.session.commit()
         flash("Updated Successfully")
