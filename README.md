@@ -326,11 +326,10 @@ For advanced users or custom deployments, PyCashFlow can be installed directly o
    # Optional: inbound balance-email authentication (app/getemail.py).
    # Balance emails are ingested only when the From address matches the
    # per-user "Allowed Sender" AND the message passes DKIM/SPF/DMARC.
-   # Set EMAIL_TRUSTED_AUTHSERV_ID to your receiving MTA's authserv-id so
-   # attacker-supplied Authentication-Results headers are ignored.
-   # EMAIL_REQUIRE_AUTH_RESULTS defaults to true; set to false only when a
-   # separate trusted ingestion path makes the headers redundant.
-   # EMAIL_TRUSTED_AUTHSERV_ID=mx.example.com
+   # Authentication uses your mailbox provider's (Gmail/Outlook/Fastmail/etc.)
+   # outermost Authentication-Results header automatically — no configuration
+   # needed. EMAIL_REQUIRE_AUTH_RESULTS defaults to true; set to false only when
+   # a separate trusted ingestion path makes the headers redundant.
    # EMAIL_REQUIRE_AUTH_RESULTS=true
 
    # Optional: Database URL (defaults to SQLite)

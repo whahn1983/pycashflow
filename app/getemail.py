@@ -84,31 +84,21 @@ def _email_message_datetime_utc(msg) -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def _parse_auth_results(msg, trusted_authserv_id: str = "") -> dict:
+def _parse_auth_results(msg) -> dict:
     """Parse *Authentication-Results* headers and return a mapping of
     mechanism → result for dkim, spf, and dmarc.
 
-    Authentication-Results headers are only trustworthy when stamped by an MTA
-    you control: a forged message can carry its own passing
-    Authentication-Results lines, and a receiving MTA only strips/relocates the
-    ones bearing its own authserv-id. When *trusted_authserv_id* is set, only
-    headers whose authserv-id token matches it are considered, pinning the
-    result to that trusted MTA. When it is empty, the first header found is used
-    (the outermost, provider-added one) — a weaker heuristic.
+    The outermost (first) Authentication-Results header is trusted: the user's
+    mailbox provider (Gmail/Outlook/Fastmail/etc.) prepends it on arrival, so it
+    reflects the provider's own authentication checks rather than any
+    attacker-supplied header deeper in the message.
 
     Only the first result found for each mechanism is kept.
 
     Example return value: {'dkim': 'pass', 'spf': 'pass', 'dmarc': 'pass'}
     """
-    trusted = (trusted_authserv_id or "").strip().lower()
     results: dict = {}
     for header_value in msg.get_all("Authentication-Results") or []:
-        # The authserv-id is the first ';'-delimited field; an optional version
-        # token may follow it (e.g. "mx.example.com 1").
-        authserv_field = header_value.split(";", 1)[0].strip().lower()
-        authserv_id = authserv_field.split()[0] if authserv_field else ""
-        if trusted and authserv_id != trusted:
-            continue
         for mech, result in re.findall(
             r"\b(dkim|spf|dmarc)=(pass|fail|softfail|none|neutral|permerror|temperror)\b",
             header_value,
@@ -149,14 +139,7 @@ def process_email_balances():
     This function supports both SQLite and PostgreSQL through SQLAlchemy.
     """
     # Authentication-enforcement policy (see app.create_app config comments).
-    trusted_authserv_id = current_app.config.get("EMAIL_TRUSTED_AUTHSERV_ID", "")
     require_auth = current_app.config.get("EMAIL_REQUIRE_AUTH_RESULTS", True)
-    if require_auth and not trusted_authserv_id:
-        logger.warning(
-            "EMAIL_TRUSTED_AUTHSERV_ID is not set; falling back to the "
-            "outermost Authentication-Results header. Set it to your receiving "
-            "MTA's authserv-id so forged auth headers cannot be trusted."
-        )
 
     # OUTER LOOP: Get all users with email settings configured
     users_with_email = db.session.query(User, Email).join(
@@ -266,7 +249,7 @@ def process_email_balances():
                             # forged, so DKIM/SPF/DMARC results from a trusted MTA
                             # are what actually authenticate the sender.
                             if require_auth:
-                                auth = _parse_auth_results(msg, trusted_authserv_id)
+                                auth = _parse_auth_results(msg)
                                 passed, detail = _authentication_passes(auth)
                                 if not passed:
                                     emails_rejected += 1

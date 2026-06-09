@@ -261,32 +261,19 @@ class TestProcessEmailBalancesPersistsDatetime:
 
 
 class TestAuthResultHelpers:
-    def test_parse_filters_by_trusted_authserv_id(self):
+    def test_parse_first_header_result_wins_per_mechanism(self):
+        # The outermost (first) header is the provider-stamped one and is
+        # trusted; results from later headers must not override it.
         raw = (
             "From: alerts@bank.com\r\n"
             "Subject: balance\r\n"
-            # Attacker-forged header bearing a passing result but a different
-            # authserv-id must be ignored when a trusted id is configured.
-            "Authentication-Results: attacker.example; dkim=pass; spf=pass; dmarc=pass\r\n"
-            "Authentication-Results: mx.test.local; dkim=fail; spf=fail; dmarc=fail\r\n"
+            "Authentication-Results: mx.test.local; dkim=pass; spf=pass; dmarc=pass\r\n"
+            "Authentication-Results: deeper.example; dkim=fail; spf=fail; dmarc=fail\r\n"
             "Content-Type: text/plain\r\n\r\nx"
         ).encode()
         msg = email_pkg.message_from_bytes(raw)
 
-        trusted = getemail._parse_auth_results(msg, "mx.test.local")
-        assert trusted == {"dkim": "fail", "spf": "fail", "dmarc": "fail"}
-
-        # With no trusted id the outermost (first) header is used.
-        outermost = getemail._parse_auth_results(msg)
-        assert outermost == {"dkim": "pass", "spf": "pass", "dmarc": "pass"}
-
-    def test_parse_handles_authserv_id_version_token(self):
-        raw = (
-            "Authentication-Results: mx.test.local 1; dkim=pass; spf=pass; dmarc=pass\r\n"
-            "Content-Type: text/plain\r\n\r\nx"
-        ).encode()
-        msg = email_pkg.message_from_bytes(raw)
-        assert getemail._parse_auth_results(msg, "mx.test.local") == {
+        assert getemail._parse_auth_results(msg) == {
             "dkim": "pass",
             "spf": "pass",
             "dmarc": "pass",
@@ -377,18 +364,6 @@ class TestProcessEmailBalancesEnforcesAuth:
         with flask_app.app_context():
             self._run(flask_app, [raw])
             assert self._today_balance(email_user) is None
-
-    def test_rejects_forged_authserv_id_when_pinned(self, flask_app, email_user):
-        raw = _build_balance_email_bytes(
-            auth_results="attacker.example; dkim=pass; spf=pass; dmarc=pass"
-        )
-        with flask_app.app_context():
-            flask_app.config["EMAIL_TRUSTED_AUTHSERV_ID"] = "mx.test.local"
-            try:
-                self._run(flask_app, [raw])
-                assert self._today_balance(email_user) is None
-            finally:
-                flask_app.config["EMAIL_TRUSTED_AUTHSERV_ID"] = ""
 
     def test_accepts_email_passing_auth(self, flask_app, email_user):
         raw = _build_balance_email_bytes()
