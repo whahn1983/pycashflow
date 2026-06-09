@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Floating bottom navigation bar rendered with the iOS 26 Liquid Glass
-/// material so it matches the translucent back button SwiftUI renders in
-/// the navigation bar. Sizes to fit its buttons and stays horizontally
+/// material (via `glassEffectCompat`, which falls back to a translucent
+/// material on iOS 17–25) so it matches the translucent back button SwiftUI
+/// renders in the navigation bar. Sizes to fit its buttons and stays horizontally
 /// centered, falling back to a horizontal scroll view only when the
 /// available width is too narrow to fit every button.
 struct FloatingNavBar: View {
@@ -29,7 +30,7 @@ struct FloatingNavBar: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 10)
-                .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
+                .glassEffectCompat(in: Capsule(style: .continuous))
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
@@ -52,7 +53,7 @@ struct FloatingNavBar: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .glassEffect(.regular.interactive().tint(.white.opacity(0.08)), in: Capsule(style: .continuous))
+            .glassEffectCompat(in: Capsule(style: .continuous), tint: .white.opacity(0.08))
         }
     }
 
@@ -94,7 +95,7 @@ struct GuestSettingsButton: View {
         }
         .buttonStyle(FloatingNavButtonStyle(isSelected: selectedSection == section))
         .disabled(isDisabled)
-        .glassEffect(.regular.interactive(), in: Circle())
+        .glassEffectCompat(in: Circle())
     }
 }
 
@@ -142,7 +143,7 @@ private struct FloatingNavButtonStyle: ButtonStyle {
                                 Capsule(style: .continuous)
                                     .stroke(.white.opacity(pressed ? 0.28 : 0.18), lineWidth: 1)
                             )
-                            .glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
+                            .glassEffectCompat(in: Capsule(style: .continuous))
                     }
                 }
             )
