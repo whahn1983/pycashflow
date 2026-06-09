@@ -19,6 +19,22 @@ final class StoreKitSubscriptionManager: ObservableObject {
     private var lastKnownEmail: String?
     private var lastKnownToken: String?
 
+    /// Account context for the signed-in user, derived from the live session
+    /// rather than persisted to disk. This lets transactions delivered outside
+    /// an explicit purchase/restore (renewals, Ask to Buy approvals, or
+    /// purchases redelivered on a later launch) be reconciled with the backend
+    /// even when this manager's in-memory context has been lost to a relaunch.
+    var accountContextProvider: (() -> AccountContext?)?
+
+    struct AccountContext {
+        let email: String
+        let token: String?
+    }
+
+    /// Guards against the cold-launch and scene-activation paths sweeping
+    /// `Transaction.unfinished` at the same time and submitting a transaction twice.
+    private var isReprocessing = false
+
     init() {
         startObservingTransactionUpdates()
     }
@@ -132,23 +148,48 @@ final class StoreKitSubscriptionManager: ObservableObject {
         }
     }
 
+    /// Submits and finishes any transactions StoreKit is still holding as
+    /// unfinished. Call this once account context becomes available (for
+    /// example after the session loads its user) so a purchase interrupted by
+    /// app termination is reconciled with the backend on the next launch rather
+    /// than only the one after that.
+    func reprocessPendingTransactions() async {
+        guard !isReprocessing else { return }
+        isReprocessing = true
+        defer { isReprocessing = false }
+
+        for await update in StoreKit.Transaction.unfinished {
+            await handle(transactionUpdate: update)
+        }
+    }
+
     private func handle(transactionUpdate result: VerificationResult<StoreKit.Transaction>) async {
         guard let transaction = try? checkVerified(result) else { return }
 
-        guard let email = lastKnownEmail, !email.isEmpty else {
+        guard let context = resolvedAccountContext() else {
             // No account context yet. Leave the transaction unfinished so StoreKit
-            // redelivers it once the user activates or restores a subscription.
+            // redelivers it once the user signs in, activates, or restores a
+            // subscription and account context becomes available.
             return
         }
 
         do {
-            try await submit(transaction: transaction, email: email, token: lastKnownToken)
+            try await submit(transaction: transaction, email: context.email, token: context.token)
             await transaction.finish()
             errorMessage = nil
             statusMessage = "Subscription updated from the App Store."
         } catch {
             errorMessage = "A subscription update could not be verified with backend."
         }
+    }
+
+    /// Prefers the email/token captured by an in-progress purchase or restore,
+    /// then falls back to the signed-in session so context survives relaunches.
+    private func resolvedAccountContext() -> AccountContext? {
+        if let email = lastKnownEmail, !email.isEmpty {
+            return AccountContext(email: email, token: lastKnownToken)
+        }
+        return accountContextProvider?()
     }
 
     private func submit(transaction: StoreKit.Transaction, email: String, token: String?) async throws {

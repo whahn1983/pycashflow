@@ -6,6 +6,7 @@ import UIKit
 @main
 struct PyCashFlowApp: App {
     @StateObject private var session = SessionManager()
+    @StateObject private var subscriptionManager = StoreKitSubscriptionManager()
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -16,11 +17,13 @@ struct PyCashFlowApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(session)
+                .environmentObject(subscriptionManager)
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active, session.isAuthenticated else { return }
             Task {
                 await session.refreshSubscriptionState(forceProfileRefresh: false)
+                await subscriptionManager.reprocessPendingTransactions()
             }
         }
     }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject var session: SessionManager
+    @EnvironmentObject var subscriptionManager: StoreKitSubscriptionManager
     @State private var selectedSection: AppSection = .dashboard
 
     var body: some View {
@@ -29,7 +30,22 @@ struct RootView: View {
             }
         }
         .task {
+            // Let out-of-band StoreKit transactions resolve account context from
+            // the live session, so renewals or interrupted purchases redelivered
+            // on a later launch are reconciled with the backend without
+            // persisting the bearer token to disk.
+            subscriptionManager.accountContextProvider = { [weak session] in
+                guard let session, session.isAuthenticated,
+                      let email = session.user?.email, !email.isEmpty else {
+                    return nil
+                }
+                return StoreKitSubscriptionManager.AccountContext(
+                    email: email,
+                    token: session.token
+                )
+            }
             await session.bootstrap()
+            await subscriptionManager.reprocessPendingTransactions()
         }
         .onChange(of: session.isAuthenticated) { _, isAuthenticated in
             if isAuthenticated {

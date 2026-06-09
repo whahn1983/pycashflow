@@ -3,7 +3,7 @@ import StoreKit
 
 struct SubscriptionPaywallView: View {
     @EnvironmentObject var session: SessionManager
-    @StateObject private var manager = StoreKitSubscriptionManager()
+    @EnvironmentObject private var manager: StoreKitSubscriptionManager
     @State private var cloudEmail: String
     private let showsEmailField: Bool
 
