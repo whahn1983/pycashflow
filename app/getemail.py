@@ -84,18 +84,31 @@ def _email_message_datetime_utc(msg) -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def _parse_auth_results(msg) -> dict:
+def _parse_auth_results(msg, trusted_authserv_id: str = "") -> dict:
     """Parse *Authentication-Results* headers and return a mapping of
     mechanism → result for dkim, spf, and dmarc.
 
-    Only the first result found for each mechanism is kept (the outermost
-    Authentication-Results header, added by the user's own mail provider,
-    appears first in the message).
+    Authentication-Results headers are only trustworthy when stamped by an MTA
+    you control: a forged message can carry its own passing
+    Authentication-Results lines, and a receiving MTA only strips/relocates the
+    ones bearing its own authserv-id. When *trusted_authserv_id* is set, only
+    headers whose authserv-id token matches it are considered, pinning the
+    result to that trusted MTA. When it is empty, the first header found is used
+    (the outermost, provider-added one) — a weaker heuristic.
+
+    Only the first result found for each mechanism is kept.
 
     Example return value: {'dkim': 'pass', 'spf': 'pass', 'dmarc': 'pass'}
     """
+    trusted = (trusted_authserv_id or "").strip().lower()
     results: dict = {}
     for header_value in msg.get_all("Authentication-Results") or []:
+        # The authserv-id is the first ';'-delimited field; an optional version
+        # token may follow it (e.g. "mx.example.com 1").
+        authserv_field = header_value.split(";", 1)[0].strip().lower()
+        authserv_id = authserv_field.split()[0] if authserv_field else ""
+        if trusted and authserv_id != trusted:
+            continue
         for mech, result in re.findall(
             r"\b(dkim|spf|dmarc)=(pass|fail|softfail|none|neutral|permerror|temperror)\b",
             header_value,
@@ -107,6 +120,27 @@ def _parse_auth_results(msg) -> dict:
     return results
 
 
+def _authentication_passes(auth: dict) -> tuple:
+    """Return ``(passed, detail)`` for the parsed Authentication-Results.
+
+    Policy: a message is authenticated when DMARC passes, or when both SPF and
+    DKIM pass. Absent or non-'pass' results are treated as failure so
+    unauthenticated — and therefore spoofable — mail can never set a balance.
+    *detail* is a short human-readable summary for logging.
+    """
+    dkim = auth.get("dkim")
+    spf = auth.get("spf")
+    dmarc = auth.get("dmarc")
+    detail = "dkim=%s spf=%s dmarc=%s" % (
+        dkim or "none", spf or "none", dmarc or "none",
+    )
+    if dmarc == "pass":
+        return True, detail
+    if spf == "pass" and dkim == "pass":
+        return True, detail
+    return False, detail
+
+
 def process_email_balances():
     """
     Process email inboxes for all users with email settings configured
@@ -114,6 +148,16 @@ def process_email_balances():
 
     This function supports both SQLite and PostgreSQL through SQLAlchemy.
     """
+    # Authentication-enforcement policy (see app.create_app config comments).
+    trusted_authserv_id = current_app.config.get("EMAIL_TRUSTED_AUTHSERV_ID", "")
+    require_auth = current_app.config.get("EMAIL_REQUIRE_AUTH_RESULTS", True)
+    if require_auth and not trusted_authserv_id:
+        logger.warning(
+            "EMAIL_TRUSTED_AUTHSERV_ID is not set; falling back to the "
+            "outermost Authentication-Results header. Set it to your receiving "
+            "MTA's authserv-id so forged auth headers cannot be trusted."
+        )
+
     # OUTER LOOP: Get all users with email settings configured
     users_with_email = db.session.query(User, Email).join(
         Email, User.id == Email.user_id
@@ -129,6 +173,19 @@ def process_email_balances():
         subjectstr = email_config.subjectstr
         startstr = email_config.startstr
         endstr = email_config.endstr
+        allowed_sender = email_config.allowed_sender
+
+        # Refuse to ingest balances when no Allowed Sender is configured: the
+        # From header alone is spoofable, so without a configured sender any
+        # message that can reach the inbox could set an arbitrary balance.
+        if not allowed_sender:
+            logger.warning(
+                "Skipping email balance import for user %s: no Allowed Sender "
+                "configured. Set an Allowed Sender in email settings to enable "
+                "balance ingestion.",
+                user_id,
+            )
+            continue
 
         try:
             # Create IMAP connection for THIS user
@@ -194,15 +251,7 @@ def process_email_balances():
                             sender_address = _extract_sender_address(
                                 From if isinstance(From, str) else str(From or "")
                             )
-                            allowed_sender = email_config.allowed_sender
-                            if not allowed_sender:
-                                logger.debug(
-                                    "No allowed_sender configured for user %s; "
-                                    "processing email without sender check",
-                                    user_id,
-                                )
-                                emails_allowed += 1
-                            elif not _sender_is_allowed(sender_address, allowed_sender):
+                            if not _sender_is_allowed(sender_address, allowed_sender):
                                 emails_rejected += 1
                                 logger.debug(
                                     "Rejected email for user %s: "
@@ -210,28 +259,25 @@ def process_email_balances():
                                     user_id,
                                 )
                                 break  # skip remaining responses for this email_id
-                            else:
-                                emails_allowed += 1
 
-                            # --- Authentication-Results inspection ---
-                            auth = _parse_auth_results(msg)
-                            for mech in ("dkim", "spf", "dmarc"):
-                                result = auth.get(mech)
-                                if result is None:
-                                    logger.debug(
-                                        "No %s result in Authentication-Results for user %s",
-                                        mech.upper(), user_id,
+                            # --- Authentication enforcement ---
+                            # Reject (do not merely log) messages that fail sender
+                            # authentication: a matching From header is trivially
+                            # forged, so DKIM/SPF/DMARC results from a trusted MTA
+                            # are what actually authenticate the sender.
+                            if require_auth:
+                                auth = _parse_auth_results(msg, trusted_authserv_id)
+                                passed, detail = _authentication_passes(auth)
+                                if not passed:
+                                    emails_rejected += 1
+                                    logger.warning(
+                                        "Rejected email for user %s: failed sender "
+                                        "authentication (%s)",
+                                        user_id, detail,
                                     )
-                                elif result != "pass":
-                                    logger.debug(
-                                        "user %s: %s check did not pass",
-                                        user_id, mech.upper(),
-                                    )
-                                else:
-                                    logger.debug(
-                                        "user %s: %s=pass",
-                                        user_id, mech.upper(),
-                                    )
+                                    break  # skip remaining responses for this email_id
+
+                            emails_allowed += 1
 
                             msg_datetime = _email_message_datetime_utc(msg)
 

@@ -500,8 +500,8 @@
                                value="{{ email_config.allowed_sender or '' if email_config else '' }}">
                         <small style="color: var(--text-muted, #6c757d); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
                             Only parse balances from this sender. Use <code>@domain.com</code> to allow any address at
-                            a domain, or <code>user@domain.com</code> for an exact match. Leave blank to skip the check
-                            (not recommended).
+                            a domain, or <code>user@domain.com</code> for an exact match. <strong>Required:</strong> leaving
+                            this blank disables balance ingestion, since the sender address alone is spoofable.
                         </small>
                     </div>
 
