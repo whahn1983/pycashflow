@@ -44,7 +44,17 @@ _CSP_DIRECTIVES = {
     ],
     "font-src": ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com"],
     "img-src": ["'self'", "data:"],
-    "connect-src": ["'self'", "https://*.plaid.com"],
+    # connect-src must also cover the CDN origins because the service worker
+    # (app/sw.js) re-fetches every cross-origin asset via fetch(); inside a
+    # worker those fetches are governed by the worker script's own CSP
+    # connect-src, so omitting the CDNs here would block Bootstrap, Font
+    # Awesome, Google Fonts, Plotly, and jQuery when CSP is enforced.
+    "connect-src": [
+        "'self'", "https://*.plaid.com",
+        "https://cdn.jsdelivr.net", "https://cdn.plot.ly",
+        "https://ajax.googleapis.com", "https://cdnjs.cloudflare.com",
+        "https://fonts.googleapis.com", "https://fonts.gstatic.com",
+    ],
     "frame-src": ["https://cdn.plaid.com", "https://*.plaid.com"],
     "frame-ancestors": ["'none'"],
     "base-uri": ["'self'"],
