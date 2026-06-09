@@ -131,6 +131,80 @@ def _authentication_passes(auth: dict) -> tuple:
     return False, detail
 
 
+def _verify_dkim_signatures(raw_message_bytes: bytes, signature_count: int,
+                            dnsfunc=None) -> set:
+    """Cryptographically verify the message's DKIM-Signature headers via DNS.
+
+    Returns the set of lower-cased signing domains (the DKIM ``d=`` tag) whose
+    signature validates against the public key published in DNS.
+
+    This is the fallback used when the receiving mailbox does not stamp a
+    trustworthy Authentication-Results header — common on custom-domain and
+    self-hosted mailboxes, where a perfectly legitimate, DKIM-signed bank alert
+    arrives with no provider authentication header to read. Verifying the
+    signature ourselves authenticates the sender without depending on the
+    provider.
+
+    Never raises: any missing dependency, DNS, or parsing problem yields an
+    empty set, so a verification failure can only *deny* ingestion and never
+    enable spoofing.
+    """
+    try:
+        import dkim  # dkimpy; optional dependency
+    except ImportError:
+        logger.warning(
+            "dkimpy is not installed; cannot verify DKIM signatures in-app. "
+            "Install dkimpy to authenticate mail whose provider does not stamp "
+            "Authentication-Results, or set EMAIL_REQUIRE_AUTH_RESULTS=false."
+        )
+        return set()
+
+    verified: set = set()
+    for idx in range(signature_count):
+        try:
+            verifier = dkim.DKIM(raw_message_bytes)
+            if dnsfunc is None:
+                ok = verifier.verify(idx=idx)
+            else:
+                ok = verifier.verify(idx=idx, dnsfunc=dnsfunc)
+            if not ok:
+                continue
+            domain = verifier.domain or b""
+            if isinstance(domain, bytes):
+                domain = domain.decode("ascii", "ignore")
+            domain = domain.strip().lower().rstrip(".")
+            if domain:
+                verified.add(domain)
+        except Exception as exc:
+            logger.debug(
+                "DKIM verification error for signature %d: %s", idx, exc,
+            )
+    return verified
+
+
+def _dkim_domain_aligns(verified_domains, sender_address: str) -> bool:
+    """Return True when a verified DKIM signing domain aligns with the sender.
+
+    Relaxed alignment (DMARC-style): the From domain and a verified DKIM ``d=``
+    domain must be equal, or one an organisational subdomain of the other (e.g.
+    From ``alerts@ealerts.bankofamerica.com`` signed by ``bankofamerica.com``).
+    This pins a cryptographically-valid signature to the address that already
+    passed the Allowed Sender check, so a message carrying its own validly
+    signed — but unrelated — DKIM signature cannot authenticate as the bank.
+    """
+    from_domain = (sender_address or "").split("@")[-1].strip().lower().rstrip(".")
+    if not from_domain:
+        return False
+    for domain in verified_domains:
+        if not domain:
+            continue
+        if domain == from_domain:
+            return True
+        if from_domain.endswith("." + domain) or domain.endswith("." + from_domain):
+            return True
+    return False
+
+
 def process_email_balances():
     """
     Process email inboxes for all users with email settings configured
@@ -140,6 +214,11 @@ def process_email_balances():
     """
     # Authentication-enforcement policy (see app.create_app config comments).
     require_auth = current_app.config.get("EMAIL_REQUIRE_AUTH_RESULTS", True)
+    # When the receiving mailbox does not stamp a trustworthy
+    # Authentication-Results header, fall back to verifying the message's DKIM
+    # signature ourselves against DNS. Disable only in environments without
+    # outbound DNS.
+    verify_dkim = current_app.config.get("EMAIL_VERIFY_DKIM", True)
 
     # OUTER LOOP: Get all users with email settings configured
     users_with_email = db.session.query(User, Email).join(
@@ -205,7 +284,12 @@ def process_email_balances():
                     res, msg = imap.fetch(email_id, "(RFC822)")
                     for response in msg:
                         if isinstance(response, tuple):
-                            msg = email.message_from_bytes(response[1])
+                            # Keep the exact raw bytes: in-app DKIM verification
+                            # is byte-sensitive (canonicalization) and must run
+                            # against the message as received, not a re-serialized
+                            # copy.
+                            raw_bytes = response[1]
+                            msg = email.message_from_bytes(raw_bytes)
 
                             # Decode subject
                             subject, encoding = decode_header(msg["Subject"])[0]
@@ -251,6 +335,30 @@ def process_email_balances():
                             if require_auth:
                                 auth = _parse_auth_results(msg)
                                 passed, detail = _authentication_passes(auth)
+                                if not passed and verify_dkim:
+                                    # The provider stamped no usable
+                                    # Authentication-Results header (e.g. a
+                                    # custom-domain/self-hosted mailbox). Verify
+                                    # the DKIM signature ourselves and require it
+                                    # to align with the allowed sender domain.
+                                    sig_count = len(
+                                        msg.get_all("DKIM-Signature") or []
+                                    )
+                                    if sig_count:
+                                        verified = _verify_dkim_signatures(
+                                            raw_bytes, sig_count
+                                        )
+                                        if _dkim_domain_aligns(
+                                            verified, sender_address
+                                        ):
+                                            passed = True
+                                            detail = (
+                                                "%s; in-app dkim verified d=%s"
+                                                % (
+                                                    detail,
+                                                    ",".join(sorted(verified)),
+                                                )
+                                            )
                                 if not passed:
                                     emails_rejected += 1
                                     logger.warning(
