@@ -331,7 +331,11 @@
 
 <!-- Plotly Chart Scripts -->
 <head>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- Strict CSP build: the standard plotly bundle pulls in a dependency that
+         uses the Function constructor, which requires script-src 'unsafe-eval'.
+         The strict build is eval-free and renders our SVG cartesian charts the
+         same, so CSP can be enforced (CSP_REPORT_ONLY=false) without breaking it. -->
+    <script src="https://cdn.plot.ly/plotly-strict-1.58.5.min.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script>
         function cb(selection) {
