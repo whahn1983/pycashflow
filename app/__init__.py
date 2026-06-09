@@ -47,6 +47,24 @@ def create_app():
     app.config["APPLE_BUNDLE_ID"] = os.environ.get("APPLE_BUNDLE_ID", "")
     app.config["APPLE_ENVIRONMENT"] = os.environ.get("APPLE_ENVIRONMENT", "production")
 
+    # Inbound balance-email authentication (app/getemail.py).
+    # Balance emails are only ingested when the From address matches the
+    # per-user Allowed Sender AND the message passes sender authentication
+    # (DKIM/SPF/DMARC). Authentication-Results headers can be forged inside a
+    # message, so they are only trustworthy when stamped by an MTA you control:
+    # set EMAIL_TRUSTED_AUTHSERV_ID to that MTA's authserv-id (e.g.
+    # "mx.example.com") so attacker-supplied headers are ignored. Leaving it
+    # blank falls back to the outermost Authentication-Results header, a weaker
+    # heuristic. EMAIL_REQUIRE_AUTH_RESULTS may be set to "false" only when a
+    # separate trusted ingestion path makes the headers redundant (not
+    # recommended).
+    app.config["EMAIL_TRUSTED_AUTHSERV_ID"] = os.environ.get(
+        "EMAIL_TRUSTED_AUTHSERV_ID", ""
+    ).strip()
+    app.config["EMAIL_REQUIRE_AUTH_RESULTS"] = (
+        os.environ.get("EMAIL_REQUIRE_AUTH_RESULTS", "true").lower() == "true"
+    )
+
     # Plaid Balance integration config (optional feature).
     # Treated as "configured" only when CLIENT_ID, SECRET, ENV, and PRODUCTS
     # are all populated; see app.plaid_service.plaid_is_configured().
