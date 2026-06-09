@@ -21,6 +21,42 @@ limiter = Limiter(key_func=get_remote_address, default_limits=[])
 csrf = CSRFProtect()
 
 
+# Content-Security-Policy allowlist, derived from the external resources the
+# templates actually load: Bootstrap (cdn.jsdelivr.net), Plotly (cdn.plot.ly),
+# jQuery (ajax.googleapis.com), Plaid Link (cdn.plaid.com), Font Awesome
+# (cdnjs.cloudflare.com), and Google Fonts (fonts.googleapis.com /
+# fonts.gstatic.com). 'unsafe-inline' is retained because the templates rely on
+# inline <script> blocks, inline event handlers (onclick/onsubmit/onfocus), and
+# inline style="" attributes that nonces cannot cover without a template
+# refactor; the host allowlist still prevents loading script/styles from any
+# other origin.
+_CSP_DIRECTIVES = {
+    "default-src": ["'self'"],
+    "script-src": [
+        "'self'", "'unsafe-inline'",
+        "https://cdn.jsdelivr.net", "https://cdn.plot.ly",
+        "https://ajax.googleapis.com", "https://cdn.plaid.com",
+    ],
+    "style-src": [
+        "'self'", "'unsafe-inline'",
+        "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com",
+        "https://fonts.googleapis.com",
+    ],
+    "font-src": ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com"],
+    "img-src": ["'self'", "data:"],
+    "connect-src": ["'self'", "https://*.plaid.com"],
+    "frame-src": ["https://cdn.plaid.com", "https://*.plaid.com"],
+    "frame-ancestors": ["'none'"],
+    "base-uri": ["'self'"],
+    "form-action": ["'self'"],
+    "object-src": ["'none'"],
+}
+
+_CONTENT_SECURITY_POLICY = "; ".join(
+    f"{name} {' '.join(values)}" for name, values in _CSP_DIRECTIVES.items()
+)
+
+
 def create_app():
 
     app = Flask(__name__, static_url_path='/static')
@@ -101,6 +137,17 @@ def create_app():
     # set RATELIMIT_STORAGE_URI to a Redis URL, e.g. redis://localhost:6379/0
     app.config['RATELIMIT_STORAGE_URI'] = os.environ.get('RATELIMIT_STORAGE_URI', 'memory://')
 
+    # Security response headers (applied in _set_security_headers below).
+    # The Content-Security-Policy ships in Report-Only mode by default so the
+    # Plaid Link bank-connection flow can be verified in a real browser before
+    # it is enforced; set CSP_REPORT_ONLY=false to switch CSP to enforcing.
+    app.config['SECURITY_HEADERS_ENABLED'] = (
+        os.environ.get('SECURITY_HEADERS_ENABLED', 'true').lower() == 'true'
+    )
+    app.config['CSP_REPORT_ONLY'] = (
+        os.environ.get('CSP_REPORT_ONLY', 'true').lower() == 'true'
+    )
+
     db.init_app(app)
     migrate.init_app(app, db)
     limiter.init_app(app)
@@ -129,6 +176,31 @@ def create_app():
             return None
         logout_user()
         return login_manager.unauthorized()
+
+    @app.after_request
+    def _set_security_headers(response):
+        from flask import request
+        if not app.config.get('SECURITY_HEADERS_ENABLED', True):
+            return response
+        response.headers.setdefault('X-Frame-Options', 'DENY')
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+        # Only assert HSTS over HTTPS so local plain-HTTP dev isn't pinned to TLS.
+        if request.is_secure:
+            response.headers.setdefault(
+                'Strict-Transport-Security', 'max-age=31536000; includeSubDomains'
+            )
+        # Keep authenticated HTML out of shared/disk caches. Scoped to text/html
+        # so static assets (CSS/JS/icons) stay cacheable for the PWA.
+        if response.mimetype == 'text/html':
+            response.headers.setdefault('Cache-Control', 'no-store')
+        csp_header = (
+            'Content-Security-Policy-Report-Only'
+            if app.config.get('CSP_REPORT_ONLY', True)
+            else 'Content-Security-Policy'
+        )
+        response.headers.setdefault(csp_header, _CONTENT_SECURITY_POLICY)
+        return response
 
     # blueprint for auth routes in our app
     from .auth import auth as auth_blueprint
