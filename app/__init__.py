@@ -9,6 +9,7 @@ from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_wtf.csrf import CSRFProtect
+from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
@@ -268,5 +269,20 @@ def create_app():
                     "Bootstrap admin creation skipped (%s); tables may not exist yet",
                     type(exc).__name__,
                 )
+
+    # When deployed behind a reverse proxy / PaaS ingress, trust that many
+    # X-Forwarded-* hops so rate limiting keys on the real client IP rather than
+    # the proxy's address. x_proto makes request.is_secure reflect the original
+    # HTTPS scheme behind TLS termination; x_host restores the public hostname for
+    # absolute URLs (e.g. password-setup links). Set TRUSTED_PROXY_COUNT=0 when
+    # clients connect directly (no proxy) so spoofed headers are ignored.
+    _proxy_count = int(os.environ.get('TRUSTED_PROXY_COUNT', '1'))
+    if _proxy_count > 0:
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=_proxy_count,
+            x_proto=_proxy_count,
+            x_host=_proxy_count,
+        )
 
     return app

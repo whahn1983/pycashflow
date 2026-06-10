@@ -104,6 +104,18 @@ def flask_app():
     return _test_app
 
 
+@pytest.fixture(scope="session")
+def create_app():
+    """Return the real create_app factory captured before any module stubs.
+
+    Tests that need to build fresh app instances (e.g. to exercise ProxyFix
+    under different TRUSTED_PROXY_COUNT settings) must use this rather than
+    importing ``app`` directly, because other test modules replace
+    ``sys.modules['app']`` with a stub at import time.
+    """
+    return _create_app
+
+
 @pytest.fixture()
 def client(flask_app):
     """Per-test Flask test client (unauthenticated)."""
