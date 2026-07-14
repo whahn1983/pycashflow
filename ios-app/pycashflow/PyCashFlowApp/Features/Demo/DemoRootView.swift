@@ -42,16 +42,16 @@ struct DemoRootView: View {
                     .tabItem { Label("Settings", systemImage: "gearshape") }
                     .tag(DemoSection.settings)
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                DemoModeBanner()
-            }
         }
         .environmentObject(store)
         .environmentObject(nav)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $nav.showPaywall) {
+            // Open the 2-step paywall: collect the Cloud email first, then hand
+            // off to SubscriptionPaywallView (matching the login trial flow),
+            // rather than dropping the user straight onto the subscribe screen.
             NavigationStack {
-                SubscriptionPaywallView()
+                CloudActivationEmailView()
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button("Done") { nav.showPaywall = false }

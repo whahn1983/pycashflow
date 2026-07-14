@@ -171,6 +171,7 @@ struct DemoSchedulesView: View {
         .listStyle(.plain)
         .appBackground()
         .navigationTitle("Schedules")
+        .localModeBanner()
     }
 
     private func pickerRow(label: String, selection: Binding<String>, options: [String]) -> some View {

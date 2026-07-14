@@ -42,6 +42,7 @@ struct DemoHoldsView: View {
         }
         .appBackground()
         .navigationTitle("Holds")
+        .localModeBanner()
     }
 
     @ViewBuilder

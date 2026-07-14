@@ -63,6 +63,7 @@ struct DemoDashboardView: View {
         }
         .appBackground()
         .navigationTitle("Dashboard")
+        .localModeBanner()
     }
 
     private func points(_ series: [DemoProjectionEngine.SeriesPoint]) -> [ProjectionPointDTO] {
