@@ -46,7 +46,13 @@ These values are hardcoded in `PyCashFlowApp/Core/Config/Config.swift`:
 
 - `API_BASE_URL` => `https://app.pycashflow.com/api/v1`
 - `SELF_HOSTED_API_BASE_URL` => `http://127.0.0.1:5000/api/v1`
-- `APP_STORE_PRODUCT_IDS` => `com.h3consultingpartners.pycashflow.cloud.monthly`
+- `APP_STORE_PRODUCT_IDS` => `com.h3consultingpartners.pycashflow.cloud.monthly,com.h3consultingpartners.pycashflow.cloud.annual`
+
+`APP_STORE_PRODUCT_IDS` is a comma-separated list. Both the monthly and annual
+auto-renewing subscriptions unlock the same PyCashFlow Cloud access; the paywall
+lists every configured product, orders them cheapest-first, and flags the plan
+with the lowest per-month price as the best value. Add or remove product IDs
+here to change which plans appear — no other code changes are required.
 
 `APIClient` normalizes base URLs so host-only values automatically use `/api/v1`.
 For security, remote self-hosted servers must use HTTPS. Plain HTTP is only
