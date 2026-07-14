@@ -50,8 +50,11 @@ final class StoreKitSubscriptionManager: ObservableObject {
         }
 
         do {
+            // Sort by the numeric price rather than the localized display string
+            // so the monthly plan reliably precedes the higher-priced annual plan
+            // regardless of currency formatting.
             availableProducts = try await Product.products(for: AppEnvironment.appStoreProductIDs)
-                .sorted { $0.displayPrice < $1.displayPrice }
+                .sorted { $0.price < $1.price }
             if availableProducts.isEmpty {
                 errorMessage = "No App Store products are currently available."
             } else {

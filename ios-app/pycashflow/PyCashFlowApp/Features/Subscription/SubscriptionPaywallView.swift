@@ -49,8 +49,17 @@ struct SubscriptionPaywallView: View {
                         .foregroundStyle(AppTheme.textMuted)
                         .cardRow()
                 } else {
+                    if manager.availableProducts.count > 1 {
+                        Text("Choose your plan")
+                            .font(.headline)
+                            .foregroundStyle(AppTheme.textPrimary)
+                    }
+
                     ForEach(manager.availableProducts, id: \.id) { product in
                         VStack(alignment: .leading, spacing: 8) {
+                            if isBestValue(product) {
+                                bestValueBadge(savings: savingsPercent(for: product))
+                            }
                             SubscriptionDisclosure(product: product)
                             Text("Your 7 day free trial begins when activated. The \(product.displayPrice) subscription begins after the 7 day trial if not cancelled.")
                                 .font(.footnote)
@@ -114,6 +123,47 @@ struct SubscriptionPaywallView: View {
 
     private var resolvedEmail: String {
         cloudEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// A small capsule highlighting the lowest per-month plan, optionally with
+    /// how much it saves versus the pricier cadence.
+    private func bestValueBadge(savings: Int?) -> some View {
+        let label = savings.map { "Best value · Save \($0)%" } ?? "Best value"
+        return Text(label)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(AppTheme.textPrimary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(AppTheme.success.opacity(0.9), in: Capsule())
+    }
+
+    /// The plan's price normalized to a per-month figure, or `nil` when its
+    /// subscription period is unavailable (e.g. in previews).
+    private func monthlyEquivalent(for product: Product) -> Decimal? {
+        guard let period = product.subscription?.subscriptionPeriod else { return nil }
+        return SubscriptionPlanValue.monthlyEquivalentPrice(price: product.price, period: period)
+    }
+
+    private var monthlyEquivalents: [Decimal] {
+        manager.availableProducts.compactMap { monthlyEquivalent(for: $0) }
+    }
+
+    /// True only for the single plan with the lowest per-month cost when more
+    /// than one plan is offered, so ties never flag multiple "best" plans.
+    private func isBestValue(_ product: Product) -> Bool {
+        let values = monthlyEquivalents
+        guard manager.availableProducts.count > 1,
+              values.count > 1,
+              let mine = monthlyEquivalent(for: product),
+              let cheapest = values.min(),
+              values.filter({ $0 == cheapest }).count == 1 else { return false }
+        return mine == cheapest
+    }
+
+    private func savingsPercent(for product: Product) -> Int? {
+        guard manager.availableProducts.count > 1,
+              let mine = monthlyEquivalent(for: product) else { return nil }
+        return SubscriptionPlanValue.savingsPercent(monthlyEquivalent: mine, comparedTo: monthlyEquivalents)
     }
 
     private func statusLine(label: String, value: String) -> some View {
