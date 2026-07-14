@@ -32,6 +32,11 @@ final class SessionManager: ObservableObject {
     @Published var selfHostedBaseURLText: String = SessionManager.loadSelfHostedURL().absoluteString
     @Published var isNavigationInteractionLocked = false
 
+    /// Whether the app is running in standalone, offline Demo mode. Persisted so
+    /// a user who entered Demo mode returns to it on the next launch. Demo mode
+    /// takes precedence over the authenticated/login flow in `RootView`.
+    @Published var isDemoMode: Bool = SessionManager.loadDemoMode()
+
     var isAuthenticated: Bool { token != nil }
     var currentBaseURL: URL { APIClient.shared.baseURL }
 
@@ -111,6 +116,21 @@ final class SessionManager: ObservableObject {
         clear()
     }
 
+    /// Enters standalone Demo mode. There is no backend session, so any bearer
+    /// token is cleared; Demo data lives only on-device via `DemoStore`.
+    func enterDemoMode() {
+        clear()
+        isDemoMode = true
+        UserDefaults.standard.set(true, forKey: Self.demoModeKey)
+    }
+
+    /// Leaves Demo mode and returns to the login screen. Demo data is left
+    /// on-device so re-entering Demo mode restores it.
+    func exitDemoMode() {
+        isDemoMode = false
+        UserDefaults.standard.set(false, forKey: Self.demoModeKey)
+    }
+
     @discardableResult
     func updateSelfHostedBaseURL(_ value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -137,10 +157,15 @@ final class SessionManager: ObservableObject {
 
     private static let modeKey = "APP_MODE"
     private static let selfHostedURLKey = "SELF_HOSTED_API_BASE_URL"
+    private static let demoModeKey = "DEMO_MODE"
 
     private static func loadMode() -> AppMode {
         let raw = UserDefaults.standard.string(forKey: modeKey)
         return AppMode(rawValue: raw ?? "") ?? .cloud
+    }
+
+    private static func loadDemoMode() -> Bool {
+        UserDefaults.standard.bool(forKey: demoModeKey)
     }
 
     private static func loadSelfHostedURL() -> URL {

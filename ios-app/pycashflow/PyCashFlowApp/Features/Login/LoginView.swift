@@ -206,6 +206,27 @@ struct LoginView: View {
                     .surfaceCard()
                 }
 
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Just exploring?")
+                        .foregroundStyle(AppTheme.textSecondary)
+                    Button {
+                        dismissKeyboard()
+                        focusedField = nil
+                        session.enterDemoMode()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "play.circle.fill")
+                            Text("Enter Local Mode")
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    Text("Try PyCashFlow with your data stored only on this device. No account or internet required.")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.textMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
             }
             .padding(20)
         }
