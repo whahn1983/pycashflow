@@ -7,7 +7,11 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if !session.isAuthenticated {
+            if session.isDemoMode {
+                // Standalone, offline Demo mode takes precedence over the
+                // login/authenticated flow and has its own tab scaffold.
+                DemoRootView()
+            } else if !session.isAuthenticated {
                 NavigationStack {
                     LoginView()
                 }
