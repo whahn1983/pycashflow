@@ -40,7 +40,11 @@ final class DemoStore: ObservableObject {
     }
 
     /// Today's date in the device's local calendar.
-    static var todayLocal: DemoDate {
+    ///
+    /// `nonisolated` so it can be used as a default argument (e.g. `projection`),
+    /// which Swift evaluates outside the enclosing type's `@MainActor` isolation.
+    /// It touches only value types (`Calendar`, `Date`, `DemoDate`), so it's safe.
+    nonisolated static var todayLocal: DemoDate {
         let comps = Calendar.current.dateComponents([.year, .month, .day], from: Date())
         return DemoDate(comps.year ?? 2000, comps.month ?? 1, comps.day ?? 1)
     }
