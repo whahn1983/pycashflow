@@ -216,11 +216,11 @@ struct LoginView: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "play.circle.fill")
-                            Text("Enter Demo Mode")
+                            Text("Enter Local Mode")
                         }
                     }
                     .buttonStyle(PrimaryButtonStyle())
-                    Text("Try PyCashFlow with sample data stored only on this device. No account or internet required.")
+                    Text("Try PyCashFlow with your data stored only on this device. No account or internet required.")
                         .font(.caption)
                         .foregroundStyle(AppTheme.textMuted)
                         .fixedSize(horizontal: false, vertical: true)

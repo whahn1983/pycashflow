@@ -4,10 +4,14 @@ SwiftUI client for PyCashFlow backed by `/api/v1` endpoints.
 
 ## Architecture
 - `Core/Networking`: `APIClient`, endpoint construction, envelope decoding.
-- `Core/Auth`: session/token state, app mode (Cloud vs Self-Hosted), and secure token persistence.
+- `Core/Auth`: session/token state, app mode (Cloud vs Self-Hosted), Local Mode flag, and secure token persistence.
 - `Core/Billing`: StoreKit purchase + restore integration and backend billing API adapters.
 - `Core/Models`: DTOs aligned to backend response shapes.
-- `Features/*`: screen-level view models and views.
+- `Core/Demo`: standalone **Local Mode** — on-device storage and a pure-Swift
+  reimplementation of the backend cash-flow projection (no network). See
+  [Local Mode](#local-mode-offline).
+- `Features/*`: screen-level view models and views (including `Features/Demo`,
+  the Local Mode screens).
 
 ## Product Model
 
@@ -23,7 +27,57 @@ The iOS app is free to download and use. It supports two modes:
    - No App Store subscription is required by the app.
    - Server-side access rules are determined by the connected backend configuration.
 
+3. **Local Mode** (offline)
+   - Fully standalone: no backend, no account, no network.
+   - See [Local Mode](#local-mode-offline) below.
+
 There is **no global app paywall** on launch. Subscription prompts appear in hosted-cloud activation and restore contexts only.
+
+## Local Mode (offline)
+
+Local Mode lets someone use the app with no backend at all. It is entered from
+the **Enter Local Mode** button on the login screen and is remembered across
+launches (persisted via `SessionManager.isDemoMode`); it takes precedence over
+the login/authenticated flow in `RootView`.
+
+What works in Local Mode:
+
+- **Dashboard**, **Balance** (manual add/edit), **Schedules**, **Scenarios**,
+  and **Holds/Skips** — all backed by on-device data only.
+- The cash-flow **projection, running-balance chart, 90-day minimum, upcoming
+  transactions, and cash-risk score** are computed entirely on-device.
+
+What is intentionally absent (all require a backend):
+
+- No AI Insights, no Plaid, no automatic balance refresh.
+- No sync of any kind — balance, schedules, scenarios, holds/skips, and
+  projections are stored only on this device and never leave the app.
+
+Behavior and UI:
+
+- A persistent **"Local Mode Only - Subscribe"** banner sits at the top of every
+  screen; tapping it opens the subscription paywall.
+- **Settings** in Local Mode shows only a *Local Mode* card with **Subscribe**
+  (opens the paywall), **Switch to Self-Hosted Mode**, and **Logout** (which
+  exits Local Mode back to the login screen). Local data is left on-device, so
+  re-entering Local Mode restores it.
+
+Implementation notes:
+
+- `Core/Demo/DemoStore` owns all Local Mode data, persisting it to
+  `UserDefaults` (`DEMO_STATE_V1`) with the same validation rules as the API.
+- `Core/Demo/DemoProjectionEngine` re-implements the backend projection
+  (`app/cashflow.py`: `calc_schedule` → `calc_transactions` →
+  `calculate_cash_risk_score`) in pure Swift, including the fast-forward,
+  month-end day restoration, and business-day weekend rolls. `Core/Demo/DemoDate`
+  does pure-integer Gregorian date math so results are independent of
+  `Foundation.Calendar`/timezone behavior.
+- The engine was verified field-for-field against the real backend; ground-truth
+  vectors are embedded in `pycashflowTests/DemoProjectionTests`.
+
+> Note: Local Mode types keep the `Demo`-prefixed identifiers used during
+> development (`DemoStore`, `DemoProjectionEngine`, `isDemoMode`, …); only the
+> user-facing copy says "Local Mode".
 
 ## Payments & Subscription Scope (Cloud only)
 

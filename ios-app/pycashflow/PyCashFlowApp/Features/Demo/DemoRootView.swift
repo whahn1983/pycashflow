@@ -4,9 +4,9 @@ enum DemoSection: Hashable {
     case dashboard, balance, schedules, scenarios, holds, settings
 }
 
-/// Root scaffold for standalone Demo mode: a tab layout mirroring the real app
+/// Root scaffold for standalone Local Mode: a tab layout mirroring the real app
 /// (minus AI Insights, which requires a backend), with the persistent
-/// "Demo Mode Only – Subscribe" banner pinned above every tab and the
+/// "Local Mode Only - Subscribe" banner pinned above every tab and the
 /// subscription paywall reachable from the banner or Settings.
 struct DemoRootView: View {
     @EnvironmentObject private var session: SessionManager

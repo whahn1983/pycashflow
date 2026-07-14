@@ -9,10 +9,10 @@ struct DemoSettingsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Demo Mode")
+                        Text("Local Mode")
                             .font(.headline)
                             .foregroundStyle(AppTheme.textPrimary)
-                        Text("You're exploring PyCashFlow with sample data stored only on this device. Subscribe to unlock the full app with cloud sync, automatic balances, and AI insights.")
+                        Text("Your data is stored only on this device — no account, sync, or internet. Subscribe to unlock the full app with cloud sync, automatic balances, and AI insights.")
                             .font(.footnote)
                             .foregroundStyle(AppTheme.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)

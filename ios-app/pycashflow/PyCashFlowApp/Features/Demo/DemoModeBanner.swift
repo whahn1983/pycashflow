@@ -9,8 +9,8 @@ final class DemoNavigation: ObservableObject {
     func openPaywall() { showPaywall = true }
 }
 
-/// The "Demo Mode Only – Subscribe" banner pinned to the top of every Demo
-/// screen. Tapping it opens the subscription paywall.
+/// The "Local Mode Only - Subscribe" banner pinned to the top of every Local
+/// Mode screen. Tapping it opens the subscription paywall.
 struct DemoModeBanner: View {
     @EnvironmentObject private var nav: DemoNavigation
 
@@ -21,7 +21,7 @@ struct DemoModeBanner: View {
             HStack(spacing: 8) {
                 Image(systemName: "lock.circle.fill")
                     .font(.subheadline)
-                Text("Demo Mode Only")
+                Text("Local Mode Only")
                     .fontWeight(.semibold)
                 Text("-")
                     .foregroundStyle(AppTheme.textPrimary.opacity(0.7))
@@ -39,7 +39,7 @@ struct DemoModeBanner: View {
             .background(AppTheme.warning.opacity(0.95))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Demo Mode only. Tap to subscribe.")
+        .accessibilityLabel("Local Mode only. Tap to subscribe.")
         .accessibilityAddTraits(.isButton)
     }
 }
