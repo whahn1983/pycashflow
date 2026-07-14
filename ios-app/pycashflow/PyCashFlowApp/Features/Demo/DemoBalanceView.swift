@@ -91,6 +91,7 @@ struct DemoBalanceView: View {
         }
         .appBackground()
         .navigationTitle("Balance")
+        .localModeBanner()
     }
 
     private func saveBalance() {

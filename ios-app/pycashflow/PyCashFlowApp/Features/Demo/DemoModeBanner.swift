@@ -44,3 +44,18 @@ struct DemoModeBanner: View {
         .accessibilityAddTraits(.isButton)
     }
 }
+
+extension View {
+    /// Pins the persistent Local Mode banner to the top of a Local Mode screen,
+    /// reserving safe-area space so the screen's content is offset below the
+    /// banner instead of sliding underneath it.
+    ///
+    /// Applied per screen rather than once on the enclosing `TabView`, because a
+    /// `safeAreaInset` on a `TabView` does not propagate the inset into each
+    /// tab's scroll/list content and leaves the content tucked under the banner.
+    func localModeBanner() -> some View {
+        safeAreaInset(edge: .top, spacing: 0) {
+            DemoModeBanner()
+        }
+    }
+}

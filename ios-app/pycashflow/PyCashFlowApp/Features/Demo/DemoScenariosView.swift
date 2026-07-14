@@ -148,6 +148,7 @@ struct DemoScenariosView: View {
         .listStyle(.plain)
         .appBackground()
         .navigationTitle("Scenarios")
+        .localModeBanner()
     }
 
     private func pickerRow(label: String, selection: Binding<String>, options: [String]) -> some View {

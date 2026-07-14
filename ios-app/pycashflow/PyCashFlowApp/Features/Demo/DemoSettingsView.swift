@@ -42,5 +42,6 @@ struct DemoSettingsView: View {
         }
         .appBackground()
         .navigationTitle("Settings")
+        .localModeBanner()
     }
 }
