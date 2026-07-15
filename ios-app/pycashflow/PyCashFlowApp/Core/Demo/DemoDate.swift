@@ -13,7 +13,11 @@ import Foundation
 ///
 /// `weekday` follows Python's `date.weekday()` convention: Monday == 0 …
 /// Sunday == 6.
-struct DemoDate: Equatable, Comparable, Hashable, Codable {
+/// `nonisolated` so this pure value type stays usable from any isolation
+/// context (e.g. `DemoStore.todayLocal`). The target builds with default
+/// `@MainActor` isolation, which would otherwise infer main-actor isolation on
+/// this type's members even though it does only integer math.
+nonisolated struct DemoDate: Equatable, Comparable, Hashable, Codable {
     let year: Int
     let month: Int
     let day: Int
@@ -152,7 +156,7 @@ struct DemoDate: Equatable, Comparable, Hashable, Codable {
 
 /// Floored integer division (matches Python `//` for negative operands, which
 /// `addingMonths` relies on when subtracting months across year boundaries).
-private func floorDiv(_ a: Int, _ b: Int) -> Int {
+private nonisolated func floorDiv(_ a: Int, _ b: Int) -> Int {
     let q = a / b
     let r = a % b
     return (r != 0 && ((r < 0) != (b < 0))) ? q - 1 : q
@@ -160,7 +164,7 @@ private func floorDiv(_ a: Int, _ b: Int) -> Int {
 
 /// Floored modulo, paired with `floorDiv` so the remainder is always in
 /// `0..<b` for positive `b`.
-private func mod(_ a: Int, _ b: Int) -> Int {
+private nonisolated func mod(_ a: Int, _ b: Int) -> Int {
     let r = a % b
     return (r != 0 && ((r < 0) != (b < 0))) ? r + b : r
 }
